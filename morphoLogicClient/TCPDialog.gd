@@ -1,4 +1,6 @@
 extends Node
+
+var microserver_process_id = null # storing process ID of microserver for cleanup
 var TCPClient = StreamPeerTCP.new()
 var is_tcp_connected = false
 const SERVER_IP = "127.0.0.1"
@@ -7,11 +9,39 @@ signal new_data_arrived(data)
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
+	run_python_microserver()
+	await get_tree().create_timer(1).timeout
+	
 	is_tcp_connected = connect_to_microserver()
 	if  is_tcp_connected:
 		print("Connected to microserver.")
 	else:
 		print("Failed to connect to microserver!")
+		connect("tree_exiting", _exit_tree())
+
+func run_python_microserver():
+	# Executing Python script
+	var python_executable = ProjectSettings.globalize_path("res://")
+	python_executable += "microserver/kafka_env/bin/python3"
+	# if OS.get_name() == "Windows":
+	# 	python_executable = "kafka_env\\Scripts\\python.exe"
+	var script_path = ProjectSettings.globalize_path("res://")
+	script_path += "microserver/microserver.py"
+	
+	# Run the script
+	var output = []
+	microserver_process_id = OS.create_process(python_executable, [script_path])
+	print(microserver_process_id)
+	if microserver_process_id != -1:
+		print("[GODOT] Python microserver started successfully.")
+	else:
+		print("[GODOT] Failed to start Python microserver. :(")
+
+func _exit_tree():
+	# Make sure Python processed is killed (to death) when exiting godot
+	if microserver_process_id != null:
+		OS.kill(microserver_process_id) # make it suffer!
+		print("[GODOT] Python microserver has been slain.")
 
 func connect_to_microserver() -> bool:
 	var connection_result = TCPClient.connect_to_host(SERVER_IP, SERVER_PORT)

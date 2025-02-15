@@ -4,5 +4,7 @@
 			"path": "."
 		}
 	],
-	"settings": {}
+	"settings": {
+		"godotTools.editorPath.godot4": "/home/moony/.local/share/Steam/steamapps/common/Godot Engine/godot.x11.opt.tools.64"
+	}
 }

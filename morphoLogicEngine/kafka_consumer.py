@@ -45,4 +45,3 @@ if __name__ == '__main__':
     finally:
         # Leave group and commit final offsets
         consumer.close()
-        ``

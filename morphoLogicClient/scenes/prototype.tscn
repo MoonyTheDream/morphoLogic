@@ -1,7 +1,7 @@
 [gd_scene load_steps=3 format=3 uid="uid://b4h3t4jgnduk6"]
 
-[ext_resource type="Script" path="res://rich_text_label.gd" id="1_erqu5"]
-[ext_resource type="Script" path="res://line_edit.gd" id="2_cfau7"]
+[ext_resource type="Script" path="res://scenes/rich_text_label.gd" id="1_c838k"]
+[ext_resource type="Script" path="res://scenes/line_edit.gd" id="2_bj4i0"]
 
 [node name="Node2D" type="Node2D"]
 
@@ -15,6 +15,7 @@ offset_right = 40.0
 offset_bottom = 40.0
 
 [node name="RichTextLabel" type="RichTextLabel" parent="Control"]
+layout_mode = 0
 offset_left = 23.0
 offset_top = 21.0
 offset_right = 1135.0
@@ -33,13 +34,14 @@ Much better, ini't?
 "
 scroll_following = true
 selection_enabled = true
-script = ExtResource("1_erqu5")
+script = ExtResource("1_c838k")
 
 [node name="LineEdit" type="LineEdit" parent="Control"]
+layout_mode = 0
 offset_left = 19.0
 offset_top = 568.0
 offset_right = 1135.0
 offset_bottom = 612.0
 middle_mouse_paste_enabled = false
 caret_blink = true
-script = ExtResource("2_cfau7")
+script = ExtResource("2_bj4i0")

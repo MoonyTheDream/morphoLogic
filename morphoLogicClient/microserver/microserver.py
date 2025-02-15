@@ -1,6 +1,6 @@
 import socket
 import threading
-import sys
+# import sys
 from confluent_kafka import Producer, Consumer, KafkaException, KafkaError
 
 HOST = "127.0.0.1"
