@@ -1,0 +1,45 @@
+[gd_scene load_steps=3 format=3 uid="uid://b4h3t4jgnduk6"]
+
+[ext_resource type="Script" path="res://rich_text_label.gd" id="1_erqu5"]
+[ext_resource type="Script" path="res://line_edit.gd" id="2_cfau7"]
+
+[node name="Node2D" type="Node2D"]
+
+[node name="Camera2D" type="Camera2D" parent="."]
+anchor_mode = 0
+
+[node name="Control" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="RichTextLabel" type="RichTextLabel" parent="Control"]
+offset_left = 23.0
+offset_top = 21.0
+offset_right = 1135.0
+offset_bottom = 549.0
+focus_mode = 2
+text = "Now that's surely better
+I think that's exactly what I was looking for
+Hope so
+As it loooks like it
+I Ges
+It have to be it
+And it is
+yeah
+Much better, ini't?
+
+"
+scroll_following = true
+selection_enabled = true
+script = ExtResource("1_erqu5")
+
+[node name="LineEdit" type="LineEdit" parent="Control"]
+offset_left = 19.0
+offset_top = 568.0
+offset_right = 1135.0
+offset_bottom = 612.0
+middle_mouse_paste_enabled = false
+caret_blink = true
+script = ExtResource("2_cfau7")
