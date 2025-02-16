@@ -1,5 +1,5 @@
 import socket
-import threading
+# import threading
 # import sys
 from confluent_kafka import Producer, Consumer, KafkaException, KafkaError
 
@@ -116,16 +116,16 @@ def tcp_server():
     """
     Start a TCP server that listens for connections from Godot
     """
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind((HOST, PORT))
-        s.listen()
-        print(f"[PY SERVICE] Kafka service listening on {HOST}:{PORT}")
-        while True:
-            conn, addr = s.accept()
-            print(f"[PY SERVICE] Connection from {addr}")
-            # Handle connection in a seperate thread
-            client_thread = threading.Thread(target=handle_client_connection, args=(conn,))
-            client_thread.start()
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    # with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+    s.bind((HOST, PORT))
+    s.listen()
+    print(f"[PY SERVICE] Kafka service listening on {HOST}:{PORT}")
+    while True:
+        conn, addr = s.accept()
+        print(f"[PY SERVICE] Connection from {addr}")
+        # Handle connection in a seperate thread
+        handle_client_connection(conn)
 
 def main():
     try:
