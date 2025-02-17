@@ -1,6 +1,6 @@
 # TOPICS
 ## Communication server -> client
--> addresedToClients (key = username)
+-> addresedToClients (key = username) # zmieniamy założenie. Będzie topic per client
 ## Communication client -> server
 -> serverGlobalTopic 
 
