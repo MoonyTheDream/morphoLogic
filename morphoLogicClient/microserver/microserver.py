@@ -1,8 +1,6 @@
 import socket
-# import threading
-# import sys
 from confluent_kafka import Producer, Consumer, KafkaException, KafkaError
-from confluent_kafka.admin import AdminClient
+from confluent_kafka.admin import AdminClient, NewTopic
 
 class KafkaHandler():
     BOOTSTRAP_SERVER = "localhost:9092"
@@ -31,24 +29,20 @@ class KafkaHandler():
         self.consumer_config["group.id"] = client_id
         self.consumer = Consumer(self.consumer_config)
         # Create new topic for this client
-        self.topic = self._request_topic(client_id)
-        
-        # ************** WIERDO
-        del self.admin # There's no point to keep it at this point. <- That's a fair point.
-        # ************** WEIRDO
-        
+        self.topic = self._create_new_topic(client_id)
         # Subscribe to the topic
         self.consumer.subscribe([self.topic])
         
-    def _request_topic(self, topic_id):
-        dict_future_topics = self.admin.create_topics([topic_id])
+    def _create_new_topic(self, topic_id):
+        nt = NewTopic(topic_id)
+        dict_future_topics = self.admin.create_topics([nt])
         try:
             dict_future_topics[topic_id].result() # Wait for confirmation
-            print(f'Topic {topic_id} created successfully.')
+            print(f'[KAFKA] Topic {topic_id} created successfully.')
         except Exception as e:
-            print(f'Failed to create topic {topic_id}: {e}')
+            print(f'[KAFKA] Failed to create topic {topic_id}: {e}')
         
-        return True
+        return topic_id
     
     def consume_message(self):
         """
@@ -64,12 +58,12 @@ class KafkaHandler():
                 # Reached end of partition
                 return ""
             else:
-                print(f"[PY SERVICE] Error while consuming: {msg.error()}")
+                print(f"[KAFKA] Error while consuming: {msg.error()}")
                 return ""
         else:
             # We have a valid message
             msg_val = msg.value().decode("utf-8")
-            print(f"[PY SERVICE] Consumed message from {msg.topic()}: {msg_val}")
+            print(f"[KAFKA] Consumed message from {msg.topic()}: {msg_val}")
             return msg_val
         
     def produce_message(self, message):
@@ -81,14 +75,22 @@ class KafkaHandler():
             # key is a name of topic, as Server then will send optional naswer to this topic.
             self.producer.produce (self.PRODUCER_TOPIC, key=self.topic, value=message)
             # producer.poll(0)
-            print(f"[PY SERVICE] Produced message to {TOPIC}: {message}")
+            print(f"[KAFKA] Produced message to {self.PRODUCER_TOPIC}: {message}")
         except KafkaException as e:
-            print(f"[PY SERVICE] KafkaException while producing: {e}")
+            print(f"[KAFKA] KafkaException while producing: {e}")
 
+    def cleanup(self):
+        self.consumer.close()
+        self.producer.flush(3)
+        self.admin.delete_topics([self.topic])
+        
 class TCPMicroserver():
-    
+    """Will wait on connection on creation"""
     HOST = "127.0.0.1"
-    PORT = 6164
+    PORT = 6165
+    conn = None
+    username = None
+    
     
     def __init__(self):
         """
@@ -98,67 +100,68 @@ class TCPMicroserver():
         # with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind((self.HOST, self.PORT))
         s.listen()
-        print(f"[PY SERVICE] Kafka service listening on {HOST}:{PORT}")
-        while True:
-            self.conn, addr = s.accept()
-            print(f"[PY SERVICE] Connection from {addr}")
-
-    def handle_client_connection(conn):
-        """
-        Handle incoming commands from Godot over TCP
-        Commands might be:
-        - "PRODUCE <message>"
-        - "CONSUME"
-        - "EXIT"
-        """
+        print(f"[TCP] Kafka service listening on {self.HOST}:{self.PORT}")
+        self.conn, addr = s.accept()
+        print(f"[TCP] Connection from {addr}")
+        self.username = self.receive_message()
+        self.conn.setblocking(False)
+        self.conn.settimeout(0.1)
+            
+    def send_message(self, message):
         try:
-            while True:
-                data = conn.recv(1024)
-                # print(data)
-                if not data:
-                    break # Clinet disconnected
-                
-                message = data.decode("utf-8").strip()
-                print(message)
-                if not message:
-                    pass
-                
-                seperated_message = message.split(" ", 1) # Split into at most 2 parts
-                cmd = seperated_message[0].upper()
-                
-                if cmd == "PRODUCE" and len (seperated_message) == 2:
-                    conn.sendall(b"RECEIVED")
-                    message = seperated_message[1]
-                    produce_message(message)
-                elif cmd == "CONSUME" and len(seperated_message) == 1:
-                    conn.sendall(b"RECEIVED")
-                    msg = consume_message()
-                    response = msg if msg else ""
-                    conn.sendall(response.encode("utf-8") + b"\n")
-                elif cmd == "EXIT":
-                    conn.sendall(b"RECEIVED")
-                    break
-                else:
-                    # Unknown command
-                    conn.sendall(b"RECEIVED")
-                    conn.sendall(b"ERR UNKNOWN COMMAND\n")
-                    
+            coded = message.encode("utf-8")
+            self.conn.sendall(coded)
+        except OSError:
+            return False
         except Exception as e:
-            print(f"Error in client connection: {e}")
+            print(f"[TCP] Error sending message via TCP: {e}")
+    
+    def receive_message(self):
+        try:
+            data = self.conn.recv(1024)
+            if not data:
+                return 'CELANUP'
+            message = data.decode("utf-8").strip()
+            return message
+        except OSError:
+            return False
             
-        finally:
-            conn.close()
-            
+def cleanup(tcp, kafka = None):
+    if kafka:
+        kafka.cleanup()
+    tcp.conn.close()
+    print("[mL MICROSERVER] CLEAN UP AND EXIT")
 
 def main():
+    k = None
     try:
-        tcp_server()
+        tcp = TCPMicroserver()
+        print("[mL MICROSERVER] TCP connection created")
+        username = tcp.username
+        if username is None:
+            cleanup(tcp)
+        k = KafkaHandler(username)
+        print("[mL MICROSERVER] KAFKA connection created. Moving to main loop.")
+        while True:
+            # Kafka -> Godot
+            k_message = k.consume_message()
+            if k_message:
+                sent = tcp.send_message(k_message)
+                if not sent:
+                    print(f"Message {k_message} has not been sent.") # Ogarnąć co jeśli nie udało się wysłać.
+            # Kafka <- Godot
+            tcp_message = tcp.receive_message()
+            if tcp_message:
+                if tcp_message == "CLEANUP":
+                    break
+                k.produce_message(tcp_message)
     except KeyboardInterrupt:
-        print("[PY SERVICE] Shutting down service.")
-    finally:
-        # The Cleanup
-        consumer.close()
-        producer.flush(3)
+        print("[mL MICROSERVER] Shutting down service.")
+        cleanup(tcp, k)
+    except Exception as e:
+        print(f"[mL MICROSERVER] An error occured, closing down: {e}")
+        cleanup(tcp, k)
+    cleanup(tcp, k)
         
 if __name__ == "__main__":
     main()

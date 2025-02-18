@@ -25,7 +25,7 @@ if __name__ == '__main__':
                 topic=msg.topic(), key=msg.key().decode('utf-8'), value=msg.value().decode('utf-8')))
 
     # Produce data by selecting random values from these lists.
-    topic = "quickstart-events"
+    topic = "test_k"
     user_ids = ['eabara', 'jsmith', 'sgarcia', 'jbernard', 'htanaka', 'awalther']
     products = ['book', 'alarm clock', 't-shirts', 'gift card', 'batteries']
 
