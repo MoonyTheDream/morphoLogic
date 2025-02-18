@@ -1,8 +1,10 @@
+"""A Microserver working as handler between Kafka and Godot Client"""
 import socket
 from confluent_kafka import Producer, Consumer, KafkaException, KafkaError
 from confluent_kafka.admin import AdminClient, NewTopic
 
 class KafkaHandler():
+    """Kafka setup for morphoLogic Client"""
     BOOTSTRAP_SERVER = "localhost:9092"
     PRODUCER_TOPIC = 'serverGlobalTopic'
     producer_config = {
@@ -68,7 +70,7 @@ class KafkaHandler():
         
     def produce_message(self, message):
         """
-        Send a message to Kafka
+        Send a message to Kafka using the topic initialized at constructor
         """
         try:
             # Asynchronous produce; if needed, handle delivery reports with callbacks
@@ -80,18 +82,21 @@ class KafkaHandler():
             print(f"[KAFKA] KafkaException while producing: {e}")
 
     def cleanup(self):
+        """Cleanup before closing Microserver"""
         self.consumer.close()
         self.producer.flush(3)
         self.admin.delete_topics([self.topic])
         
 class TCPMicroserver():
-    """Will wait on connection on creation"""
+    """
+    TCP connection for morphoLogic Client.
+    It will hang on __init__ waiting for a connection from Godot.
+    """
     HOST = "127.0.0.1"
-    PORT = 6165
+    PORT = 6164
     conn = None
     username = None
-    
-    
+
     def __init__(self):
         """
         Start a TCP server that listens for connections from Godot
@@ -108,6 +113,7 @@ class TCPMicroserver():
         self.conn.settimeout(0.1)
             
     def send_message(self, message):
+        """Senf message to Godot via TCP"""
         try:
             coded = message.encode("utf-8")
             self.conn.sendall(coded)
@@ -115,8 +121,12 @@ class TCPMicroserver():
             return False
         except Exception as e:
             print(f"[TCP] Error sending message via TCP: {e}")
-    
+
     def receive_message(self):
+        """
+        Reveive a message from Godot via TCP
+        Godot will send "CLEANUP" before it closes itself to close the microserver too
+        """
         try:
             data = self.conn.recv(1024)
             if not data:
@@ -125,14 +135,16 @@ class TCPMicroserver():
             return message
         except OSError:
             return False
-            
+
 def cleanup(tcp, kafka = None):
+    """Cleaning up before exit"""
     if kafka:
         kafka.cleanup()
     tcp.conn.close()
     print("[mL MICROSERVER] CLEAN UP AND EXIT")
 
 def main():
+    """Main loop"""
     k = None
     try:
         tcp = TCPMicroserver()
@@ -165,4 +177,3 @@ def main():
         
 if __name__ == "__main__":
     main()
-            

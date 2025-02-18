@@ -10,14 +10,6 @@ signal new_data_arrived(data)
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
 	run_python_microserver()
-	await get_tree().create_timer(1).timeout
-	
-	is_tcp_connected = connect_to_microserver()
-	if  is_tcp_connected:
-		print("Connected to microserver.")
-	else:
-		print("Failed to connect to microserver!")
-		connect("tree_exiting", _exit_tree())
 
 func run_python_microserver():
 	# Executing Python script
@@ -29,60 +21,58 @@ func run_python_microserver():
 	script_path += "microserver/microserver.py"
 	
 	# Run the script
-	var output = []
 	microserver_process_id = OS.create_process(python_executable, [script_path])
-	print(microserver_process_id)
+	# print(microserver_process_id)
 	if microserver_process_id != -1:
 		print("[GODOT] Python microserver started successfully.")
 	else:
 		print("[GODOT] Failed to start Python microserver. :(")
 
+func initialize_connection(username: String) -> void:
+	is_tcp_connected = connect_to_microserver()
+	if  is_tcp_connected:
+		print("Connected to microserver.")
+	else:
+		print("Failed to connect to microserver!")
+		connect("tree_exiting", _exit_tree())
+		return
+	send_tcp_message(username)
+	var tcp_t = Thread.new()
+	tcp_t.start(continously_receive_messages)
+
 func _exit_tree():
 	# Make sure Python processed is killed (to death) when exiting godot
-	if microserver_process_id != null:
-		OS.kill(microserver_process_id) # make it suffer!
-		print("[GODOT] Python microserver has been slain.")
+	send_tcp_message("CLEANUP")
+	print("[GODOT] Python microserver has been slain.")
 
 func connect_to_microserver() -> bool:
 	var connection_result = TCPClient.connect_to_host(SERVER_IP, SERVER_PORT)
 	if connection_result == OK:
+		print("Connected to %s" % TCPClient.get_connected_host())
 		return true
 	else:
 		print("An error occured: %s" % connection_result)
 	return false
 
-func send_tcp_message(message: String):
+func continously_receive_messages() -> void:
+	while true:
+		TCPClient.poll()
+		if is_tcp_connected and TCPClient.get_status() == StreamPeerTCP.STATUS_CONNECTED:
+			var available_bytes = TCPClient.get_available_bytes()
+			if available_bytes > 0:
+				var received_data = TCPClient.get_utf8_string(available_bytes)
+				new_data_arrived.emit(received_data)
+
+func send_tcp_message(message: String) -> void:
 	TCPClient.poll()
 	if is_tcp_connected and TCPClient.get_status() == StreamPeerTCP.STATUS_CONNECTED:
 		var data = message.to_utf8_buffer()
 		TCPClient.put_data(data)
-		_ask_for_confirmation()
 		print(data)
 		#TCPClient.put_utf8_string(message)
 	else:
 		print("Not connected. Message \"%s\" has not been sent." % message)
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
-func _process(delta: float) -> void:
-	TCPClient.poll()
-	if is_tcp_connected and TCPClient.get_status() == StreamPeerTCP.STATUS_CONNECTED:
-		var available_bytes = TCPClient.get_available_bytes()
-		if available_bytes > 0:
-			var received_data = TCPClient.get_utf8_string(available_bytes)
-			if received_data != "RECEIVED":
-				new_data_arrived.emit(received_data)
-		else:
-			send_tcp_message("CONSUME")
-			
-			
-			
-func _ask_for_confirmation() -> bool:
-	while true:
-		if is_tcp_connected and TCPClient.get_status() == StreamPeerTCP.STATUS_CONNECTED:
-			var available_bytes = TCPClient.get_available_bytes()
-			if available_bytes > 0:
-				var received_data = TCPClient.get_utf8_string(available_bytes)
-				if received_data == "RECEIVED":
-					return true
-			else: continue
-	return false
+func _process(_delta: float) -> void:
+	pass
