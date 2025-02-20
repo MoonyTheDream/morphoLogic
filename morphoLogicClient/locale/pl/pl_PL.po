@@ -1,0 +1,40 @@
+# LANGUAGE translation for morphoLogicClient for the following files:
+# res://scenes/line_edit.gd
+#
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: morphoLogicClient\n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: pl_PL\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 3.5\n"
+
+#: scenes/line_edit.gd
+msgid "Please provide your [color=teal]username[/color].\n"
+msgstr ""
+"Ukochany użytkowniku. Bądź łaskaw zdradzić [color=teal]jak zwą Cię[/color] w "
+"twych stronach.\n"
+
+#: scenes/line_edit.gd
+msgid "Please don't use any spaces in your username.\n"
+msgstr "Ale nie rozgaduj mi się i jednym słowem się opisz!\n"
+
+#: scenes/line_edit.gd
+msgid ""
+"Welcome, [color=teal]{username}[/color]! Let me see if you are on the invite "
+"guest.\n"
+msgstr ""
+"Witaj zatem, [color=teal]{username}[/color]! Niech no spojrzę czy na liście "
+"Ciebie mamy.\n"
+
+#: scenes/rich_text_label.gd
+msgid "Connecting...\n"
+msgstr "Przebudzanie i odzyskiwanie kontaktu z otoczeniem...\n"

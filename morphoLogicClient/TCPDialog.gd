@@ -1,6 +1,6 @@
 extends Node
 
-var microserver_process_id = null # storing process ID of microserver for cleanup
+# var microserver_process_id = null # storing process ID of microserver for cleanup
 var TCPClient = StreamPeerTCP.new()
 var is_tcp_connected = false
 const SERVER_IP = "127.0.0.1"
@@ -21,7 +21,7 @@ func run_python_microserver():
 	script_path += "microserver/microserver.py"
 	
 	# Run the script
-	microserver_process_id = OS.create_process(python_executable, [script_path])
+	var microserver_process_id = OS.create_process(python_executable, [script_path])
 	# print(microserver_process_id)
 	if microserver_process_id != -1:
 		print("[GODOT] Python microserver started successfully.")
@@ -29,13 +29,20 @@ func run_python_microserver():
 		print("[GODOT] Failed to start Python microserver. :(")
 
 func initialize_connection(username: String) -> void:
+	var txt_f = get_node("%MainTextField")
 	is_tcp_connected = connect_to_microserver()
+	var message = ""
 	if  is_tcp_connected:
-		print("Connected to microserver.")
+		message = "Connected to microserver."
+		print(message)
+
 	else:
-		print("Failed to connect to microserver!")
+		message = "Failed to connect to microserver!"
+		print(message)
 		connect("tree_exiting", _exit_tree())
 		return
+
+	message = txt_f.draw_new_message(message)
 	send_tcp_message(username)
 	var tcp_t = Thread.new()
 	tcp_t.start(continously_receive_messages)
@@ -68,7 +75,7 @@ func send_tcp_message(message: String) -> void:
 	if is_tcp_connected and TCPClient.get_status() == StreamPeerTCP.STATUS_CONNECTED:
 		var data = message.to_utf8_buffer()
 		TCPClient.put_data(data)
-		print(data)
+		# print(data)
 		#TCPClient.put_utf8_string(message)
 	else:
 		print("Not connected. Message \"%s\" has not been sent." % message)
