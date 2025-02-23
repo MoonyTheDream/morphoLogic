@@ -7,9 +7,9 @@ func _ready() -> void:
 
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
-func _process(delta: float) -> void:
+func _process(_delta: float) -> void:
 	#connect("TCPClient.new_data_arrived", _draw_new_message_from_server)
 	pass
 	
-func draw_new_message(text: String) -> void:
-	self.append_text(text)
+func draw_new_message(message: String) -> void:
+	self.append_text(message)

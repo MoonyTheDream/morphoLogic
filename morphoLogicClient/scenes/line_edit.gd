@@ -1,53 +1,83 @@
 extends LineEdit
 
-var inputList = []
-@export var inputListNumber = 25
-var cursor = 0
+var inputList = [] # A list of sent messages
+@export var inputListNumber = 25 # Max number of remembered sent messages
+var cursor = 0 # Current position in inputListNumber
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
-	inputList.append("placeholder") # occupying the 0 position - will be needed later
-	self.text_submitted.connect(_inputConfiguration)
-	await get_tree().create_timer(0.30).timeout
-	await self.request_username()
+	grab_focus()
+	inputList.append("") # occupying the 0 position, so any other will take subsequent place
+	self.text_submitted.connect(_inputHandler) # later it will be part of _send_to_tcp
+	await get_tree().create_timer(0.30).timeout # Better UX and time for other services to start
+	
+	var username = await self.request_username()
+	TCPDialog.initialize_connection(_client_auth_json(username))
+
+	self.text_submitted.disconnect(_inputHandler)
 	self.text_submitted.connect(_send_to_tcp)
 
-func _inputConfiguration(message: String):
-	var buffor = message
+func _inputHandler(message: String, strip = true) -> void:
+	self.cursor = 0
+	if strip:
+		message.strip_edges()
 	self.select_all()
+	for s in inputList:
+		if message == s:
+			return
+	_append(message)
+	
+func _append(message: String) -> void:
 	if inputList.size() < inputListNumber:
-		inputList.append(buffor)
+		inputList.append(message)
 	else:
-		inputList = inputList.pop_front()
-		inputList.append(buffor)
+		inputList.pop_front()
+		inputList.append(message)
 
+func _send_to_tcp(message: String) -> void:
+	_inputHandler(message)
+	TCPDialog.send_tcp_message(message)
+	
 func _up():
-	# if self.inputList[0] == self.text:
-
-	self.inputList[0] = self.text
-	self.cursor = 25 % self.inputList.size()
+	_if_at_zero(true)
+	self.cursor = (self.cursor - 1) % self.inputList.size()
+	if self.cursor == -1:
+		self.cursor = self.inputList.size() - 1
 	self.text = self.inputList[self.cursor]
+	self.select_all()
 
 func _down():
-	self.inputList[0] = self.text
-	self.cursor += 1
+	_if_at_zero()
+	self.cursor = (self.cursor + 1) % self.inputList.size()
 	self.text = self.inputList[self.cursor]
+	self.select_all()
+
+func _if_at_zero(is_up=false):
+	if self.cursor == 0:
+		if inputList[inputList.size()-1] != text:
+			self.inputList[0] = self.text
+		elif is_up:
+			cursor -=1
 
 func _esc():
-	if self.text != self.inputList[0]:
-		self.text = self.inputList[0]
+	if cursor != 0:
+		text = inputList[0]
+		cursor = 0
 	else:
 		self.text = ""
-	self.cursor = 0
+	grab_focus()
+	select_all()
 
-	
+func _enter_key():
+	if not has_focus():
+		grab_focus()
+		select_all()
 
-
-func request_username():
+func request_username() -> String:
 	var answer = ""
 	var txt_f = get_node("%MainTextField")
-	var entry_message = tr("Please provide your [color=teal]username[/color].\n")
-	entry_message = "[pulse freq=1.0 color=#ffffff40 ease=-2.0]" + entry_message + "[/pulse]"
+	var entry_message = tr("Please provide your [color=medium_turquoise]username[/color].\n")
+	entry_message = "[pulse freq=0.5 color=#ffffff60 ease=2.0]" + entry_message + "[/pulse]"
 	
 	txt_f.draw_new_message(entry_message)
 
@@ -61,17 +91,34 @@ func request_username():
 			if " " in answer:
 				txt_f.draw_new_message(tr("Please don't use any spaces in your username.\n"))
 				continue
-			txt_f.draw_new_message(tr("Welcome, [color=teal]{username}[/color]! Let me see if you are on the invite guest.\n").format({username = answer}))
-			break
+			if not is_valid_username(answer):
+				txt_f.draw_new_message(tr('You can only use letters, digits and "_", "-".\n'))
+				continue
+			txt_f.draw_new_message(tr("Welcome, [color=medium_turquoise]{username}[/color]! Let me see if you are on the invite guest.\n").format({username = answer}))
+			return answer
+	return ""
+
+func is_valid_username(username_text: String) -> bool:
+	var regex = RegEx.new()
+	regex.compile("^[\\p{L}0-9_-]+$")  # Allows only letters, numbers, _ and -
+	return regex.search(username_text) != null
+
+func _client_auth_json(username: String) -> String:
+	var data = {
+		"username": username,
+		"client_version": ClientData.version
+	}
+	return JSON.stringify(data)
 
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
-func _process(delta: float) -> void:
-	if Input.is_action_pressed("key_up"):
+func _process(_delta: float) -> void:
+	if Input.is_action_just_pressed("key_up"):
 		_up()
 	if Input.is_action_just_pressed("key_down"):
 		_down()
+	if Input.is_action_just_pressed("enter_key"):
+		_enter_key()
+	if Input.is_action_just_pressed("key_esc"):
+		_esc()
 	
-func _send_to_tcp(text: String) -> void:
-	text.strip_edges()
-	TCPDialog.send_tcp_message(text)

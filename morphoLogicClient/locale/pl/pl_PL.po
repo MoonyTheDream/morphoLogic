@@ -18,22 +18,29 @@ msgstr ""
 "X-Generator: Poedit 3.5\n"
 
 #: scenes/line_edit.gd
-msgid "Please provide your [color=teal]username[/color].\n"
+msgid "Please provide your [color=medium_turquoise]username[/color].\n"
 msgstr ""
-"Ukochany użytkowniku. Bądź łaskaw zdradzić [color=teal]jak zwą Cię[/color] w "
-"twych stronach.\n"
+"Ukochany użytkowniku. Bądź łaskaw zdradzić [color=medium_turquoise]jak zwą "
+"Cię[/color] w twych stronach.\n"
 
 #: scenes/line_edit.gd
 msgid "Please don't use any spaces in your username.\n"
 msgstr "Ale nie rozgaduj mi się i jednym słowem się opisz!\n"
 
 #: scenes/line_edit.gd
-msgid ""
-"Welcome, [color=teal]{username}[/color]! Let me see if you are on the invite "
-"guest.\n"
+msgid "You can only use letters, digits and \"_\", \"-\".\n"
 msgstr ""
-"Witaj zatem, [color=teal]{username}[/color]! Niech no spojrzę czy na liście "
-"Ciebie mamy.\n"
+"Proszę o wybaczenie, ale czy mógłbym poprosić o ponowne przedstawienie? I "
+"proszę się nie gniewać, lecz symbole inne niż \"_\", czy \"-\" nie są zbyt "
+"dobrze mi znane. \n"
+
+#: scenes/line_edit.gd
+msgid ""
+"Welcome, [color=medium_turquoise]{username}[/color]! Let me see if you are "
+"on the invite guest.\n"
+msgstr ""
+"Witaj zatem, [color=medium_turquoise]{username}[/color]! Niech no spojrzę "
+"czy na liście Ciebie mamy.\n"
 
 #: scenes/rich_text_label.gd
 msgid "Connecting...\n"

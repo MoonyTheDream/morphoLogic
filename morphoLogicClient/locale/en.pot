@@ -13,7 +13,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8-bit\n"
 
 #: scenes/line_edit.gd
-msgid "Please provide your [color=teal]username[/color].\n"
+msgid "Please provide your [color=medium_turquoise]username[/color].\n"
 msgstr ""
 
 #: scenes/line_edit.gd
@@ -21,7 +21,15 @@ msgid "Please don't use any spaces in your username.\n"
 msgstr ""
 
 #: scenes/line_edit.gd
-msgid "Welcome, [color=teal]{username}[/color]! Let me see if you are on the invite guest.\n"
+msgid "You can only use letters, digits and \"_\", \"-\".\n"
+msgstr ""
+
+#: scenes/line_edit.gd
+msgid "Welcome, [color=medium_turquoise]{username}[/color]! Let me see if you are on the invite guest.\n"
+msgstr ""
+
+#: scenes/line_edit.gd
+msgid ""
 msgstr ""
 
 #: scenes/rich_text_label.gd

@@ -1,26 +1,65 @@
-[gd_scene load_steps=3 format=3 uid="uid://b4h3t4jgnduk6"]
+[gd_scene load_steps=8 format=3 uid="uid://b4h3t4jgnduk6"]
 
 [ext_resource type="Script" path="res://scenes/rich_text_label.gd" id="1_c838k"]
+[ext_resource type="FontFile" uid="uid://b2qnutwcbw7pr" path="res://fonts/quaaykop-font/Quaaykop-DYE1R.ttf" id="1_saump"]
 [ext_resource type="Script" path="res://scenes/line_edit.gd" id="2_bj4i0"]
+[ext_resource type="Texture2D" uid="uid://dn5of4l8x8vqp" path="res://images/blurred_painting.png" id="4_re2a1"]
 
-[node name="BasicView" type="Node2D"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1ogr5"]
+bg_color = Color(0, 0, 0, 0.321569)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.657, 0.9, 0.8676, 0.737255)
+border_blend = true
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 2
+expand_margin_left = 8.0
+expand_margin_right = 8.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_gbnq0"]
+bg_color = Color(0, 0, 0, 0.0980392)
+expand_margin_left = 8.0
+expand_margin_right = 8.0
+
+[sub_resource type="Theme" id="Theme_68rva"]
+default_font = ExtResource("1_saump")
+default_font_size = 34
+LineEdit/colors/selection_color = Color(0.347388, 0.515218, 0.414999, 1)
+LineEdit/styles/focus = SubResource("StyleBoxFlat_1ogr5")
+LineEdit/styles/normal = SubResource("StyleBoxFlat_gbnq0")
+
+[node name="BasicView" type="Node"]
 
 [node name="Camera2D" type="Camera2D" parent="."]
 anchor_mode = 0
 
 [node name="MainTextControls" type="Control" parent="."]
+unique_name_in_owner = true
 layout_mode = 3
-anchors_preset = 0
-offset_right = 40.0
-offset_bottom = 40.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = SubResource("Theme_68rva")
+metadata/_edit_use_anchors_ = true
+
+[node name="Sprite2D" type="Sprite2D" parent="MainTextControls"]
+position = Vector2(944, -38)
+scale = Vector2(1.08178, 1.08178)
+texture = ExtResource("4_re2a1")
 
 [node name="MainTextField" type="RichTextLabel" parent="MainTextControls"]
 unique_name_in_owner = true
 layout_mode = 0
 offset_left = 23.0
 offset_top = 21.0
-offset_right = 1135.0
-offset_bottom = 549.0
+offset_right = 1893.0
+offset_bottom = 909.0
 focus_mode = 2
 bbcode_enabled = true
 scroll_following = true
@@ -30,10 +69,10 @@ script = ExtResource("1_c838k")
 [node name="InputField" type="LineEdit" parent="MainTextControls"]
 unique_name_in_owner = true
 layout_mode = 0
-offset_left = 19.0
-offset_top = 568.0
-offset_right = 1135.0
-offset_bottom = 612.0
+offset_left = 18.0
+offset_top = 968.0
+offset_right = 1895.0
+offset_bottom = 1042.0
 middle_mouse_paste_enabled = false
 caret_blink = true
 script = ExtResource("2_bj4i0")

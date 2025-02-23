@@ -1,4 +1,5 @@
 """A Microserver working as handler between Kafka and Godot Client"""
+import json
 import socket
 from confluent_kafka import Producer, Consumer, KafkaException, KafkaError
 from confluent_kafka.admin import AdminClient, NewTopic
@@ -22,18 +23,24 @@ class KafkaHandler():
         'auto.offset.reset': 'earliest'
     }
     
-    def __init__(self, client_id):
-        # AdminClient
-        self.admin = AdminClient({'bootstrap.servers': self.BOOTSTRAP_SERVER})
-        # Producer
-        self.producer = Producer(self.producer_config)
-        # Consumer
-        self.consumer_config["group.id"] = client_id
-        self.consumer = Consumer(self.consumer_config)
-        # Create new topic for this client
-        self.topic = self._create_new_topic(client_id)
-        # Subscribe to the topic
-        self.consumer.subscribe([self.topic])
+    def __init__(self, client_info):
+        client_data = json.loads(client_info)
+        client_id = client_data.get("username", "")
+        if client_id:
+            # AdminClient
+            self.admin = AdminClient({'bootstrap.servers': self.BOOTSTRAP_SERVER})
+            # Producer
+            self.producer = Producer(self.producer_config)
+            # Consumer
+            self.consumer_config["group.id"] = client_id
+            self.consumer = Consumer(self.consumer_config)
+            # Create new topic for this client
+            self.topic = self._create_new_topic(client_id)
+            # Subscribe to the topic
+            self.consumer.subscribe([self.topic])
+            self.initialized = True
+        else:
+            self.initialized = False
         
     def _create_new_topic(self, topic_id):
         nt = NewTopic(topic_id)
@@ -95,7 +102,7 @@ class TCPMicroserver():
     HOST = "127.0.0.1"
     PORT = 6164
     conn = None
-    username = None
+    client_data = None
 
     def __init__(self):
         """
@@ -108,7 +115,7 @@ class TCPMicroserver():
         print(f"[TCP] Kafka service listening on {self.HOST}:{self.PORT}")
         self.conn, addr = s.accept()
         print(f"[TCP] Connection from {addr}")
-        self.username = self.receive_message()
+        self.client_data = self.receive_message()
         self.conn.setblocking(False)
         self.conn.settimeout(0.1)
             
@@ -149,10 +156,14 @@ def main():
     try:
         tcp = TCPMicroserver()
         print("[mL MICROSERVER] TCP connection created")
-        username = tcp.username
-        if username is None:
+        client_data = tcp.client_data
+        if client_data is None:
             cleanup(tcp)
-        k = KafkaHandler(username)
+            return
+        k = KafkaHandler(client_data)
+        if not k.initialized:
+            cleanup(tcp, k)
+            return
         print("[mL MICROSERVER] KAFKA connection created. Moving to main loop.")
         while True:
             # Kafka -> Godot

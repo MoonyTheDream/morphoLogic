@@ -6,10 +6,12 @@ var is_tcp_connected = false
 const SERVER_IP = "127.0.0.1"
 const SERVER_PORT = 6164
 signal new_data_arrived(data)
+var root
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
 	run_python_microserver()
+	root = get_tree().root
 
 func run_python_microserver():
 	# Executing Python script
@@ -28,8 +30,8 @@ func run_python_microserver():
 	else:
 		print("[GODOT] Failed to start Python microserver. :(")
 
-func initialize_connection(username: String) -> void:
-	var txt_f = get_node("%MainTextField")
+func initialize_connection(client_data: String) -> void:
+	var txt_f = root.get_node("BasicView/MainTextControls/MainTextField")
 	is_tcp_connected = connect_to_microserver()
 	var message = ""
 	if  is_tcp_connected:
@@ -42,8 +44,8 @@ func initialize_connection(username: String) -> void:
 		connect("tree_exiting", _exit_tree())
 		return
 
-	message = txt_f.draw_new_message(message)
-	send_tcp_message(username)
+	txt_f.draw_new_message(message)
+	send_tcp_message(client_data)
 	var tcp_t = Thread.new()
 	tcp_t.start(continously_receive_messages)
 
@@ -63,7 +65,7 @@ func connect_to_microserver() -> bool:
 
 func continously_receive_messages() -> void:
 	while true:
-		TCPClient.poll()
+		var debug = TCPClient.poll()
 		if is_tcp_connected and TCPClient.get_status() == StreamPeerTCP.STATUS_CONNECTED:
 			var available_bytes = TCPClient.get_available_bytes()
 			if available_bytes > 0:
@@ -72,6 +74,7 @@ func continously_receive_messages() -> void:
 
 func send_tcp_message(message: String) -> void:
 	TCPClient.poll()
+	# var debug = TCPClient.get_status()
 	if is_tcp_connected and TCPClient.get_status() == StreamPeerTCP.STATUS_CONNECTED:
 		var data = message.to_utf8_buffer()
 		TCPClient.put_data(data)
