@@ -1,6 +1,7 @@
-"""A Microserver working as handler between Kafka and Godot Client"""
+"""A Microserver working as bridge between Kafka and Godot Client"""
 import json
 import logging
+import os
 import socket
 import sys
 
@@ -8,14 +9,26 @@ from logging.handlers import RotatingFileHandler
 from confluent_kafka import Producer, Consumer, KafkaException, KafkaError
 from confluent_kafka.admin import AdminClient, NewTopic
 
-DEBUG = True  # Change to false in production
+SETTINGS_FILE = "settings.json"
+
+def load_settings():
+    """Load global settings from JSON file"""
+    if not os.path.exists(SETTINGS_FILE):
+        raise FileNotFoundError(f"Settings file {SETTINGS_FILE} not found.")
+    
+    with open(SETTINGS_FILE, "r") as f:
+        return json.load(f)
+
+_SETTINGS = load_settings()
+
+DEBUG = _SETTINGS.get("log_level_debug", False) #Change to false in settings.json for .debug visible
 logger = logging.getLogger("mL microserver")
 
 
 class KafkaHandler():
     """Kafka setup for morphoLogic Client"""
-    BOOTSTRAP_SERVER = "localhost:9092"
-    PRODUCER_TOPIC = 'serverGlobalTopic'
+    BOOTSTRAP_SERVER = _SETTINGS.get("kafka_server")
+    PRODUCER_TOPIC = _SETTINGS.get('generalTopic')
     producer_config = {
         'bootstrap.servers': BOOTSTRAP_SERVER,
 
@@ -32,6 +45,7 @@ class KafkaHandler():
     }
 
     def __init__(self, client_info):
+        # user information wrapped to json by the Godot with answer for Username
         client_data = json.loads(client_info)
         client_id = client_data.get("username", "")
         
@@ -57,9 +71,11 @@ class KafkaHandler():
                 self.initialized = True
             except Exception:
                 logger.exception("Failed to initialize Kafka connection.")
-                self.initialized = False
+                cleanup()
         else:
-            self.initialized = False
+            logger.warning("Failed to initialize Kafka connection.")
+            cleanup()
+
 
     def _create_new_topic(self, topic_id):
         nt = NewTopic(topic_id)
@@ -69,7 +85,7 @@ class KafkaHandler():
             logger.info('Topic %s created successfully.', topic_id)
         except Exception:
             logger.exception('Failed to create topic %s.', topic_id)
-
+            cleanup(kafka=self)
         return topic_id
 
     def consume_message(self):
@@ -99,7 +115,7 @@ class KafkaHandler():
         """
         try:
             # Asynchronous produce; if needed, handle delivery reports with callbacks
-            # key is a name of topic, as Server then will send optional naswer to this topic.
+            # key is a name of topic, as Server then will send optional answer to this topic.
             self.producer.produce(self.PRODUCER_TOPIC,
                                   key=self.topic, value=message)
             # producer.poll(0)
@@ -175,7 +191,7 @@ class TCPMicroserver():
         #     sys.exit(1)  # Exit if no connection
         except Exception:
             logger.exception("Unexpected error setting up TCP connection.")
-            sys.exit(1)
+            cleanup()
 
     def send_message(self, message) -> bool:
         """Senf message to Godot via TCP"""
@@ -199,19 +215,21 @@ class TCPMicroserver():
         try:
             data = self.conn.recv(1024)
             if not data:
-                return 'CELANUP'
+                cleanup(self)
             message = data.decode("utf-8").strip()
             return message
         except OSError:
             return False
 
 
-def cleanup(tcp, kafka=None):
+def cleanup(tcp=None, kafka=None):
     """Cleaning up before exit"""
     if kafka:
         kafka.cleanup()
-    tcp.conn.close()
+    if tcp:
+        tcp.conn.close()
     logger.info("CLEAN UP AND EXIT")
+    sys.exit()
 
 
 def setup_logger():
