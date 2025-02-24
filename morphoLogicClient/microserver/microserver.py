@@ -1,12 +1,18 @@
 """A Microserver working as handler between Kafka and Godot Client"""
 import json
+import logging
 import socket
+
+from logging.handlers import RotatingFileHandler
 from confluent_kafka import Producer, Consumer, KafkaException, KafkaError
 from confluent_kafka.admin import AdminClient, NewTopic
 
+DEBUG = False # Change to false in production
+logger = logging.getLogger("mL microserver")
+
 class KafkaHandler():
     """Kafka setup for morphoLogic Client"""
-    BOOTSTRAP_SERVER = "localhost:9092"
+    BOOTSTRAP_SERVER = "localhost:9092" 
     PRODUCER_TOPIC = 'serverGlobalTopic'
     producer_config = {
         'bootstrap.servers': BOOTSTRAP_SERVER,
@@ -47,9 +53,9 @@ class KafkaHandler():
         dict_future_topics = self.admin.create_topics([nt])
         try:
             dict_future_topics[topic_id].result() # Wait for confirmation
-            print(f'[KAFKA] Topic {topic_id} created successfully.')
-        except Exception as e:
-            print(f'[KAFKA] Failed to create topic {topic_id}: {e}')
+            logger.info('Topic %s created successfully.', topic_id)
+        except Exception:
+            logger.exception('Failed to create topic %s.', topic_id)
         
         return topic_id
     
@@ -66,13 +72,12 @@ class KafkaHandler():
             if msg.error().code() == KafkaError._PARTITION_EOF:
                 # Reached end of partition
                 return ""
-            else:
-                print(f"[KAFKA] Error while consuming: {msg.error()}")
-                return ""
+            logger.error("Error while consuming: %s", msg.error())
+            return ""
         else:
             # We have a valid message
             msg_val = msg.value().decode("utf-8")
-            print(f"[KAFKA] Consumed message from {msg.topic()}: {msg_val}")
+            logger.debug("Consumed message from %s: %s", msg.topic(),  msg_val)
             return msg_val
         
     def produce_message(self, message):
@@ -84,15 +89,20 @@ class KafkaHandler():
             # key is a name of topic, as Server then will send optional naswer to this topic.
             self.producer.produce (self.PRODUCER_TOPIC, key=self.topic, value=message)
             # producer.poll(0)
-            print(f"[KAFKA] Produced message to {self.PRODUCER_TOPIC}: {message}")
-        except KafkaException as e:
-            print(f"[KAFKA] KafkaException while producing: {e}")
+            logger.debug("Produced message to %s: %s", self.PRODUCER_TOPIC, message)
+        except KafkaException:
+            logger.exception("KafkaException while producing message")
 
     def cleanup(self):
         """Cleanup before closing Microserver"""
         self.consumer.close()
         self.producer.flush(3)
-        self.admin.delete_topics([self.topic])
+        dict_future_topics = self.admin.delete_topics([self.topic])
+        try:
+            dict_future_topics[self.topic].result() # Wait for confirmation
+            logger.info('Topic %s deleted successfully.', self.topic)
+        except Exception:
+            logger.exception('Failed to delete topic %s.', self.topic)
         
 class TCPMicroserver():
     """
@@ -112,9 +122,9 @@ class TCPMicroserver():
         # with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind((self.HOST, self.PORT))
         s.listen()
-        print(f"[TCP] Kafka service listening on {self.HOST}:{self.PORT}")
+        logger.info("Kafka service listening on %s:%s", self.HOST, self.PORT)
         self.conn, addr = s.accept()
-        print(f"[TCP] Connection from {addr}")
+        logger.info("Connection from %s", addr)
         self.client_data = self.receive_message()
         self.conn.setblocking(False)
         self.conn.settimeout(0.1)
@@ -126,8 +136,8 @@ class TCPMicroserver():
             self.conn.sendall(coded)
         except OSError:
             return False
-        except Exception as e:
-            print(f"[TCP] Error sending message via TCP: {e}")
+        except Exception:
+            logger.exception("Error sending message via TCP.")
 
     def receive_message(self):
         """
@@ -148,14 +158,30 @@ def cleanup(tcp, kafka = None):
     if kafka:
         kafka.cleanup()
     tcp.conn.close()
-    print("[mL MICROSERVER] CLEAN UP AND EXIT")
+    logger.info("CLEAN UP AND EXIT")
+
+def setup_logger():
+    """Preparing logger for microserver"""
+    log_file = "microserver/microserver.log"
+    log_handler = RotatingFileHandler(
+        log_file, maxBytes=5*1024*1024, backupCount=3  # 5MB per file, keep 3 backups
+    )
+    formatter = logging.Formatter(
+        "%(asctime)s [%(levelname)s][%(name)s]: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    log_handler.setFormatter(formatter)
+    logger.setLevel(logging.DEBUG if DEBUG else logging.INFO)
+    logger.addHandler(log_handler)
 
 def main():
     """Main loop"""
+    setup_logger()
+    # Prepare connection
     k = None
     try:
         tcp = TCPMicroserver()
-        print("[mL MICROSERVER] TCP connection created")
+        logger.info("TCP connection created")
         client_data = tcp.client_data
         if client_data is None:
             cleanup(tcp)
@@ -164,14 +190,16 @@ def main():
         if not k.initialized:
             cleanup(tcp, k)
             return
-        print("[mL MICROSERVER] KAFKA connection created. Moving to main loop.")
+        logger.info("KAFKA connection created. Moving to main loop.")
+        
+        # Main loop
         while True:
             # Kafka -> Godot
             k_message = k.consume_message()
             if k_message:
                 sent = tcp.send_message(k_message)
                 if not sent:
-                    print(f"Message {k_message} has not been sent.") # Ogarnąć co jeśli nie udało się wysłać.
+                    logger.warning("Message %s has not been sent.", k_message) # Ogarnąć co jeśli nie udało się wysłać.
             # Kafka <- Godot
             tcp_message = tcp.receive_message()
             if tcp_message:
@@ -179,10 +207,10 @@ def main():
                     break
                 k.produce_message(tcp_message)
     except KeyboardInterrupt:
-        print("[mL MICROSERVER] Shutting down service.")
+        logger.info("Shutting down service.")
         cleanup(tcp, k)
-    except Exception as e:
-        print(f"[mL MICROSERVER] An error occured, closing down: {e}")
+    except Exception:
+        logger.exception("An error occured, closing down.")
         cleanup(tcp, k)
     cleanup(tcp, k)
         

@@ -1,10 +1,6 @@
-import time
+# import time
 from confluent_kafka import Consumer
 
-def terazumnie(heheszki):
-    print("Teraz jestes u mnie hue hue")
-    time.sleep(0.5)
-    print(heheszki)
     
 if __name__ == '__main__':
 
@@ -13,7 +9,7 @@ if __name__ == '__main__':
         'bootstrap.servers': 'localhost:9092',
 
         # Fixed properties
-        'group.id':          'kafka-python-getting-started',
+        'group.id':          'serverGlobalTopic',
         'auto.offset.reset': 'earliest'
     }
 
@@ -21,7 +17,7 @@ if __name__ == '__main__':
     consumer = Consumer(config)
 
     # Subscribe to topic
-    topic = "quickstart-events"
+    topic = "serverGlobalTopic"
     consumer.subscribe([topic])
 
     # Poll for new messages from Kafka and print them.
@@ -39,7 +35,8 @@ if __name__ == '__main__':
                 # Extract the (optional) key and value, and print.
                 heheszki = str("Consumed event from topic {topic}: key = {key:12} value = {value:12}".format(
                     topic=msg.topic(), key=msg.key().decode('utf-8') if msg.key() else "", value=msg.value().decode('utf-8')))
-                terazumnie(heheszki)
+                # terazumnie(heheszki)
+                print(heheszki)
     except KeyboardInterrupt:
         pass
     finally:
