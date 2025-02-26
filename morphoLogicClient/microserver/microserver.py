@@ -163,12 +163,13 @@ class TCPSserver:
             logger.exception("Error sending data via TCP.")
             return False
 
-    def receive_message(self, bufsize: int = 1024) -> str:
+    def receive_message(self, bufsize: int = 1024, nonblocking: bool = True) -> str:
         """
         Non-blicking. Receive a message from Godot client via TCP. Returns the decoded string,
         or empty string if the connection is closed or an error occurs.
         """
-        self.conn.setblocking(False)
+        if nonblocking:
+            self.conn.setblocking(False)
         # self.conn.settimeout(0.1)
         # # except socket.timeout:
         # #     logger.warning(
@@ -186,7 +187,8 @@ class TCPSserver:
             logger.exception("Error receiving data via TCP.")
             return ""
         finally:
-            self.conn.setblocking(True)
+            if nonblocking:
+                self.conn.setblocking(True)
     
     def cleanup(self):
         """
