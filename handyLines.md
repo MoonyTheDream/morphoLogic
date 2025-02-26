@@ -12,8 +12,8 @@ bin/kafka-topics.sh --create --topic serverGlobalTopic --bootstrap-server localh
 bin/kafka-topics.sh --create --topic addresedToClients --bootstrap-server localhost:9092
     key = <userName>
 
-bin/kafka-console-producer.sh --topic quickstart-events --bootstrap-server localhost:9092 --timeout 0
-bin/kafka-console-consumer.sh --topic quickstart-events --from-beginning --bootstrap-server localhost:9092
+bin/kafka-console-producer.sh --topic Moony --bootstrap-server localhost:9092 --timeout 0
+bin/kafka-console-consumer.sh --topic serverGlobalTopic --from-beginning --bootstrap-server localhost:9092
 
 # pip
 <!-- Just the latest -->

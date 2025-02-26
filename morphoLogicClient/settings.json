@@ -1,5 +1,6 @@
 {
     "kafka_server": "localhost:9092",
     "log_level_debug": true,
-    "generalTopic": "serverGlobalTopic"
+    "generalTopic": "serverGlobalTopic",
+    "deleteTopicAtExit": false
 }
