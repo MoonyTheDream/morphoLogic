@@ -283,41 +283,41 @@ def kafka_resources(client_id: str):
         #     except Exception:
         #         logger.exception("Failed to delete topic '%s'.", topic)
 
-    def consume_message(self):
-        """
-        Consume one message (non-blocking)
-        """
-        # Poll with a short timeout
-        msg = self.consumer.poll(0.1)
-        if msg is None:
-            return ""
+def consume_kafka_message(consumer: Consumer) -> str:
+    """
+    Consume one message (non-blocking)
+    """
+    # Poll with a short timeout
+    msg = consumer.poll(0.1)
+    if msg is None:
+        return ""
 
-        if msg.error():
-            if msg.error().code() == KafkaError._PARTITION_EOF:
-                # Reached end of partition
-                return ""
-            logger.error("Error while consuming: %s", msg.error())
+    if msg.error():
+        if msg.error().code() == KafkaError._PARTITION_EOF:
+            # Reached end of partition
             return ""
-        else:
-            # We have a valid message
-            msg_val = msg.value().decode("utf-8")
-            logger.debug("Consumed message from %s: %s", msg.topic(),  msg_val)
-            return msg_val
+        logger.error("Error while consuming: %s", msg.error())
+        return ""
+    else:
+        # We have a valid message
+        msg_val = msg.value().decode("utf-8")
+        logger.debug("Consumed message from %s: %s", msg.topic(),  msg_val)
+        return msg_val
 
-    def produce_message(self, message):
-        """
-        Send a message to Kafka using the topic initialized at constructor
-        """
-        try:
-            # Asynchronous produce; if needed, handle delivery reports with callbacks
-            # key is a name of topic, as Server then will send optional answer to this topic.
-            self.producer.produce(self.PRODUCER_TOPIC,
-                                  key=self.topic, value=message)
-            # producer.poll(0)
-            logger.debug("Produced message to %s: %s",
-                         self.PRODUCER_TOPIC, message)
-        except KafkaException:
-            logger.exception("KafkaException while producing message")
+  def produce_kafka_message(producer: Producer, message: str, topic: str):
+      """
+      Send a message to Kafka using the given producer
+      """
+      try:
+          # Asynchronous produce; if needed, handle delivery reports with callbacks
+          # key is a name of topic, as Server then will send optional answer to this topic.
+          producer.produce(self.PRODUCER_TOPIC,
+                                key=self.topic, value=message)
+          # producer.poll(0)
+          logger.debug("Produced message to %s: %s",
+                       self.PRODUCER_TOPIC, message)
+      except KafkaException:
+          logger.exception("KafkaException while producing message")
 
     def cleanup(self):
         """Cleanup before closing Microserver"""
