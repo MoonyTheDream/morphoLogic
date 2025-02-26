@@ -246,15 +246,14 @@ def kafka_resources(client_id: str):
             producer.flush(3)  # ensure all queued messages are delivered
             logger.info("Flushed Kafka producer.")
 
-        if admin and topic:
-            # If dynamic usage is truly desired, remove topic here:
-            pass
-            # try:
-            #     del_futures = admin.delete_topics([topic])
-            #     del_futures[topic].result()
-            #     logger.info("Deleted Kafka topic '%s'.", topic)
-            # except Exception:
-            #     logger.exception("Failed to delete topic '%s'.", topic)
+        # if admin and topic:
+        #     # If dynamic usage is truly desired, remove topic here:
+        #     try:
+        #         del_futures = admin.delete_topics([topic])
+        #         del_futures[topic].result()
+        #         logger.info("Deleted Kafka topic '%s'.", topic)
+        #     except Exception:
+        #         logger.exception("Failed to delete topic '%s'.", topic)
 
 
 ###############################################################################
