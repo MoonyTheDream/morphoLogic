@@ -64,7 +64,7 @@ func initialize_connection(client_data: String) -> void:
 		connect("tree_exiting", _exit_tree())
 		return
 
-	txt_f.draw_new_message(message)
+	# txt_f.draw_new_message(message)
 	send_tcp_message(client_data)
 	var tcp_t = Thread.new()
 	tcp_t.start(continously_receive_messages)

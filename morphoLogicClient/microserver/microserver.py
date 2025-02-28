@@ -4,8 +4,10 @@ import logging
 import os
 import socket
 import sys
+import time
 
 from contextlib import contextmanager
+from enum import Enum
 from logging.handlers import RotatingFileHandler
 
 from confluent_kafka import Producer, Consumer, KafkaException  # , KafkaError
@@ -15,8 +17,18 @@ from confluent_kafka.admin import AdminClient, NewTopic
 # Configuration & Logging
 ####################################################################################################
 
+MICROSERVER_VERSION = "0.1.0"
 SETTINGS_FILE = "settings.json"
 
+# Message type from microserver to clinet with enum
+class MessageType(Enum):
+    """
+    Defines the possible types of messages from microserver to client
+    """
+    DEBUG = 0
+    NORMAL = 1
+    WARNING = 2
+    ERROR = 3
 
 def load_settings(path=SETTINGS_FILE):
     """
@@ -146,7 +158,7 @@ class TCPServer:
         """
         self.cleanup()
 
-    def send_message(self, data: str) -> bool:
+    def send_message(self, data: str, type: str = "") -> bool:
         """
         Send and UTF-8 string to the Godot client.
         Returns True if successful.
@@ -155,14 +167,46 @@ class TCPServer:
             logger.error("No active TCP connection to send data.")
             return False
         try:
-            self.conn.sendall(data.encode("utf-8"))
-            logger.info('Sent via TCP: "%s"', data)
+            wrapped_data = json.dumps({"source":"microserver", "message": data, "type": type})
+            self.conn.sendall(wrapped_data.encode("utf-8"))
+            logger.info('Sent via TCP: "%s"', wrapped_data)
             return True
         # except OSError:
         #     return True
         except Exception:
             logger.exception("Error sending data via TCP.")
             return False
+        
+    def send_message_from_microserver(self, message: str, m_type: MessageType = MessageType.NORMAL):
+        """
+        Used when a microserver has a message that should be displayed directly in Godot (errors,
+        connection confirmations etc.).
+        """
+        if type.value != 1:
+            message = self._colorize_message(message, m_type)
+        wrapped_data = json.dumps(
+            {
+                "auth": {
+                    "source": "microserver",
+                    "server_version": MICROSERVER_VERSION,
+                    "timestamp": time.time()
+                },
+                "direct_messages": [message],
+            }
+        )
+        self.send_message(wrapped_data)
+    
+    def _colorize_message(self, message: str, m_type: MessageType) -> str:
+        color = "lime_green" # fallback
+        match m_type.value:
+            case 0:
+                color = "magenta"
+            case 2:
+                color = "gold"
+            case 3:
+                color = "tomato"
+        return f"[color={color}]" + message + "[/color]"
+    
 
     def receive_message(self, bufsize: int = 1024, nonblocking: bool = True) -> str:
         """
@@ -210,7 +254,7 @@ class TCPServer:
 
 
 @contextmanager
-def kafka_resources(client_id: str):
+def kafka_resources(client_id: str, tcp_server: TCPServer = None):
     """
     A context manager that handles the creation of Kafka Admin Client, Producer,
     Consmer and a new topic for a specific client_id.
@@ -225,6 +269,7 @@ def kafka_resources(client_id: str):
             'bootstrap.servers': BOOTSTRAP_SERVER
         }
         admin = AdminClient(admin_conf)
+        verify_kafka_connection(admin, tcp_server)
 
         producer_conf = {
             'bootstrap.servers': BOOTSTRAP_SERVER,
@@ -260,8 +305,11 @@ def kafka_resources(client_id: str):
             "admin": admin,
             "producer": producer,
             "consumer": consumer,
-            "topic": topic
+            # "topic": topic
         }
+    except Exception:
+        logger.exception("Error setting up Kafka resources.")
+        raise
     finally:
         # Cleanup: close consumer, flush producer, optionally delete topic
         if consumer:
@@ -281,6 +329,27 @@ def kafka_resources(client_id: str):
             except Exception:
                 logger.exception("Failed to delete topic '%s'.", topic)
 
+def verify_kafka_connection(admin, tcp_server, max_retries=3, wait_time=1):
+    """
+    Verifies the connection to Kafka by requesting cluster metadata.
+    Retries a few times before giving up.
+    """
+    for attemt in range(max_retries):
+        try:
+            cluster_metadata = admin.list_topics(timeout=5)
+            if cluster_metadata.brokers:
+                logger.debug("Kafka connection verified.")
+                return
+        except KafkaException as e:
+            if attemt < max_retries - 1:
+                logger.warning("Kafka connection failed. Retrying.")
+                tcp_server.send_message("Kafka connection failed. Retrying.", type="warning")   
+                time.sleep(wait_time)
+            else:
+                logger.error("Kafka connection failed after %d retries.", max_retries)
+                tcp_server.send_message(f"Kafka connection failed after {max_retries} retries.", type="error")
+                raise RuntimeError("Kafka cluster is unreachable. Check if the broker is running.") from e
+            
 
 def main():
     """
@@ -318,14 +387,16 @@ def main():
                 return
 
             # Enter Kafka context
-            with kafka_resources(client_id) as kafka_context:
+            with kafka_resources(client_id, tcp) as kafka_context:
                 producer = kafka_context["producer"]
                 consumer = kafka_context["consumer"]
-                topic = kafka_context["topic"]
+                # topic = kafka_context["topic"]
+                # logger.debug(str(kafka_resources))
 
                 logger.info(
                     "Kafka resources for client '%s' set up. Entering main loop.", client_id
                 )
+                tcp.send_message("Connected to Server.")
 
                 # Main bridging loop
                 while True:

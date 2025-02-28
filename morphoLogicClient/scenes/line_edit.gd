@@ -100,7 +100,7 @@ func request_username() -> String:
 
 func is_valid_username(username_text: String) -> bool:
 	var regex = RegEx.new()
-	regex.compile("^[\\p{L}0-9_-]+$")  # Allows only letters, numbers, _ and -
+	regex.compile("^[a-zA-Z0-9_-]+$")  # Allows only letters, numbers, _ and -
 	return regex.search(username_text) != null
 
 func _client_auth_json(username: String) -> String:
