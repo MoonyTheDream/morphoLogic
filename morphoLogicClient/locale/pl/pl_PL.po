@@ -45,3 +45,11 @@ msgstr ""
 #: scenes/rich_text_label.gd
 msgid "Connecting...\n"
 msgstr "Przebudzanie i odzyskiwanie kontaktu z otoczeniem...\n"
+
+#: scenes/rich_text_label.gd
+msgid "[color=yellow_green]Microserver Running.[/color]\n"
+msgstr "[color=yellow_green]Częściowo odzyskano samoświadomość.[/color]\n"
+
+#: scenes/rich_text_label.gd
+msgid "[color=tomato]Failed to launch Microserver![/color]\n"
+msgstr "[color=tomato]Nie udało się uruchomić Mircoservera![/color]\n"

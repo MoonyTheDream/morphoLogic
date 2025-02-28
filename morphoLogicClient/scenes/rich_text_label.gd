@@ -2,8 +2,13 @@ extends RichTextLabel
 	
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
-	TCPDialog.new_data_arrived.connect(parse_message)
 	self.append_text(tr("Connecting...\n"))
+	var microserver_running = await TCPDialog.run_python_microserver()
+	if microserver_running:
+		draw_new_message(tr("[color=yellow_green]Microserver Running.[/color]\n"))
+	else:
+		draw_new_message(tr("[color=tomato]Failed to launch Microserver![/color]\n"))
+	TCPDialog.new_data_arrived.connect(parse_message)
 
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
@@ -16,10 +21,7 @@ func draw_new_message(message: String) -> void:
 
 func parse_message(data: String) -> void:
 	var data_dict = JSON.parse_string(data)
-	if data_dict.has("message"):
-		var to_send = data_dict["message"]
-		if data_dict["type"] == "error":
-			to_send = "[color=tomato]" + to_send + "[/color]"
-		if data_dict["type"] == "warning":
-			to_send = "[color=gold]" + to_send + "[/color]"
-		draw_new_message(to_send + "\n")
+	if data_dict.has("direct_messages") and data_dict["direct_messages"].size()>0:
+		var messages = data_dict["direct_messages"]
+		for m in messages:
+			draw_new_message(m + "\n")

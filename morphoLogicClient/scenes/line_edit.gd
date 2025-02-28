@@ -12,7 +12,8 @@ func _ready() -> void:
 	await get_tree().create_timer(0.30).timeout # Better UX and time for other services to start
 	
 	var username = await self.request_username()
-	TCPDialog.initialize_connection(_client_auth_json(username))
+	ClientData.username = username
+	TCPDialog.initialize_server_connection("REQUEST_SERVER_CONNECTION")
 
 	self.text_submitted.disconnect(_inputHandler)
 	self.text_submitted.connect(_send_to_tcp)
@@ -103,12 +104,12 @@ func is_valid_username(username_text: String) -> bool:
 	regex.compile("^[a-zA-Z0-9_-]+$")  # Allows only letters, numbers, _ and -
 	return regex.search(username_text) != null
 
-func _client_auth_json(username: String) -> String:
-	var data = {
-		"username": username,
-		"client_version": ClientData.version
-	}
-	return JSON.stringify(data)
+# func _client_auth_json(username: String) -> String:
+# 	var data = {
+# 		"username": username,
+# 		"client_version": ClientData.version
+# 	}
+# 	return JSON.stringify(data)
 
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.

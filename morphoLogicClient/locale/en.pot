@@ -1,6 +1,7 @@
 # LANGUAGE translation for morphoLogicClient for the following files:
 # res://scenes/line_edit.gd
 # res://scenes/rich_text_label.gd
+# res://TCPDialog.gd
 #
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
 #
@@ -34,4 +35,12 @@ msgstr ""
 
 #: scenes/rich_text_label.gd
 msgid "Connecting...\n"
+msgstr ""
+
+#: scenes/rich_text_label.gd
+msgid "[color=yellow_green]Microserver Running.[/color]\n"
+msgstr ""
+
+#: scenes/rich_text_label.gd
+msgid "[color=tomato]Failed to launch Microserver![/color]\n"
 msgstr ""

@@ -158,7 +158,7 @@ class TCPServer:
         """
         self.cleanup()
 
-    def send_message(self, data: str, type: str = "") -> bool:
+    def send_message(self, data: str) -> bool:
         """
         Send and UTF-8 string to the Godot client.
         Returns True if successful.
@@ -167,9 +167,8 @@ class TCPServer:
             logger.error("No active TCP connection to send data.")
             return False
         try:
-            wrapped_data = json.dumps({"source":"microserver", "message": data, "type": type})
-            self.conn.sendall(wrapped_data.encode("utf-8"))
-            logger.info('Sent via TCP: "%s"', wrapped_data)
+            self.conn.sendall(data.encode("utf-8"))
+            logger.info('Sent via TCP: "%s"', data)
             return True
         # except OSError:
         #     return True
@@ -177,17 +176,18 @@ class TCPServer:
             logger.exception("Error sending data via TCP.")
             return False
         
-    def send_message_from_microserver(self, message: str, m_type: MessageType = MessageType.NORMAL):
+    def send_message_from_microserver(self, message: str, username: str, m_type: MessageType = MessageType.NORMAL):
         """
         Used when a microserver has a message that should be displayed directly in Godot (errors,
         connection confirmations etc.).
         """
-        if type.value != 1:
+        if m_type.value != 1:
             message = self._colorize_message(message, m_type)
         wrapped_data = json.dumps(
             {
                 "auth": {
                     "source": "microserver",
+                    "to_user": username,
                     "server_version": MICROSERVER_VERSION,
                     "timestamp": time.time()
                 },
@@ -269,7 +269,7 @@ def kafka_resources(client_id: str, tcp_server: TCPServer = None):
             'bootstrap.servers': BOOTSTRAP_SERVER
         }
         admin = AdminClient(admin_conf)
-        verify_kafka_connection(admin, tcp_server)
+        verify_kafka_connection(admin, tcp_server, client_id)
 
         producer_conf = {
             'bootstrap.servers': BOOTSTRAP_SERVER,
@@ -329,7 +329,9 @@ def kafka_resources(client_id: str, tcp_server: TCPServer = None):
             except Exception:
                 logger.exception("Failed to delete topic '%s'.", topic)
 
-def verify_kafka_connection(admin, tcp_server, max_retries=3, wait_time=1):
+def verify_kafka_connection(
+    admin: AdminClient, tcp_server: TCPServer, username, max_retries=3, wait_time=1
+    ):
     """
     Verifies the connection to Kafka by requesting cluster metadata.
     Retries a few times before giving up.
@@ -343,11 +345,15 @@ def verify_kafka_connection(admin, tcp_server, max_retries=3, wait_time=1):
         except KafkaException as e:
             if attemt < max_retries - 1:
                 logger.warning("Kafka connection failed. Retrying.")
-                tcp_server.send_message("Kafka connection failed. Retrying.", type="warning")   
+                tcp_server.send_message_from_microserver(
+                    "Kafka connection failed. Retrying.", username, MessageType.WARNING
+                    )
                 time.sleep(wait_time)
             else:
                 logger.error("Kafka connection failed after %d retries.", max_retries)
-                tcp_server.send_message(f"Kafka connection failed after {max_retries} retries.", type="error")
+                tcp_server.send_message_from_microserver(
+                    f"Kafka connection failed after {max_retries} retries.", username, MessageType.ERROR
+                    )
                 raise RuntimeError("Kafka cluster is unreachable. Check if the broker is running.") from e
             
 
@@ -375,7 +381,10 @@ def main():
 
             try:
                 data_json = json.loads(client_info)
-                client_id = data_json.get("username", "").strip()
+                if data_json["client_input"] == "REQUEST_SERVER_CONNECTION":
+                    client_id = data_json["auth"].get("username", "").strip()
+                else:
+                    client_id = ""
             except (json.JSONDecodeError, AttributeError):
                 logger.exception(
                     "Invalid JSON received from TCP client. Shutting down.")
@@ -396,7 +405,8 @@ def main():
                 logger.info(
                     "Kafka resources for client '%s' set up. Entering main loop.", client_id
                 )
-                tcp.send_message("Connected to Server.")
+                if DEBUG_MODE:
+                    tcp.send_message_from_microserver("Connected to Server.", client_id)
 
                 # Main bridging loop
                 while True:
