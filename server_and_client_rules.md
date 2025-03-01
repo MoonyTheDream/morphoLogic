@@ -19,6 +19,7 @@ Type: *JSON*
     "timestamp": "<timestamp>"
   },
   "direct_messages": ["strings to show on the client", "can be more than one"],
+  "system_message": "optional system message like 'connected to server'",
   "obejcts": {
     "id_of_object_01": {
       "value_01": "value",

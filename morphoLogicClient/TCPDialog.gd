@@ -83,7 +83,7 @@ func initialize_server_connection(client_data):
 
 func _exit_tree():
 	# Make sure Python processed is killed (to death) when exiting godot
-	send_tcp_message("CLEANUP")
+	send_tcp_message("CLEANUP", true)
 	print("[GODOT] Python microserver has been slain.")
 
 
@@ -100,17 +100,17 @@ func continously_receive_messages() -> void:
 func emit_received_data(data):
 	new_data_arrived.emit(data)
 
-func send_tcp_message(message: String) -> void:
+func send_tcp_message(message: String, system_message: bool = false) -> void:
 	var wrap_message
-	if message == "CLEANUP":
+	if system_message:
 		wrap_message = message
 	else:
 		wrap_message = {
 			"auth": {
 				"username": ClientData.username,
 				"client_version": ClientData.version,
-				"timestamp": Time.get_unix_time_from_system(),
-				"client_ip": IP.get_local_addresses()
+				"timestamp": Time.get_datetime_string_from_system(true, true),
+				"session_token": "NOT_IMPLEMENTED_YET"
 			},
 			"client_input": message
 		}

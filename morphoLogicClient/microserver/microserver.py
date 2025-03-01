@@ -4,11 +4,11 @@ import logging
 import os
 import socket
 import sys
-import time
 
 from contextlib import contextmanager
 from enum import Enum
 from logging.handlers import RotatingFileHandler
+from time import gmtime, strftime, sleep
 
 from confluent_kafka import Producer, Consumer, KafkaException  # , KafkaError
 from confluent_kafka.admin import AdminClient, NewTopic
@@ -19,6 +19,11 @@ from confluent_kafka.admin import AdminClient, NewTopic
 
 MICROSERVER_VERSION = "0.1.0"
 SETTINGS_FILE = "settings.json"
+
+def get_gmt_time():
+    return strftime("%Y-%m-%d %H:%M:%S", gmtime())
+
+    
 
 # Message type from microserver to clinet with enum
 class MessageType(Enum):
@@ -175,25 +180,53 @@ class TCPServer:
         except Exception:
             logger.exception("Error sending data via TCP.")
             return False
+    
+    def add_auth(self, data: dict, username: str):
+        """
+        Used when a microserver needs to send data directly to client.
+        Wraps auth data to the dictionary.
+        """
+        data.update({
+            "auth": {
+                    "source": "microserver",
+                    "to_user": username,
+                    "server_version": MICROSERVER_VERSION,
+                    "timestamp": get_gmt_time()
+                }
+        })
+        return data
         
-    def send_message_from_microserver(self, message: str, username: str, m_type: MessageType = MessageType.NORMAL):
+    def send_direct_message_to_client(self, message: str, username: str, m_type: MessageType = MessageType.NORMAL):
         """
         Used when a microserver has a message that should be displayed directly in Godot (errors,
         connection confirmations etc.).
         """
         if m_type.value != 1:
             message = self._colorize_message(message, m_type)
-        wrapped_data = json.dumps(
-            {
-                "auth": {
-                    "source": "microserver",
-                    "to_user": username,
-                    "server_version": MICROSERVER_VERSION,
-                    "timestamp": time.time()
-                },
-                "direct_messages": [message],
-            }
-        )
+        # wrapped_data = json.dumps(
+        #     {
+        #         "auth": {
+        #             "source": "microserver",
+        #             "to_user": username,
+        #             "server_version": MICROSERVER_VERSION,
+        #             "timestamp": get_gmt_time()
+        #         },
+        #         "direct_messages": [message],
+        #     }
+        # )
+        message = {"direct_messages": [message]}
+        wrapped_data = self.add_auth(message, username)
+        wrapped_data = json.dumps(wrapped_data)
+        self.send_message(wrapped_data)
+        
+    def send_system_message_to_client(self, message: str, username: str):
+        """
+        Used when a microserver has a system message to client like 'Connected to Server'
+        """
+        message = {"system_message":message}
+        wrapped_data = self.add_auth(message, username)
+        logger.debug(wrapped_data)
+        wrapped_data = json.dumps(wrapped_data)
         self.send_message(wrapped_data)
     
     def _colorize_message(self, message: str, m_type: MessageType) -> str:
@@ -345,13 +378,13 @@ def verify_kafka_connection(
         except KafkaException as e:
             if attemt < max_retries - 1:
                 logger.warning("Kafka connection failed. Retrying.")
-                tcp_server.send_message_from_microserver(
+                tcp_server.send_direct_message_to_client(
                     "Kafka connection failed. Retrying.", username, MessageType.WARNING
                     )
-                time.sleep(wait_time)
+                sleep(wait_time)
             else:
                 logger.error("Kafka connection failed after %d retries.", max_retries)
-                tcp_server.send_message_from_microserver(
+                tcp_server.send_direct_message_to_client(
                     f"Kafka connection failed after {max_retries} retries.", username, MessageType.ERROR
                     )
                 raise RuntimeError("Kafka cluster is unreachable. Check if the broker is running.") from e
@@ -406,7 +439,7 @@ def main():
                     "Kafka resources for client '%s' set up. Entering main loop.", client_id
                 )
                 if DEBUG_MODE:
-                    tcp.send_message_from_microserver("Connected to Server.", client_id)
+                    tcp.send_system_message_to_client("CONNECTED_TO_SERVER", client_id)
 
                 # Main bridging loop
                 while True:
@@ -436,7 +469,7 @@ def main():
                             # Delivery reports if needed here
                             producer.poll(0)
                             logger.debug(
-                                "Produced TCP->Kafka message to topic '%s': %s", GENERAL_TOPIC, tcp_msg)
+                                "Produced TCP -> Kafka message to topic '%s': %s", GENERAL_TOPIC, tcp_msg)
                         except KafkaException:
                             logger.exception(
                                 "KafkaException while producing message.")

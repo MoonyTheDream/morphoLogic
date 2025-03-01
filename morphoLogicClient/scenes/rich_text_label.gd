@@ -25,3 +25,10 @@ func parse_message(data: String) -> void:
 		var messages = data_dict["direct_messages"]
 		for m in messages:
 			draw_new_message(m + "\n")
+
+	var system_message = data_dict.get("system_message", "")
+	if system_message:
+		if system_message == "CONNECTED_TO_SERVER":
+			draw_new_message(tr("[color=yellow_green]Succsessfully connected to server.[/color]"))
+			
+		
