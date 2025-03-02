@@ -21,14 +21,15 @@ func draw_new_message(message: String) -> void:
 
 func parse_message(data: String) -> void:
 	var data_dict = JSON.parse_string(data)
-	if data_dict.has("direct_messages") and data_dict["direct_messages"].size()>0:
-		var messages = data_dict["direct_messages"]
-		for m in messages:
-			draw_new_message(m + "\n")
+	if data_dict:
+		if data_dict.has("direct_messages") and data_dict["direct_messages"].size()>0:
+			var messages = data_dict["direct_messages"]
+			for m in messages:
+				draw_new_message(m + "\n")
 
-	var system_message = data_dict.get("system_message", "")
-	if system_message:
-		if system_message == "CONNECTED_TO_SERVER":
-			draw_new_message(tr("[color=yellow_green]Succsessfully connected to server.[/color]"))
+		var system_message = data_dict.get("system_message", "")
+		if system_message:
+			if system_message == "CONNECTED_TO_SERVER":
+				draw_new_message(tr("[color=yellow_green]Succsessfully connected to server.[/color]"))
 			
 		

@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "morphologic-server"
+version = "0.1.0"
+description = "Game server for morphoLogic"
+authors = [{name = "Moony The Dream", email = "moonchasered@gmail.com"}]
+licesne = { file = "LICENSE" }
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "confluent-kafka"
+]
+
+[tool.hatch.build]
+exclude = ["tests/", "logs/", "*.md"]
+
+# Required if dependencies include direct git repos
+# [tool.hatch.metadata]
+# allow-direct-references = true
+
+[project.scripts]
+morphologic = "morphologic_server.cli:main"

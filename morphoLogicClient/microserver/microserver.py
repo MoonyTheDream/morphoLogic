@@ -20,10 +20,11 @@ from confluent_kafka.admin import AdminClient, NewTopic
 MICROSERVER_VERSION = "0.1.0"
 SETTINGS_FILE = "settings.json"
 
+
 def get_gmt_time():
+    """Wrapper to get strigified GMT time"""
     return strftime("%Y-%m-%d %H:%M:%S", gmtime())
 
-    
 
 # Message type from microserver to clinet with enum
 class MessageType(Enum):
@@ -34,6 +35,7 @@ class MessageType(Enum):
     NORMAL = 1
     WARNING = 2
     ERROR = 3
+
 
 def load_settings(path=SETTINGS_FILE):
     """
@@ -180,7 +182,7 @@ class TCPServer:
         except Exception:
             logger.exception("Error sending data via TCP.")
             return False
-    
+
     def add_auth(self, data: dict, username: str):
         """
         Used when a microserver needs to send data directly to client.
@@ -192,10 +194,10 @@ class TCPServer:
                     "to_user": username,
                     "server_version": MICROSERVER_VERSION,
                     "timestamp": get_gmt_time()
-                }
+                    }
         })
         return data
-        
+
     def send_direct_message_to_client(self, message: str, username: str, m_type: MessageType = MessageType.NORMAL):
         """
         Used when a microserver has a message that should be displayed directly in Godot (errors,
@@ -203,34 +205,23 @@ class TCPServer:
         """
         if m_type.value != 1:
             message = self._colorize_message(message, m_type)
-        # wrapped_data = json.dumps(
-        #     {
-        #         "auth": {
-        #             "source": "microserver",
-        #             "to_user": username,
-        #             "server_version": MICROSERVER_VERSION,
-        #             "timestamp": get_gmt_time()
-        #         },
-        #         "direct_messages": [message],
-        #     }
-        # )
         message = {"direct_messages": [message]}
         wrapped_data = self.add_auth(message, username)
         wrapped_data = json.dumps(wrapped_data)
         self.send_message(wrapped_data)
-        
+
     def send_system_message_to_client(self, message: str, username: str):
         """
         Used when a microserver has a system message to client like 'Connected to Server'
         """
-        message = {"system_message":message}
+        message = {"system_message": message}
         wrapped_data = self.add_auth(message, username)
         logger.debug(wrapped_data)
         wrapped_data = json.dumps(wrapped_data)
         self.send_message(wrapped_data)
-    
+
     def _colorize_message(self, message: str, m_type: MessageType) -> str:
-        color = "lime_green" # fallback
+        color = "lime_green"  # fallback
         match m_type.value:
             case 0:
                 color = "magenta"
@@ -239,7 +230,6 @@ class TCPServer:
             case 3:
                 color = "tomato"
         return f"[color={color}]" + message + "[/color]"
-    
 
     def receive_message(self, bufsize: int = 1024, nonblocking: bool = True) -> str:
         """
@@ -313,7 +303,8 @@ def kafka_resources(client_id: str, tcp_server: TCPServer = None):
         consumer_conf = {
             'bootstrap.servers': BOOTSTRAP_SERVER,
             'group.id': client_id,  # group.id is the same as client_id
-            'auto.offset.reset': 'earliest'
+            'auto.offset.reset': 'earliest',
+            "enable.partition.eof": False  # we'll be hitting end of partition quite often
         }
         consumer = Consumer(consumer_conf)
 
@@ -362,16 +353,10 @@ def kafka_resources(client_id: str, tcp_server: TCPServer = None):
             except Exception:
                 logger.exception("Failed to delete topic '%s'.", topic)
 
-# def verify_kafka_connection(admin: AdminClient) -> bool:
-#     cluster_metadata = admin.list_topics(timeout=0.2)
-#             if cluster_metadata.brokers:
-#                 logger.debug("Kafka connection verified.")
-#                 return
-#         except KafkaException as e:
 
 def establish_kafka_connection(
     admin: AdminClient, tcp_server: TCPServer, username, max_retries=3, wait_time=1
-    ):
+):
     """
     Verifies the connection to Kafka by requesting cluster metadata.
     Retries a few times before giving up.
@@ -387,15 +372,17 @@ def establish_kafka_connection(
                 logger.warning("Kafka connection failed. Retrying.")
                 tcp_server.send_direct_message_to_client(
                     "Kafka connection failed. Retrying.", username, MessageType.WARNING
-                    )
+                )
                 sleep(wait_time)
             else:
-                logger.error("Kafka connection failed after %d retries.", max_retries)
+                logger.error(
+                    "Kafka connection failed after %d retries.", max_retries)
                 tcp_server.send_direct_message_to_client(
                     f"Kafka connection failed after {max_retries} retries.", username, MessageType.ERROR
-                    )
-                raise RuntimeError("Kafka cluster is unreachable. Check if the broker is running.") from e
-            
+                )
+                raise RuntimeError(
+                    "Kafka cluster is unreachable. Check if the broker is running.") from e
+
 
 def main():
     """
@@ -437,8 +424,8 @@ def main():
 
             # Enter Kafka context
             with kafka_resources(client_id, tcp) as kafka_context:
-                producer = kafka_context["producer"]
-                consumer = kafka_context["consumer"]
+                producer: Producer = kafka_context["producer"]
+                consumer: Consumer = kafka_context["consumer"]
                 # topic = kafka_context["topic"]
                 # logger.debug(str(kafka_resources))
 
@@ -446,13 +433,17 @@ def main():
                     "Kafka resources for client '%s' set up. Entering main loop.", client_id
                 )
                 if DEBUG_MODE:
-                    tcp.send_system_message_to_client("CONNECTED_TO_SERVER", client_id)
+                    tcp.send_system_message_to_client(
+                        "CONNECTED_TO_SERVER", client_id)
 
                 # Main bridging loop
                 while True:
 
                     # Kafka -> TCP -> Godot
-                    msg = consumer.poll(0.1)
+                    try:
+                        msg = consumer.consume(num_messages=1, timeout=0.1)
+                    except Exception:
+                        logger.exception("Error consuming message from Kafka.")
                     if msg and not msg.error():
                         kafka_msg = msg.value().decode("utf-8")
                         if kafka_msg:
@@ -461,7 +452,11 @@ def main():
                                 logger.warning(
                                     "Message '%s' not sent to Godot.", kafka_msg)
                             else:
-                                logger.debug('Consumed message from Kafka: "%s"', kafka_msg)
+                                logger.debug(
+                                    'Consumed message from Kafka: "%s"', kafka_msg)
+                    elif msg and msg.error():
+                        logger.debug("Error consuming message: %s",
+                                     msg.error().reason())
 
                     # Godot -> TCP -> Kafka
                     tcp_msg = tcp.receive_message()
@@ -472,7 +467,8 @@ def main():
                             break
                         # Produce the message to the Kafka topic with username as a key
                         try:
-                            producer.produce(GENERAL_TOPIC, key=client_id, value=tcp_msg, on_delivery=_verify_delivery_kafka)
+                            producer.produce(
+                                GENERAL_TOPIC, key=client_id, value=tcp_msg, on_delivery=_verify_delivery_kafka)
                             # Delivery reports if needed here
                             logger.debug(
                                 "Produced TCP -> Kafka message to topic '%s': %s", GENERAL_TOPIC, tcp_msg)
@@ -487,8 +483,11 @@ def main():
     finally:
         logger.info("Exiting microserver.")
 
-def _verify_delivery_kafka(_err,_msg):
-    """Trzeba tu zrobić handling niedostarczonej wiadomości"""
+
+def _verify_delivery_kafka(err, _msg):
+    """Trzeba tu zrobić handling niedostarczonej wiadomości i/lub kontroler ilości wysłanych w kliencie vs dostarczonych"""
+    if err:
+        logger.debug("Error after producing message: %s", err)
     # pass
     # logger.debug(str(err))
     # logger.debug(str(msg))
