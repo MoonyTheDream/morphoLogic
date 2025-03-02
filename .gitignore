@@ -112,6 +112,7 @@ celerybeat.pid
 *.sage.py
 
 # Environments
+kafka_env/
 .env
 .venv
 env/
@@ -151,5 +152,5 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-/godot_kafa_extension
+/godot_kafka_extension
 /kafka_2.13-3.9.0

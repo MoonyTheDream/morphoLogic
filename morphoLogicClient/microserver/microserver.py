@@ -302,7 +302,7 @@ def kafka_resources(client_id: str, tcp_server: TCPServer = None):
             'bootstrap.servers': BOOTSTRAP_SERVER
         }
         admin = AdminClient(admin_conf)
-        verify_kafka_connection(admin, tcp_server, client_id)
+        establish_kafka_connection(admin, tcp_server, client_id)
 
         producer_conf = {
             'bootstrap.servers': BOOTSTRAP_SERVER,
@@ -362,7 +362,14 @@ def kafka_resources(client_id: str, tcp_server: TCPServer = None):
             except Exception:
                 logger.exception("Failed to delete topic '%s'.", topic)
 
-def verify_kafka_connection(
+# def verify_kafka_connection(admin: AdminClient) -> bool:
+#     cluster_metadata = admin.list_topics(timeout=0.2)
+#             if cluster_metadata.brokers:
+#                 logger.debug("Kafka connection verified.")
+#                 return
+#         except KafkaException as e:
+
+def establish_kafka_connection(
     admin: AdminClient, tcp_server: TCPServer, username, max_retries=3, wait_time=1
     ):
     """
@@ -465,20 +472,26 @@ def main():
                             break
                         # Produce the message to the Kafka topic with username as a key
                         try:
-                            producer.produce(GENERAL_TOPIC, key=client_id, value=tcp_msg)
+                            producer.produce(GENERAL_TOPIC, key=client_id, value=tcp_msg, on_delivery=_verify_delivery_kafka)
                             # Delivery reports if needed here
-                            producer.poll(0)
                             logger.debug(
                                 "Produced TCP -> Kafka message to topic '%s': %s", GENERAL_TOPIC, tcp_msg)
                         except KafkaException:
                             logger.exception(
                                 "KafkaException while producing message.")
+                    producer.poll(0)
     except KeyboardInterrupt:
         logger.info("KeyboardInterrupt detected. Shutting down gracefully.")
     except Exception:
         logger.exception("Unexpected error. Shutting down.")
     finally:
         logger.info("Exiting microserver.")
+
+def _verify_delivery_kafka(_err,_msg):
+    """Trzeba tu zrobić handling niedostarczonej wiadomości"""
+    # pass
+    # logger.debug(str(err))
+    # logger.debug(str(msg))
 
 
 if __name__ == "__main__":

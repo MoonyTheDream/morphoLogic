@@ -6,6 +6,7 @@
 
 # Docker Kafka Client Commands
 ## kafka_2.13-3.9.0
+docker pull apache/kafka:latest
 docker run -p 9092:9092 apache/kafka:latest
 bin/kafka-topics.sh --create --topic serverGlobalTopic --bootstrap-server localhost:9092
     key = None

@@ -1,4 +1,4 @@
-#!/home/moony/Coding/morphoLogic/morphoLogicClient/microserver/kafka_venv/bin/python3
+#!/home/moony/coding/morphoLogic/morphoLogicClient/microserver/kafka_venv/bin/python3
 # -*- coding: utf-8 -*-
 import re
 import sys
