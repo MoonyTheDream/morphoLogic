@@ -1,8 +1,8 @@
 [gd_scene load_steps=8 format=3 uid="uid://b4h3t4jgnduk6"]
 
-[ext_resource type="Script" path="res://scenes/rich_text_label.gd" id="1_c838k"]
+[ext_resource type="Script" uid="uid://dhpif8130p6s" path="res://scenes/rich_text_label.gd" id="1_c838k"]
 [ext_resource type="FontFile" uid="uid://b2qnutwcbw7pr" path="res://fonts/quaaykop-font/Quaaykop-DYE1R.ttf" id="1_saump"]
-[ext_resource type="Script" path="res://scenes/line_edit.gd" id="2_bj4i0"]
+[ext_resource type="Script" uid="uid://basqkxjcadfu4" path="res://scenes/line_edit.gd" id="2_bj4i0"]
 [ext_resource type="Texture2D" uid="uid://dn5of4l8x8vqp" path="res://images/blurred_painting.png" id="4_re2a1"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1ogr5"]
