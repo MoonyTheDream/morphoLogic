@@ -1,1 +1,4 @@
-from .awakening import awake
+from morphologic_server.awakening import awake
+
+if __name__ == "__main__":
+    awake()

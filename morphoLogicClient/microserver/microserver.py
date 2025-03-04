@@ -441,7 +441,7 @@ def main():
 
                     # Kafka -> TCP -> Godot
                     try:
-                        msg = consumer.consume(num_messages=1, timeout=0.1)
+                        msg = consumer.consume(num_messages=1, timeout=0.1)[0]
                     except Exception:
                         logger.exception("Error consuming message from Kafka.")
                     if msg and not msg.error():

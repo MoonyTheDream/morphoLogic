@@ -2,6 +2,9 @@ import argparse
 from morphologic_server.awakening import awake
 
 def start_server(args):
+    """
+    Start the server
+    """
     if args.log:
             print("Awakening of the World. The Scribes are here too.")
     else:
@@ -9,6 +12,9 @@ def start_server(args):
     awake()
 
 def main():
+    """
+    Main function of CLI
+    """
     parser = argparse.ArgumentParser(
         prog="morphologic", description="morhphoLogic Game Server CLI",
         usage="%(prog)s [options]"
