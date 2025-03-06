@@ -32,3 +32,8 @@ Type: *JSON*
     }
   }
 }
+## Colors
+NAMES = [color=medium_turquoise]
+INFO (positive) = [color=yellow_green]
+WARNING = [color=gold]
+ERROR = [color=tomato]

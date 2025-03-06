@@ -15,3 +15,9 @@ morphoLogicEngine/
 ├── requirements.txt    # Dependencies
 ├── .gitignore          # Ignore unnecessary files
 └── README.md           # This documentation
+
+# Building morphoLogicEngine CLI
+pip install --upgrade hatch
+hatch build
+pip install -e .
+

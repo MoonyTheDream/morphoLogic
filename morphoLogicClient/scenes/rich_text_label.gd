@@ -29,7 +29,12 @@ func parse_message(data: String) -> void:
 
 		var system_message = data_dict.get("system_message", "")
 		if system_message:
-			if system_message == "CONNECTED_TO_SERVER":
-				draw_new_message(tr("[color=yellow_green]Succsessfully connected to server.[/color]"))
-			
-		
+			match system_message:
+				"CONNECTED_TO_SERVER":
+					draw_new_message(tr("[color=yellow_green]Succsessfully connected to server.[/color]\n"))
+				"SERVER_CONNECTION_RETRY":
+					draw_new_message(tr("[color=gold]Trouble Connecting to Server. Retrying.[/color]\n"))
+				"SERVER_CONNECTION_FAILURE":
+					draw_new_message(tr("[color=tomato]Failure Connecting to Server.[/color]\n"))
+				_:
+					draw_new_message(tr("[color=tomato]UKNOWN SYSTEM MESSAGE! REPORT ISSUE TO DEVS.[/color]\n"))

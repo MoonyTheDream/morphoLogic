@@ -13,10 +13,11 @@ from ..utils.logger import logger
 from ..config import settings as _SETTINGS
 
 BOOTSTRAP_SERVER = os.getenv(
-    "KAFKA_BOOTSTRAP_SERVER", _SETTINGS.get("kafka_server", "localhost:9092")
-)
+    "KAFKA_BOOTSTRAP_SERVER", _SETTINGS.get("kafka_server", "localhost:9092"))
 GENERAL_TOPIC = os.getenv("KAFKA_GENERAL_TOPIC", _SETTINGS.get(
     "generalTopic", "serverGlobalTopic"))
+HANDSHAKE_TOPIC = os.getenv("KAFKA_HANDSHAKE_TOPIC", _SETTINGS.get(
+    "handshakeTopic", "serverHandshakeTopic"))
 
 ####################################################################################################
 # Kafka Context Manager
@@ -32,7 +33,7 @@ class KafkaConnection:
         self.producer: Producer = None
         self.consumer: Consumer = None
         self.bootstrap_server = bootstrap_server
-        self.general_topic = GENERAL_TOPIC
+        # self.general_topic = GENERAL_TOPIC
         
     def _establish_kafka_connection(self, admin: AdminClient, max_retries=4, wait_time=1):
         """
@@ -80,7 +81,7 @@ class KafkaConnection:
             }
             self.consumer = Consumer(consumer_conf)
 
-            self.subscribe_to_topics([GENERAL_TOPIC])
+            self.subscribe_to_topics([GENERAL_TOPIC, HANDSHAKE_TOPIC])
             
             # kafka_resources = {
             #     "admin": admin,

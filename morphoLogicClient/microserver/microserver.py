@@ -278,6 +278,48 @@ class TCPServer:
 # Kafka Context Manager
 ####################################################################################################
 
+def handle_kafka_handshake(consumer: Consumer, tcp_server: TCPServer, username: str) -> str:
+    given_topic = None
+    attempt = 0
+    while attempt < 2:
+        if attempt > 0:
+            tcp_server.send_system_message_to_client("SERVER_CONNECTION_RETRY", username)
+            
+        try:
+            handshake_msg = consumer.consume(num_messages=1, timeout=5) # timeout in s
+            if not handshake_msg:
+                logger.warning("No handshake message received from Kafka. Retrying.")
+                attempt += 1
+                continue
+            handshake_msg = handshake_msg[0]
+        # except Exception:
+        #     logger.exception("Error consuming handshake message from Kafka.")
+            if handshake_msg.error():
+                logger.error("Error consuming message: %s", handshake_msg.error().str())
+                attempt += 1
+                continue
+                
+            if handshake_msg:
+                if handshake_msg.key() != "server_message":
+                    continue
+                kafka_msg = handshake_msg.value().decode("utf-8")
+                kafka_msg = json.loads(kafka_msg)
+                
+                if kafka_msg.get("system_message") == "CONNECTION_APPROVED":
+                    given_topic = kafka_msg["client_topic_handoff"]
+                    return given_topic
+            
+            tcp_server.send_system_message_to_client("SERVER_CONNECTION_FAILURE", username)
+            return None
+            # raise RuntimeError("Error consuming handshake message.")
+        
+        except Exception:
+            tcp_server.send_system_message_to_client("SERVER_CONNECTION_FAILURE", username)
+            logger.exception("Error consuming handshake message from Kafka.")
+            raise
+        
+    return None
+        
 
 @contextmanager
 def kafka_resources(data_json: dict, tcp_server: TCPServer = None):
@@ -325,57 +367,12 @@ def kafka_resources(data_json: dict, tcp_server: TCPServer = None):
                 "KafkaException while producing message.")
         
         # Reading topic from Kafka handshake message and subscribing to it
-        given_topic = ""
-        retried = False
-        while True:
-            try:
-                handshake_msg = consumer.consume(1, 10)
-                if not handshake_msg and not retried:
-                    logger.warning("Microserver didn't receive handshake message from Kafka. Retrying.")
-                    retried = True
-                    continue
-                if not handshake_msg and retried:
-                    break
-                handshake_msg = handshake_msg[0]
-            except Exception:
-                logger.exception("Error consuming handshake message from Kafka.")
-            if handshake_msg and not handshake_msg.error():
-                if handshake_msg.key() != "server_message":
-                    continue
-                kafka_msg = handshake_msg.value().decode("utf-8")
-                kafka_msg = json.loads(kafka_msg)
-                
-                if kafka_msg.get("system_message") == "CONNECTION_APPROVED":
-                    given_topic = kafka_msg["client_topic_handoff"]
-                    break
-                
-                tcp_server.send_system_message_to_client("SERVER_CONNECTION_FAILURE", username)
-                raise RuntimeError("Handshake message from Kafka invalid")
-            
-            elif handshake_msg and handshake_msg.error():
-                logger.error("Error consuming message: %s", handshake_msg.error().reason())
-                raise RuntimeError("Error consuming handshake message.")
-            
-        if not given_topic or not handshake_msg:
-            raise RuntimeError("Topic after handshake not found.")
+        given_topic = handle_kafka_handshake(consumer, tcp_server, username)
+        logger.debug("Given topic: %s", given_topic)
+        if not given_topic:
+            raise RuntimeError("Error consuming handshake message.")
         
         consumer.subscribe([given_topic])
-        
-        
-        # new_topic = NewTopic(topic)
-        # dict_future_topics = admin.create_topics([new_topic])
-        # try:
-        #     dict_future_topics[topic].result()  # Wait for confirmation
-        #     logger.info('Created Kafka topic "%s"', topic)
-        # except Exception as e:
-        #     if "TOPIC_ALREADY_EXISTS" in str(e):
-        #         logger.warning(
-        #             'Kafra topic "%s" already exists. Continuing.', topic)
-        #     else:
-        #         logger.exception('Failed to create topic %s.', topic)
-        #         raise  # re-raise to exit the context manager
-
-        # consumer.subscribe([topic])
         logger.info('Subscribed to Kafka topic "%s"', given_topic)
 
         yield {
@@ -385,9 +382,14 @@ def kafka_resources(data_json: dict, tcp_server: TCPServer = None):
             "username": username,
             "topic": given_topic
         }
+    except RuntimeError:
+        logger.exception("Error setting up Kafka resources.")
+        tcp_server.send_system_message_to_client("SERVER_CONNECTION_FAILURE", username)
+        raise
     except Exception:
         logger.exception("Error setting up Kafka resources.")
         raise
+    
     finally:
         # Cleanup: close consumer, flush producer, optionally delete topic
         if consumer:
@@ -397,15 +399,9 @@ def kafka_resources(data_json: dict, tcp_server: TCPServer = None):
         if producer:
             producer.flush(3)  # ensure all queued messages are delivered
             logger.info("Flushed Kafka producer.")
+            
+        tcp_server.send_system_message_to_client("SERVER_CONNECTION_CLOSED", username)
 
-        # # OPTIONAL cleanup: delete the topic
-        # if admin is not None and topic and DELETE_TOPIC_AT_EXIT:
-        #     try:
-        #         del_futures = admin.delete_topics([topic])
-        #         del_futures[topic].result()
-        #         logger.info("Deleted Kafka topic '%s'.", topic)
-        #     except Exception:
-        #         logger.exception("Failed to delete topic '%s'.", topic)
 
 
 def establish_kafka_connection(
