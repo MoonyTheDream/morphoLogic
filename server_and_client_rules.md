@@ -8,7 +8,8 @@ Type: *JSON*
     "timestamp": "<timestamp>",
     "client_ip": "<client.ip>"
   },
-  "client_input": "<string sent by an user>"
+  "client_input": "<string sent by an user>",
+  "system_message": "optional system message like 'HANSHAKE'" // created only by microserver
 }
 ## Server -> Client
 {

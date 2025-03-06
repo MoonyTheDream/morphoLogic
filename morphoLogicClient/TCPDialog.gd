@@ -77,7 +77,7 @@ func read_port_from_temp_file() -> bool:
 	return false
 
 func initialize_server_connection(client_data):
-	send_tcp_message(client_data)
+	send_tcp_message(client_data, true)
 	var tcp_t = Thread.new()
 	tcp_t.start(continously_receive_messages)
 
@@ -101,20 +101,20 @@ func emit_received_data(data):
 	new_data_arrived.emit(data)
 
 func send_tcp_message(message: String, system_message: bool = false) -> void:
-	var wrap_message
-	if system_message:
-		wrap_message = message
-	else:
-		wrap_message = {
+	var wrap_message = {
 			"auth": {
 				"username": ClientData.username,
 				"client_version": ClientData.version,
 				"timestamp": Time.get_datetime_string_from_system(true, true),
 				"session_token": "NOT_IMPLEMENTED_YET"
-			},
-			"client_input": message
+			}
 		}
-		wrap_message = JSON.stringify(wrap_message)
+	if system_message:
+		wrap_message["system_message"] = message
+	else:
+		wrap_message["client_input"] = message
+	wrap_message = JSON.stringify(wrap_message)
+
 	TCPClient.poll()
 	# var debug = TCPClient.get_status()
 	if TCPClient.get_status() == StreamPeerTCP.STATUS_CONNECTED:

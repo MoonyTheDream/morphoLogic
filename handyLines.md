@@ -3,6 +3,7 @@
 -> addresedToClients (key = username) # zmieniamy założenie. Będzie topic per client
 ## Communication client -> server
 -> serverGlobalTopic 
+-> serverHandshakeTopic
 
 # Docker Kafka Client Commands
 ## kafka_2.13-3.9.0

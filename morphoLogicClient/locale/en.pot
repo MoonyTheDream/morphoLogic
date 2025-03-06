@@ -1,7 +1,6 @@
 # LANGUAGE translation for morphoLogicClient for the following files:
 # res://scenes/line_edit.gd
 # res://scenes/rich_text_label.gd
-# res://TCPDialog.gd
 #
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
 #
@@ -12,6 +11,10 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8-bit\n"
+
+#: scenes/line_edit.gd
+msgid ""
+msgstr ""
 
 #: scenes/line_edit.gd
 msgid "Please provide your [color=medium_turquoise]username[/color].\n"
@@ -29,10 +32,6 @@ msgstr ""
 msgid "Welcome, [color=medium_turquoise]{username}[/color]! Let me see if you are on the invite guest.\n"
 msgstr ""
 
-#: scenes/line_edit.gd
-msgid ""
-msgstr ""
-
 #: scenes/rich_text_label.gd
 msgid "Connecting...\n"
 msgstr ""
@@ -43,4 +42,8 @@ msgstr ""
 
 #: scenes/rich_text_label.gd
 msgid "[color=tomato]Failed to launch Microserver![/color]\n"
+msgstr ""
+
+#: scenes/rich_text_label.gd
+msgid "[color=yellow_green]Succsessfully connected to server.[/color]"
 msgstr ""

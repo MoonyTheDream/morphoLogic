@@ -39,8 +39,8 @@ msgid ""
 "Welcome, [color=medium_turquoise]{username}[/color]! Let me see if you are "
 "on the invite guest.\n"
 msgstr ""
-"Witaj zatem, [color=medium_turquoise]{username}[/color]! Niech no spojrzę "
-"czy na liście Ciebie mamy.\n"
+"Witaj zatem, [color=medium_turquoise]{username}[/color]! Pozwól tylko, że "
+"spojrzę czy na liście Ciebie mamy.\n"
 
 #: scenes/rich_text_label.gd
 msgid "Connecting...\n"
@@ -53,3 +53,7 @@ msgstr "[color=yellow_green]Częściowo odzyskano samoświadomość.[/color]\n"
 #: scenes/rich_text_label.gd
 msgid "[color=tomato]Failed to launch Microserver![/color]\n"
 msgstr "[color=tomato]Nie udało się uruchomić Mircoservera![/color]\n"
+
+#: scenes/rich_text_label.gd
+msgid "[color=yellow_green]Succsessfully connected to server.[/color]"
+msgstr "[color=yellow_green]Odzyskano kontakt z rzeczywistością.[/color]"

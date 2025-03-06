@@ -73,6 +73,7 @@ offset_left = 18.0
 offset_top = 968.0
 offset_right = 1895.0
 offset_bottom = 1042.0
+keep_editing_on_text_submit = true
 middle_mouse_paste_enabled = false
 caret_blink = true
 script = ExtResource("2_bj4i0")

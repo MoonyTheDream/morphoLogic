@@ -11,7 +11,7 @@ from logging.handlers import RotatingFileHandler
 from time import gmtime, strftime, sleep
 
 from confluent_kafka import Producer, Consumer, KafkaException  # , KafkaError
-from confluent_kafka.admin import AdminClient, NewTopic
+# from confluent_kafka.admin import AdminClient, NewTopic
 
 ####################################################################################################
 # Configuration & Logging
@@ -46,7 +46,9 @@ def load_settings(path=SETTINGS_FILE):
         raise FileNotFoundError(f"Settings file {path} not found.")
 
     with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+            return json.load(f)
+
+
 
 
 _SETTINGS = load_settings()
@@ -56,8 +58,10 @@ BOOTSTRAP_SERVER = os.getenv(
 )
 GENERAL_TOPIC = os.getenv("KAFKA_GENERAL_TOPIC", _SETTINGS.get(
     "generalTopic", "serverGlobalTopic"))
-DELETE_TOPIC_AT_EXIT = os.getenv("DELETE_TOPIC_AT_EXIT", _SETTINGS.get(
-    "deleteTopicAtExit", False))
+HANDSHAKE_TOPIC = os.getenv("KAFKA_HANDSHAKE_TOPIC", _SETTINGS.get(
+    "handshakeTopic", "serverHandshakeTopic"))
+# DELETE_TOPIC_AT_EXIT = os.getenv("DELETE_TOPIC_AT_EXIT", _SETTINGS.get(
+#     "deleteTopicAtExit", False))
 
 # Get a log level from settings.json
 # Change to false in settings.json for .debug visible
@@ -216,7 +220,6 @@ class TCPServer:
         """
         message = {"system_message": message}
         wrapped_data = self.add_auth(message, username)
-        logger.debug(wrapped_data)
         wrapped_data = json.dumps(wrapped_data)
         self.send_message(wrapped_data)
 
@@ -277,59 +280,110 @@ class TCPServer:
 
 
 @contextmanager
-def kafka_resources(client_id: str, tcp_server: TCPServer = None):
+def kafka_resources(data_json: dict, tcp_server: TCPServer = None):
     """
     A context manager that handles the creation of Kafka Admin Client, Producer,
     Consmer and a new topic for a specific client_id.
     """
-    admin = None
+    # admin = None
     producer = None
     consumer = None
-    topic = client_id  # a topic name based on the username
+    username = data_json["auth"]["username"].strip()  # a topic name based on the username
 
     try:
-        admin_conf = {
-            'bootstrap.servers': BOOTSTRAP_SERVER
-        }
-        admin = AdminClient(admin_conf)
-        establish_kafka_connection(admin, tcp_server, client_id)
+        # admin_conf = {
+        #     'bootstrap.servers': BOOTSTRAP_SERVER
+        # }
+        # admin = AdminClient(admin_conf)
 
+        consumer_conf = {
+            'bootstrap.servers': BOOTSTRAP_SERVER,
+            'group.id': username + "ClientGroup",  # group.id is the same as client_id
+            'auto.offset.reset': 'earliest',
+            "enable.partition.eof": False  # we'll be hitting end of partition quite often
+        }
+        consumer = Consumer(consumer_conf)
+        establish_kafka_connection(consumer, tcp_server, username)
+        consumer.subscribe([HANDSHAKE_TOPIC])
+        
         producer_conf = {
             'bootstrap.servers': BOOTSTRAP_SERVER,
             'acks': 'all'
         }
         producer = Producer(producer_conf)
 
-        consumer_conf = {
-            'bootstrap.servers': BOOTSTRAP_SERVER,
-            'group.id': client_id,  # group.id is the same as client_id
-            'auto.offset.reset': 'earliest',
-            "enable.partition.eof": False  # we'll be hitting end of partition quite often
-        }
-        consumer = Consumer(consumer_conf)
-
-        # Creating a new topic. If it already exists we just log this info and continue.
-        new_topic = NewTopic(topic)
-        dict_future_topics = admin.create_topics([new_topic])
+        # Handshake and request server for a topic name.
+        data_json = json.dumps(data_json)
         try:
-            dict_future_topics[topic].result()  # Wait for confirmation
-            logger.info('Created Kafka topic "%s"', topic)
-        except Exception as e:
-            if "TOPIC_ALREADY_EXISTS" in str(e):
-                logger.warning(
-                    'Kafra topic "%s" already exists. Continuing.', topic)
-            else:
-                logger.exception('Failed to create topic %s.', topic)
-                raise  # re-raise to exit the context manager
+            producer.produce(
+                HANDSHAKE_TOPIC, key=username, value=data_json)
+            # Delivery reports if needed here
+            logger.debug(
+                "Produced TCP -> Kafka message to topic '%s': %s", HANDSHAKE_TOPIC, data_json)
+        except KafkaException:
+            logger.exception(
+                "KafkaException while producing message.")
+        
+        # Reading topic from Kafka handshake message and subscribing to it
+        given_topic = ""
+        retried = False
+        while True:
+            try:
+                handshake_msg = consumer.consume(1, 10)
+                if not handshake_msg and not retried:
+                    logger.warning("Microserver didn't receive handshake message from Kafka. Retrying.")
+                    retried = True
+                    continue
+                if not handshake_msg and retried:
+                    break
+                handshake_msg = handshake_msg[0]
+            except Exception:
+                logger.exception("Error consuming handshake message from Kafka.")
+            if handshake_msg and not handshake_msg.error():
+                if handshake_msg.key() != "server_message":
+                    continue
+                kafka_msg = handshake_msg.value().decode("utf-8")
+                kafka_msg = json.loads(kafka_msg)
+                
+                if kafka_msg.get("system_message") == "CONNECTION_APPROVED":
+                    given_topic = kafka_msg["client_topic_handoff"]
+                    break
+                
+                tcp_server.send_system_message_to_client("SERVER_CONNECTION_FAILURE", username)
+                raise RuntimeError("Handshake message from Kafka invalid")
+            
+            elif handshake_msg and handshake_msg.error():
+                logger.error("Error consuming message: %s", handshake_msg.error().reason())
+                raise RuntimeError("Error consuming handshake message.")
+            
+        if not given_topic or not handshake_msg:
+            raise RuntimeError("Topic after handshake not found.")
+        
+        consumer.subscribe([given_topic])
+        
+        
+        # new_topic = NewTopic(topic)
+        # dict_future_topics = admin.create_topics([new_topic])
+        # try:
+        #     dict_future_topics[topic].result()  # Wait for confirmation
+        #     logger.info('Created Kafka topic "%s"', topic)
+        # except Exception as e:
+        #     if "TOPIC_ALREADY_EXISTS" in str(e):
+        #         logger.warning(
+        #             'Kafra topic "%s" already exists. Continuing.', topic)
+        #     else:
+        #         logger.exception('Failed to create topic %s.', topic)
+        #         raise  # re-raise to exit the context manager
 
-        consumer.subscribe([topic])
-        logger.info('Subscribed to Kafka topic "%s"', topic)
+        # consumer.subscribe([topic])
+        logger.info('Subscribed to Kafka topic "%s"', given_topic)
 
         yield {
-            "admin": admin,
+            # "admin": admin,
             "producer": producer,
             "consumer": consumer,
-            # "topic": topic
+            "username": username,
+            "topic": given_topic
         }
     except Exception:
         logger.exception("Error setting up Kafka resources.")
@@ -338,37 +392,37 @@ def kafka_resources(client_id: str, tcp_server: TCPServer = None):
         # Cleanup: close consumer, flush producer, optionally delete topic
         if consumer:
             consumer.close()
-            logger.info('Closed Kafka consumer for topic "%s"', topic)
+            logger.info('Closed Kafka consumer.')
 
         if producer:
             producer.flush(3)  # ensure all queued messages are delivered
             logger.info("Flushed Kafka producer.")
 
-        # OPTIONAL cleanup: delete the topic
-        if admin is not None and topic and DELETE_TOPIC_AT_EXIT:
-            try:
-                del_futures = admin.delete_topics([topic])
-                del_futures[topic].result()
-                logger.info("Deleted Kafka topic '%s'.", topic)
-            except Exception:
-                logger.exception("Failed to delete topic '%s'.", topic)
+        # # OPTIONAL cleanup: delete the topic
+        # if admin is not None and topic and DELETE_TOPIC_AT_EXIT:
+        #     try:
+        #         del_futures = admin.delete_topics([topic])
+        #         del_futures[topic].result()
+        #         logger.info("Deleted Kafka topic '%s'.", topic)
+        #     except Exception:
+        #         logger.exception("Failed to delete topic '%s'.", topic)
 
 
 def establish_kafka_connection(
-    admin: AdminClient, tcp_server: TCPServer, username, max_retries=3, wait_time=1
+    consumer: Consumer, tcp_server: TCPServer, username, max_retries=3, wait_time=1
 ):
     """
     Verifies the connection to Kafka by requesting cluster metadata.
     Retries a few times before giving up.
     """
-    for attemt in range(max_retries):
+    for attempt in range(max_retries):
         try:
-            cluster_metadata = admin.list_topics(timeout=5)
+            cluster_metadata = consumer.list_topics(timeout=5)
             if cluster_metadata.brokers:
                 logger.debug("Kafka connection verified.")
                 return
         except KafkaException as e:
-            if attemt < max_retries - 1:
+            if attempt < max_retries - 1:
                 logger.warning("Kafka connection failed. Retrying.")
                 tcp_server.send_direct_message_to_client(
                     "Kafka connection failed. Retrying.", username, MessageType.WARNING
@@ -408,33 +462,33 @@ def main():
 
             try:
                 data_json = json.loads(client_info)
-                if data_json["client_input"] == "REQUEST_SERVER_CONNECTION":
-                    client_id = data_json["auth"].get("username", "").strip()
-                else:
-                    client_id = ""
-            except (json.JSONDecodeError, AttributeError):
+                # if data_json["system_message"] == "REQUEST_SERVER_CONNECTION":
+                #     client_id = data_json["auth"].get("username", "").strip()
+                # else:
+                #     client_id = ""
+            except json.JSONDecodeError:
                 logger.exception(
                     "Invalid JSON received from TCP client. Shutting down.")
                 return
 
-            if not client_id:
+            if not data_json.get("system_message", "") or not data_json["auth"].get("username", ""):
                 logger.error(
                     "No valid 'username' in initial JSON. Shutting down.")
                 return
 
             # Enter Kafka context
-            with kafka_resources(client_id, tcp) as kafka_context:
+            with kafka_resources(data_json, tcp) as kafka_context:
                 producer: Producer = kafka_context["producer"]
                 consumer: Consumer = kafka_context["consumer"]
                 # topic = kafka_context["topic"]
-                # logger.debug(str(kafka_resources))
+                username = kafka_context["username"]
 
                 logger.info(
-                    "Kafka resources for client '%s' set up. Entering main loop.", client_id
+                    "Kafka resources for client '%s' set up. Entering main loop.", username
                 )
                 if DEBUG_MODE:
                     tcp.send_system_message_to_client(
-                        "CONNECTED_TO_SERVER", client_id)
+                        "CONNECTED_TO_SERVER", username)
 
                 # Main bridging loop
                 while True:
@@ -442,6 +496,7 @@ def main():
                     # Kafka -> TCP -> Godot
                     try:
                         msg = consumer.consume(num_messages=1, timeout=0.1)[0]
+                        
                     except Exception:
                         logger.exception("Error consuming message from Kafka.")
                     if msg and not msg.error():
@@ -461,14 +516,14 @@ def main():
                     # Godot -> TCP -> Kafka
                     tcp_msg = tcp.receive_message()
                     if tcp_msg:
-                        if tcp_msg == "CLEANUP":
+                        if json.loads(tcp_msg).get("system_message", "") == "CLEANUP":
                             logger.info(
                                 "Received CLEANUP message from Godot. Exiting.")
                             break
                         # Produce the message to the Kafka topic with username as a key
                         try:
                             producer.produce(
-                                GENERAL_TOPIC, key=client_id, value=tcp_msg, on_delivery=_verify_delivery_kafka)
+                                GENERAL_TOPIC, key=username, value=tcp_msg, on_delivery=_verify_delivery_kafka)
                             # Delivery reports if needed here
                             logger.debug(
                                 "Produced TCP -> Kafka message to topic '%s': %s", GENERAL_TOPIC, tcp_msg)
