@@ -55,5 +55,22 @@ msgid "[color=tomato]Failed to launch Microserver![/color]\n"
 msgstr "[color=tomato]Nie udało się uruchomić Mircoservera![/color]\n"
 
 #: scenes/rich_text_label.gd
-msgid "[color=yellow_green]Succsessfully connected to server.[/color]"
-msgstr "[color=yellow_green]Odzyskano kontakt z rzeczywistością.[/color]"
+msgid "[color=yellow_green]Succsessfully connected to server.[/color]\n"
+msgstr "[color=yellow_green]Odzyskano kontakt z rzeczywistością.[/color]\n"
+
+#: scenes/rich_text_label.gd
+msgid "[color=gold]Trouble Connecting to Server. Retrying.[/color]\n"
+msgstr ""
+"[color=gold]Problem z połączeniem z Serwerem. Próbuję ponownie.[/color]\n"
+
+#: scenes/rich_text_label.gd
+msgid "[color=tomato]Failure Connecting to Server.[/color]\n"
+msgstr ""
+"[color=tomato]Nie udało się połączyć z Serwerem! Smuteczek. :( Śpij, "
+"Słodki Książę.[/color]\n"
+
+#: scenes/rich_text_label.gd
+msgid "[color=tomato]UKNOWN SYSTEM MESSAGE! REPORT ISSUE TO DEVS.[/color]\n"
+msgstr ""
+"[color=tomato]NIEZNANA WIADOMOŚĆ SYSTEMOWA! ZGŁOŚ PROBLEM TWÓRCOM.[/"
+"color]\n"

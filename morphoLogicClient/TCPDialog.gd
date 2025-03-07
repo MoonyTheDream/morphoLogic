@@ -103,6 +103,7 @@ func emit_received_data(data):
 func send_tcp_message(message: String, system_message: bool = false) -> void:
 	var wrap_message = {
 			"auth": {
+				"source": "client",
 				"username": ClientData.username,
 				"client_version": ClientData.version,
 				"timestamp": Time.get_datetime_string_from_system(true, true),

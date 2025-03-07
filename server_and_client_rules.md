@@ -1,8 +1,19 @@
 # Communication between Server and Clinet
 Type: *JSON*
+
+## HANDSHAKE
+*In handshake topic:*
+client -> "system_message": "REQUEST_SERVER_CONNECTION"
+server -> {"system_message": "TOPIC_CREATED_SEND_HANDSHAKE_THERE", "client_topic_handoff": <topic>}
+*In handled topic:*
+client -> "system_message": "HANDSHAKE_DEDICATED_TOPIC"
+server -> "system_message": "ACK"
+
+
 ## Client -> Server
 {
   "auth": {
+    "source": "client"
     "username": "<username>",
     "client_version": "<client_version>",
     "timestamp": "<timestamp>",

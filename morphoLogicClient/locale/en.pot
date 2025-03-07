@@ -45,5 +45,17 @@ msgid "[color=tomato]Failed to launch Microserver![/color]\n"
 msgstr ""
 
 #: scenes/rich_text_label.gd
-msgid "[color=yellow_green]Succsessfully connected to server.[/color]"
+msgid "[color=yellow_green]Succsessfully connected to server.[/color]\n"
+msgstr ""
+
+#: scenes/rich_text_label.gd
+msgid "[color=gold]Trouble Connecting to Server. Retrying.[/color]\n"
+msgstr ""
+
+#: scenes/rich_text_label.gd
+msgid "[color=tomato]Failure Connecting to Server.[/color]\n"
+msgstr ""
+
+#: scenes/rich_text_label.gd
+msgid "[color=tomato]UKNOWN SYSTEM MESSAGE! REPORT ISSUE TO DEVS.[/color]\n"
 msgstr ""

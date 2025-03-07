@@ -3,6 +3,7 @@ Initializing Kafka connection and creating context manager for
 Producer, Consumer and Admin
 """
 import os
+import json
 
 from time import sleep
 
@@ -10,6 +11,7 @@ from confluent_kafka import Producer, Consumer, KafkaException  # , KafkaError
 from confluent_kafka.admin import AdminClient, NewTopic
 
 from ..utils.logger import logger
+from ..utils.time_helpers import get_gmt_time
 from ..config import settings as _SETTINGS
 
 BOOTSTRAP_SERVER = os.getenv(
@@ -110,17 +112,20 @@ class KafkaConnection:
     def create_new_topics(self, topics: list[str]):
         """Creating a new topic. If it already exists we just log this info and continue."""
         new_topics_list = []
+        b_topic = ""
         for topic in topics:
             if not self._topic_exists(topic):
-                new_topics_list.append = NewTopic(topic)
-        dict_future_topics = self.admin.create_topics(new_topics_list)
-        try:
-            for topic, future_topic in dict_future_topics.items():
-                future_topic.result()
-            logger.info('Created Kafka topic "%s"', topic)
-        except Exception:
-            logger.exception('Failed to create topic %s.', topic)
-            raise  # re-raise to exit the context manager
+                new_topics_list.append(NewTopic(topic))
+        if new_topics_list:
+            dict_future_topics = self.admin.create_topics(new_topics_list)
+            try:
+                for topic, future_topic in dict_future_topics.items():
+                    b_topic = topic
+                    future_topic.result()
+                logger.info('Created Kafka topic "%s"', topic)
+            except Exception:
+                logger.exception('Failed to create topic "%s".', b_topic)
+                raise  # re-raise to exit the context manager
         
     def _topic_exists(self, topic: str) -> bool:
         metadata = self.admin.list_topics()
@@ -135,6 +140,80 @@ class KafkaConnection:
         """Unsubscribes the class' Kafka Consumer from specific topic."""
         self.consumer.unsubscribe(topics)
         logger.info('Unsubscribed from Kafka topics "%s"', topics)
+
+    def send_data_to_user(
+        self,
+        topic: str,
+        username: str,
+        data: dict = None,
+        direct_message="",
+        system_message=""
+        ):
+        """Wrapper for sending message. Add more preferences here later if needed"""
+        if data is None:
+            data = {}
+        data.update ({
+            "dicrect_message": direct_message,
+            "system_message": system_message
+        })
+        wrapped_data = self._add_auth(data, username)
+        wrapped_data = json.dumps(data)
+        self.producer.produce(topic, value=wrapped_data) # no key, see below
+        # adding key might result in some consumers not consuming their message as each 
+        # consumer get's it's own partition when there's more that one consumers
+        # and there might be more than one producer and consumer when multiple users will try to join
+        
+    def _add_auth(self, data: dict, username: str) -> dict:
+        """
+        Wraps auth data to the dictionary.
+        """
+        data.update(
+            {
+                "auth": {
+                    "source": "server",
+                    "to_user": username,
+                    "server_version": _SETTINGS.get("server_version", "ERROR"),
+                    "timestamp": get_gmt_time()
+                }
+            }
+        )
+        return data
+    
+    # def consume_message(self) -> dict:
+    #     """Wrapper helper consuming one message from Kafka"""
+    #     try:
+    #         msg = self.consumer.consume(num_messages=1, timeout=-1)
+    #         if msg:
+    #             msg = msg[0]
+                
+    #             if msg.error():
+    #                 logger.warning(
+    #                     "Error consuming message: %s", msg.error().str())
+    #                 # WIP
+    #                 # FUTURE ADDITIONAL HANDLING
+    #                 return None
+                
+    #             kafka_msg = msg.value().decode("utf-8")
+    #             logger.debug('Consumed message from Kafka: "%s"', kafka_msg)
+    #             kafka_msg = json.loads(kafka_msg)
+    #             return kafka_msg
+    #     except Exception:
+    #         logger.exception("Error consuming message from Kafka")  
+    
+    def update_subscription(self, topics: list[str]):
+        """Checks if listed topics are already subscribed and if not, subscribes"""
+        current_subscription = self.consumer.assignment()
+        current_subscription = [topic_partition.topic for topic_partition in current_subscription]
+        logger.debug('Current subscribed: "%s"', current_subscription)
+        
+        to_update = []
+        for topic in topics:
+            if topic not in current_subscription:
+                to_update.append(topic)
+        
+        to_update += current_subscription
+        self.consumer.subscribe(to_update)
+                    
 
 
 
