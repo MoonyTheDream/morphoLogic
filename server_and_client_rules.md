@@ -12,7 +12,7 @@ server -> "system_message": "ACK"
 
 ## Client -> Server
 {
-  "auth": {
+  "metadata": {
     "source": "client"
     "username": "<username>",
     "client_version": "<client_version>",
@@ -24,7 +24,7 @@ server -> "system_message": "ACK"
 }
 ## Server -> Client
 {
-  "auth": {
+  "metadata": {
     "source": "<server/microserver>",
     "to_user": "<name_of_the_target_user>",
     "server_version": "<client_version>",

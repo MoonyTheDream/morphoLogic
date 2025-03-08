@@ -156,20 +156,20 @@ class KafkaConnection:
             "dicrect_message": direct_message,
             "system_message": system_message
         })
-        wrapped_data = self._add_auth(data, username)
+        wrapped_data = self._add_metadata(data, username)
         wrapped_data = json.dumps(data)
         self.producer.produce(topic, value=wrapped_data) # no key, see below
         # adding key might result in some consumers not consuming their message as each 
         # consumer get's it's own partition when there's more that one consumers
         # and there might be more than one producer and consumer when multiple users will try to join
         
-    def _add_auth(self, data: dict, username: str) -> dict:
+    def _add_metadata(self, data: dict, username: str) -> dict:
         """
-        Wraps auth data to the dictionary.
+        Wraps metadata data to the dictionary.
         """
         data.update(
             {
-                "auth": {
+                "metadata": {
                     "source": "server",
                     "to_user": username,
                     "server_version": _SETTINGS.get("server_version", "ERROR"),

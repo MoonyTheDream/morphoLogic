@@ -187,13 +187,13 @@ class TCPServer:
             logger.exception("Error sending data via TCP.")
             return False
 
-    def add_auth(self, data: dict, username: str):
+    def add_metadata(self, data: dict, username: str):
         """
         Used when a microserver needs to send data directly to client.
-        Wraps auth data to the dictionary.
+        Wraps metadata data to the dictionary.
         """
         data.update({
-            "auth": {
+            "metadata": {
                     "source": "microserver",
                     "to_user": username,
                     "server_version": MICROSERVER_VERSION,
@@ -210,7 +210,7 @@ class TCPServer:
         if m_type.value != 1:
             message = self._colorize_message(message, m_type)
         message = {"direct_messages": [message]}
-        wrapped_data = self.add_auth(message, username)
+        wrapped_data = self.add_metadata(message, username)
         wrapped_data = json.dumps(wrapped_data)
         self.send_message(wrapped_data)
 
@@ -219,7 +219,7 @@ class TCPServer:
         Used when a microserver has a system message to client like 'Connected to Server'
         """
         message = {"system_message": message}
-        wrapped_data = self.add_auth(message, username)
+        wrapped_data = self.add_metadata(message, username)
         wrapped_data = json.dumps(wrapped_data)
         self.send_message(wrapped_data)
 
@@ -302,7 +302,7 @@ def handle_kafka_handshake(consumer: Consumer, producer: Producer, tcp_server: T
             if handshake_msg:
                 kafka_msg = handshake_msg.value().decode("utf-8")
                 kafka_msg = json.loads(kafka_msg)
-                if kafka_msg['auth'].get("to_user", "") != username:
+                if kafka_msg['metadata'].get("to_user", "") != username:
                     continue
                 
                 if kafka_msg.get("system_message") == "TOPIC_CREATED_SEND_HANDSHAKE_THERE":
@@ -327,7 +327,7 @@ def _confirm_and_ack(given_topic: str, consumer: Consumer, producer: Producer, t
         value = json.dumps(
             {
             "system_message": "HANDSHAKE_DEDICATED_TOPIC",
-            "auth": {
+            "metadata": {
                 "source":"client",
                 "username":username
                 }
@@ -372,7 +372,7 @@ def kafka_resources(data_json: dict, tcp_server: TCPServer = None):
     # admin = None
     producer = None
     consumer = None
-    username = data_json["auth"]["username"].strip()  # a topic name based on the username
+    username = data_json["metadata"]["username"].strip()  # a topic name based on the username
 
     try:
         # admin_conf = {
@@ -501,7 +501,7 @@ def main():
             try:
                 data_json = json.loads(client_info)
                 # if data_json["system_message"] == "REQUEST_SERVER_CONNECTION":
-                #     client_id = data_json["auth"].get("username", "").strip()
+                #     client_id = data_json["metadata"].get("username", "").strip()
                 # else:
                 #     client_id = ""
             except json.JSONDecodeError:
@@ -509,7 +509,7 @@ def main():
                     "Invalid JSON received from TCP client. Shutting down.")
                 return
 
-            if not data_json.get("system_message", "") or not data_json["auth"].get("username", ""):
+            if not data_json.get("system_message", "") or not data_json["metadata"].get("username", ""):
                 logger.error(
                     "No valid 'username' in initial JSON. Shutting down.")
                 return

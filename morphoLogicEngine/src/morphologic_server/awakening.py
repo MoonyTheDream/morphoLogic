@@ -18,8 +18,11 @@ def awake():
     logger.info("Server version: %s", _SETTINGS.get("server_version", "ERROR"))
     logger.info("Waking up laws of nature.")
     with KafkaConnection() as kafka:
-        while True:
-            consume_and_handle(kafka)
+        try:
+            while True:
+                consume_and_handle(kafka)
+        except KeyboardInterrupt:
+            logger.info("Keyboard Interrupt - closing down the server.")
     logger.info("Server closing down.")
             
 
@@ -40,7 +43,7 @@ def consume_and_handle(kafka: KafkaConnection):
                     
                 if msg.topic() == _HANDSHAKE_TOPIC:
                     kafka_msg = _decode_msg(msg)
-                    if kafka_msg['auth']['source'] == "server":
+                    if kafka_msg['metadata']['source'] == "server":
                         return
                     
                     # Handler
@@ -73,7 +76,7 @@ def _decode_msg(msg) -> dict:
     
 
 def _handshake_topic_creation(kafka: KafkaConnection, client_handshake_msg: dict):
-    username = client_handshake_msg['auth'].get("username", "")
+    username = client_handshake_msg['metadata'].get("username", "")
     if username: # tu można później dodać walidację, czy użytkownik istnieje i jaki topic itp.
         kafka.create_new_topics([username])
         kafka.update_subscription([username])
@@ -89,7 +92,7 @@ def _check_and_acknowledge_client_topic(kafka: KafkaConnection, msg: dict):
     After client's HANDSHAKE_DEDICATED_TOPIC check if the topic is subscribed and 
     then send there an "ACK" system message
     """
-    topic = msg['auth']["username"]
+    topic = msg['metadata']["username"]
     current_subscription = kafka.consumer.assignment()
     logger.debug('Current subscribed: "%s"', [topic_partition.topic for topic_partition in current_subscription])
     is_subscribed = False
