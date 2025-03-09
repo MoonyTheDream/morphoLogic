@@ -60,8 +60,6 @@ GENERAL_TOPIC = os.getenv("KAFKA_GENERAL_TOPIC", _SETTINGS.get(
     "generalTopic", "serverGlobalTopic"))
 HANDSHAKE_TOPIC = os.getenv("KAFKA_HANDSHAKE_TOPIC", _SETTINGS.get(
     "handshakeTopic", "serverHandshakeTopic"))
-# DELETE_TOPIC_AT_EXIT = os.getenv("DELETE_TOPIC_AT_EXIT", _SETTINGS.get(
-#     "deleteTopicAtExit", False))
 
 # Get a log level from settings.json
 # Change to false in settings.json for .debug visible
@@ -121,8 +119,6 @@ class TCPServer:
         """
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._configure_socket(self.sock)
-        # s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        # s.settimeout(60)  # Exit if no connection within 1 min
 
         try:
             self.sock.bind((self.HOST, self.port))
@@ -131,7 +127,6 @@ class TCPServer:
             self.port = self.sock.getsockname()[1]
             with open(self.FILE_PORT_HANDLING, "w", encoding="utf-8") as f:
                 f.write(str(self.port))
-                # f.flush() # Not needed, file is closed after this block
 
             self.sock.listen()
             logger.info("Kafka service listening on %s:%s",
@@ -181,8 +176,6 @@ class TCPServer:
             self.conn.sendall(data.encode("utf-8"))
             logger.info('Sent via TCP: "%s"', data)
             return True
-        # except OSError:
-        #     return True
         except Exception:
             logger.exception("Error sending data via TCP.")
             return False
@@ -326,7 +319,7 @@ def _confirm_and_ack(given_topic: str, consumer: Consumer, producer: Producer, t
         # ZWALONE! DO POPRAWY!
         value = json.dumps(
             {
-            "system_message": "HANDSHAKE_DEDICATED_TOPIC",
+            "system_message": "HANDSHAKE_GLOBAL_TOPIC",
             "metadata": {
                 "source":"client",
                 "username":username
@@ -375,11 +368,6 @@ def kafka_resources(data_json: dict, tcp_server: TCPServer = None):
     username = data_json["metadata"]["username"].strip()  # a topic name based on the username
 
     try:
-        # admin_conf = {
-        #     'bootstrap.servers': BOOTSTRAP_SERVER
-        # }
-        # admin = AdminClient(admin_conf)
-
         consumer_conf = {
             'bootstrap.servers': BOOTSTRAP_SERVER,
             'group.id': username + "ClientGroup",  # group.id is the same as client_id
@@ -396,40 +384,41 @@ def kafka_resources(data_json: dict, tcp_server: TCPServer = None):
         }
         producer = Producer(producer_conf)
 
-        # Handshake and request server for a topic name.
-        data_json = json.dumps(data_json)
-        try:
-            producer.produce(
-                HANDSHAKE_TOPIC, value=data_json)
-            # Delivery reports if needed here
-            logger.debug(
-                "Produced TCP -> Kafka message to topic '%s': %s", HANDSHAKE_TOPIC, data_json)
-        except KafkaException:
-            logger.exception(
-                "KafkaException while producing message.")
+        # # Handshake and request server for a topic name.
+        # data_json = json.dumps(data_json)
+        # try:
+        #     producer.produce(
+        #         HANDSHAKE_TOPIC, value=data_json)
+        #     # Delivery reports if needed here
+        #     logger.debug(
+        #         "Produced TCP -> Kafka message to topic '%s': %s", HANDSHAKE_TOPIC, data_json)
+        # except KafkaException:
+        #     logger.exception(
+        #         "KafkaException while producing message.")
         
-        # Reading topic from Kafka handshake message and subscribing to it
-        given_topic = handle_kafka_handshake(consumer, producer, tcp_server, username)
-        logger.debug("Given topic: %s", given_topic)
-        if not given_topic:
-            raise RuntimeError("Error consuming handshake message.")
+        # # Reading topic from Kafka handshake message and subscribing to it
+        # given_topic = handle_kafka_handshake(consumer, producer, tcp_server, username)
+        # logger.debug("Given topic: %s", given_topic)
+        # if not given_topic:
+        #     raise RuntimeError("Error consuming handshake message.")
         
-        consumer.subscribe([given_topic])
-        logger.info('Subscribed to Kafka topic "%s"', given_topic)
+        # consumer.subscribe([given_topic])
+        # logger.info('Subscribed to Kafka topic "%s"', given_topic)
 
         yield {
             # "admin": admin,
             "producer": producer,
             "consumer": consumer,
             "username": username,
-            "topic": given_topic
+            # "topic": given_topic
         }
-    except RuntimeError:
-        logger.exception("Error setting up Kafka resources.")
-        tcp_server.send_system_message_to_client("SERVER_CONNECTION_FAILURE", username)
-        raise
+    # except RuntimeError:
+    #     logger.exception("Error setting up Kafka resources.")
+    #     tcp_server.send_system_message_to_client("SERVER_CONNECTION_FAILURE", username)
+    #     raise
     except Exception:
         logger.exception("Error setting up Kafka resources.")
+        tcp_server.send_system_message_to_client("SERVER_CONNECTION_FAILURE", username)
         raise
     
     finally:
@@ -486,6 +475,7 @@ def main():
     """
     setup_logger()
     logger.info("Starting microserver.")
+    produce_topic = GENERAL_TOPIC
 
     try:
         with TCPServer() as tcp:
@@ -500,10 +490,10 @@ def main():
 
             try:
                 data_json = json.loads(client_info)
-                # if data_json["system_message"] == "REQUEST_SERVER_CONNECTION":
-                #     client_id = data_json["metadata"].get("username", "").strip()
-                # else:
-                #     client_id = ""
+                if data_json["system_message"] == "REQUEST_SERVER_CONNECTION":
+                    client_id = data_json["metadata"].get("username", "").strip()
+                else:
+                    client_id = ""
             except json.JSONDecodeError:
                 logger.exception(
                     "Invalid JSON received from TCP client. Shutting down.")
@@ -545,10 +535,10 @@ def main():
                             sent = tcp.send_message(kafka_msg)
                             if not sent:
                                 logger.warning(
-                                    "Message '%s' not sent to Godot.", kafka_msg)
+                                    'Message from %s: "%s" not sent to Godot.', msg.topic(), kafka_msg)
                             else:
                                 logger.debug(
-                                    'Consumed message from Kafka: "%s"', kafka_msg)
+                                    'Consumed message from %s: "%s"', msg.topic(), kafka_msg)
                     elif msg and msg.error():
                         logger.debug("Error consuming message: %s",
                                      msg.error().reason())
@@ -556,17 +546,35 @@ def main():
                     # Godot -> TCP -> Kafka
                     tcp_msg = tcp.receive_message()
                     if tcp_msg:
-                        if json.loads(tcp_msg).get("system_message", "") == "CLEANUP":
-                            logger.info(
-                                "Received CLEANUP message from Godot. Exiting.")
-                            break
+                        
+                        # Handling Godot requests to Microserver
+                        system_message = json.loads(tcp_msg).get("system_message", "")
+                        match system_message:
+                            case "CLEANUP":
+                                logger.info(
+                                    "Received CLEANUP message from Godot. Exiting.")
+                                break
+                            # case "REQUEST_SERVER_CONNECTION":
+                                
+                            case "MICROSERVER_SUBSCRIBE":
+                                subscribe_to = tcp_msg['microserver_subscribe_to']
+                                consumer.subscribe([subscribe_to])
+                                logger.debug('Subscribed to:"%s"', subscribe_to)
+                                continue
+                            case "MICROSERVER_PRODUCE_TO":
+                                produce_topic = tcp_msg['produce_topic']
+                                logger.debug('Changed topic to produce to, to: "%s"', produce_topic)
+                                continue
+                            case _:
+                                pass
+
                         # Produce the message to the Kafka topic with username as a key
                         try:
                             producer.produce(
-                                GENERAL_TOPIC, key=username, value=tcp_msg, on_delivery=_verify_delivery_kafka)
+                                produce_topic, key=username, value=tcp_msg, on_delivery=_verify_delivery_kafka)
                             # Delivery reports if needed here
                             logger.debug(
-                                "Produced TCP -> Kafka message to topic '%s': %s", GENERAL_TOPIC, tcp_msg)
+                                "Produced TCP -> Kafka message to topic '%s': %s", produce_topic, tcp_msg)
                         except KafkaException:
                             logger.exception(
                                 "KafkaException while producing message.")

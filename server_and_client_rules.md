@@ -5,9 +5,11 @@ Type: *JSON*
 *In handshake topic:*
 client -> "system_message": "REQUEST_SERVER_CONNECTION"
 server -> {"system_message": "TOPIC_CREATED_SEND_HANDSHAKE_THERE", "client_topic_handoff": <topic>}
+*In globalServerTopic*
+client -> "system_message": "HANDSHAKE_GLOBAL_TOPIC"
 *In handled topic:*
-client -> "system_message": "HANDSHAKE_DEDICATED_TOPIC"
 server -> "system_message": "ACK"
+
 
 
 ## Client -> Server
@@ -48,3 +50,14 @@ NAMES = [color=medium_turquoise]
 INFO (positive) = [color=yellow_green]
 WARNING = [color=gold]
 ERROR = [color=tomato]
+
+
+## Godot -> Microserver requests
+
+Subscribing to new topic by client
+"system_message": "MICROSERVER_SUBSCRIBE"
+"microserver_subscribe_to": "<topic>"
+
+Setting topic to produce to:
+"system_message": "MICROSERVER_PRODUCE_TO"
+"produce_topic": "<the topic>"

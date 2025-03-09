@@ -13,7 +13,7 @@ func _ready() -> void:
 	
 	var username = await self.request_username()
 	ClientData.username = username
-	TCPDialog.initialize_server_connection("REQUEST_SERVER_CONNECTION")
+	TCPDialog.initialize_server_connection()
 
 	self.text_submitted.disconnect(_inputHandler)
 	self.text_submitted.connect(_send_to_tcp)
@@ -37,7 +37,7 @@ func _append(message: String) -> void:
 
 func _send_to_tcp(message: String) -> void:
 	_inputHandler(message)
-	TCPDialog.send_tcp_message(message)
+	TCPDialog.send_tcp_message({"client_input": message})
 	
 func _up():
 	_if_at_zero(true)

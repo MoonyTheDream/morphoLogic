@@ -76,14 +76,14 @@ func read_port_from_temp_file() -> bool:
 			return false
 	return false
 
-func initialize_server_connection(client_data):
-	send_tcp_message(client_data, true)
+func initialize_server_connection():
+	send_tcp_message({"system_message": "REQUEST_SERVER_CONNECTION"})
 	var tcp_t = Thread.new()
 	tcp_t.start(continously_receive_messages)
 
 func _exit_tree():
 	# Make sure Python processed is killed (to death) when exiting godot
-	send_tcp_message("CLEANUP", true)
+	send_tcp_message({"system_message" = "CLEANUP"})
 	print("[GODOT] Python microserver has been slain.")
 
 
@@ -94,37 +94,35 @@ func continously_receive_messages() -> void:
 			var available_bytes = TCPClient.get_available_bytes()
 			if available_bytes > 0:
 				var received_data = TCPClient.get_utf8_string(available_bytes)
-				call_deferred("emit_received_data", received_data)
+				var dict_data : Dictionary = JSON.parse_string(received_data)
+				call_deferred("emit_received_data", dict_data)
 				# new_data_arrived.emit(received_data)
 
 func emit_received_data(data):
 	new_data_arrived.emit(data)
 
-func send_tcp_message(message: String, system_message: bool = false) -> void:
-	var wrap_message = {
-			"metadata": {
-				"source": "client",
-				"username": ClientData.username,
-				"client_version": ClientData.version,
-				"timestamp": Time.get_datetime_string_from_system(true, true),
-				"session_token": "NOT_IMPLEMENTED_YET"
-			}
+func send_tcp_message(data_to_send: Dictionary) -> void:
+	data_to_send['metadata'] = {
+			"source": "client",
+			"username": ClientData.username,
+			"client_version": ClientData.version,
+			"timestamp": Time.get_datetime_string_from_system(true, true),
+			"session_token": "NOT_IMPLEMENTED_YET"
 		}
-	if system_message:
-		wrap_message["system_message"] = message
-	else:
-		wrap_message["client_input"] = message
-	wrap_message = JSON.stringify(wrap_message)
+	var wrapped_message = JSON.stringify(data_to_send)
 
 	TCPClient.poll()
 	# var debug = TCPClient.get_status()
 	if TCPClient.get_status() == StreamPeerTCP.STATUS_CONNECTED:
-		var data = wrap_message.to_utf8_buffer()
+		var data = wrapped_message.to_utf8_buffer()
 		TCPClient.put_data(data)
 		# print(data)
 		#TCPClient.put_utf8_string(message)
 	else:
-		print("Not connected. Message \"%s\" has not been sent." % message)
+		print("Not connected. Message \"%s\" has not been sent." % wrapped_message)
+
+# func subscribe_to(topic: String) -> void:
+# 	send_tcp_message(
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(_delta: float) -> void:
