@@ -9,7 +9,7 @@ if __name__ == '__main__':
         'bootstrap.servers': 'localhost:9092',
 
         # Fixed properties
-        'group.id':          'serverGlobalTopic',
+        'group.id':          'serverGeneralTopic',
         'auto.offset.reset': 'earliest'
     }
 
@@ -17,7 +17,7 @@ if __name__ == '__main__':
     consumer = Consumer(config)
 
     # Subscribe to topic
-    topic = "serverGlobalTopic"
+    topic = "serverGeneralTopic"
     consumer.subscribe([topic])
 
     # Poll for new messages from Kafka and print them.

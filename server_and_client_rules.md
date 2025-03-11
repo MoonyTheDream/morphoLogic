@@ -2,13 +2,12 @@
 Type: *JSON*
 
 ## HANDSHAKE
-*In handshake topic:*
-client -> "system_message": "REQUEST_SERVER_CONNECTION"
-server -> {"system_message": "TOPIC_CREATED_SEND_HANDSHAKE_THERE", "client_topic_handoff": <topic>}
-*In globalServerTopic*
-client -> "system_message": "HANDSHAKE_GLOBAL_TOPIC"
-*In handled topic:*
-server -> "system_message": "ACK"
+client in *serverHandshakeTopic* -> "system_message": "REQUEST_SERVER_CONNECTION"
+server in *clientHandshakeTopic* -> {"system_message": "TOPIC_CREATED_SEND_HANDSHAKE_THERE", "client_topic_handoff": <dedicated_topic>}
+client in *serverGeneralTopic* -> "system_message": "HANDSHAKE_GLOBAL_TOPIC"
+server in <dedicated_topic> -> "system_message": "ACK"
+
+In case of not receiving "ACK" message after a timeout Godot will send an error message back to *serverHandshakeTopic*
 
 
 

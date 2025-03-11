@@ -1,21 +1,23 @@
 # TOPICS
 ## Communication server -> client
--> addresedToClients (key = username) # zmieniamy założenie. Będzie topic per client
+- A given topic per client
+-> clientHandshakeTopic
 ## Communication client -> server
--> serverGlobalTopic 
+-> serverGeneralTopic 
 -> serverHandshakeTopic
 
 # Docker Kafka Client Commands
 ## kafka_2.13-3.9.0
 docker pull apache/kafka:latest
 docker run -p 9092:9092 apache/kafka:latest
-bin/kafka-topics.sh --create --topic serverGlobalTopic --bootstrap-server localhost:9092
+bin/kafka-topics.sh --create --topic serverGeneralTopic --bootstrap-server localhost:9092
+  --config retention.ms=60000 // for hansdhake topics
     key = None
 bin/kafka-topics.sh --create --topic addresedToClients --bootstrap-server localhost:9092
     key = <userName>
 
 bin/kafka-console-producer.sh --topic Moony --bootstrap-server localhost:9092 --timeout 0
-bin/kafka-console-consumer.sh --topic serverGlobalTopic --from-beginning --bootstrap-server localhost:9092
+bin/kafka-console-consumer.sh --topic serverGeneralTopic --from-beginning --bootstrap-server localhost:9092
 
 # pip
 <!-- Just the latest -->

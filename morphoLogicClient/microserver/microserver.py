@@ -46,9 +46,7 @@ def load_settings(path=SETTINGS_FILE):
         raise FileNotFoundError(f"Settings file {path} not found.")
 
     with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-
-
+        return json.load(f)
 
 
 _SETTINGS = load_settings()
@@ -57,9 +55,12 @@ BOOTSTRAP_SERVER = os.getenv(
     "KAFKA_BOOTSTRAP_SERVER", _SETTINGS.get("kafka_server", "localhost:9092")
 )
 GENERAL_TOPIC = os.getenv("KAFKA_GENERAL_TOPIC", _SETTINGS.get(
-    "generalTopic", "serverGlobalTopic"))
-HANDSHAKE_TOPIC = os.getenv("KAFKA_HANDSHAKE_TOPIC", _SETTINGS.get(
-    "handshakeTopic", "serverHandshakeTopic"))
+    "generalTopic", "serverGeneralTopic"))
+CLIENT_HANDSHAKE_TOPIC = os.getenv("KAFKA_HANDSHAKE_TOPIC", _SETTINGS.get(
+    "handshakeTopic", "clientHandshakeTopic"))
+SERVER_HANDSHAKE_TOPIC = os.getenv("KAFKA_HANDSHAKE_TOPIC", _SETTINGS.get(
+    "serverandshakeTopic", "serverHandshakeTopic"))
+
 
 # Get a log level from settings.json
 # Change to false in settings.json for .debug visible
@@ -81,6 +82,7 @@ def setup_logger():
     )
     log_handler.setFormatter(formatter)
 
+    # Showing .debug logs only when debug setting is true
     logger.setLevel(logging.DEBUG if DEBUG_MODE else logging.INFO)
     logger.addHandler(log_handler)
 
@@ -125,8 +127,13 @@ class TCPServer:
 
             # Handling the port to Godot
             self.port = self.sock.getsockname()[1]
+
+            # *********** NEED CHANGES *************
+            # Głupia metoda, w przyszłości trzeba zrobić, żeby procesy między sobą to przekazały
+            # Przy pomocy Standard Pipes
             with open(self.FILE_PORT_HANDLING, "w", encoding="utf-8") as f:
                 f.write(str(self.port))
+            # *********** NEED CHANGES *************
 
             self.sock.listen()
             logger.info("Kafka service listening on %s:%s",
@@ -139,8 +146,8 @@ class TCPServer:
             self._configure_socket(self.conn)
         except Exception:
             logger.exception("Failed to set up or accept TCP connection.")
-            # self.cleanup()
-            # raise # re-raise so the context manager won't proceed to __exit__
+            self.cleanup()
+            raise # re-raise so the context manager won't proceed to __exit__
 
         return self  # Return self so it can be used in the "with" block
 
@@ -180,7 +187,7 @@ class TCPServer:
             logger.exception("Error sending data via TCP.")
             return False
 
-    def add_metadata(self, data: dict, username: str):
+    def _add_metadata(self, data: dict):
         """
         Used when a microserver needs to send data directly to client.
         Wraps metadata data to the dictionary.
@@ -188,31 +195,33 @@ class TCPServer:
         data.update({
             "metadata": {
                     "source": "microserver",
-                    "to_user": username,
+                    # "to_user": username,
                     "server_version": MICROSERVER_VERSION,
                     "timestamp": get_gmt_time()
                     }
         })
         return data
 
-    def send_direct_message_to_client(self, message: str, username: str, m_type: MessageType = MessageType.NORMAL):
+    def send_direct_message_to_client(self, message: str, m_type: MessageType = MessageType.NORMAL):
         """
         Used when a microserver has a message that should be displayed directly in Godot (errors,
         connection confirmations etc.).
+
+        ~~DEPRECATED!~~
         """
         if m_type.value != 1:
             message = self._colorize_message(message, m_type)
         message = {"direct_messages": [message]}
-        wrapped_data = self.add_metadata(message, username)
+        wrapped_data = self._add_metadata(message)
         wrapped_data = json.dumps(wrapped_data)
         self.send_message(wrapped_data)
 
-    def send_system_message_to_client(self, message: str, username: str):
+    def send_system_message_to_client(self, message: str):
         """
         Used when a microserver has a system message to client like 'Connected to Server'
         """
         message = {"system_message": message}
-        wrapped_data = self.add_metadata(message, username)
+        wrapped_data = self._add_metadata(message)
         wrapped_data = json.dumps(wrapped_data)
         self.send_message(wrapped_data)
 
@@ -228,10 +237,18 @@ class TCPServer:
         return f"[color={color}]" + message + "[/color]"
 
     def receive_message(self, bufsize: int = 1024, nonblocking: bool = True) -> str:
-        """
-        Non-blicking. Receive a message from Godot client via TCP. Returns the decoded string,
+        """Non-blocking by default. Receive a message from Godot client via TCP. Returns the decoded string,
         or empty string if the connection is closed or an error occurs.
-        """
+
+        Args:
+            bufsize (int, optional): Bufsize (in bytes). Defaults to 1024.
+            nonblocking (bool, optional): Setting the socket to non-blocking. Defaults to True.
+
+        Returns:
+            str:    The decoded string received from the client, or an empty string if no data
+                    is received or an error occurs.
+
+        """        
         if nonblocking:
             self.conn.setblocking(False)
         try:
@@ -241,6 +258,8 @@ class TCPServer:
                 self.cleanup()
             return data.decode("utf-8").strip()
         except OSError:
+            # The OSError occurs when there's no data received in the given period of time,
+            # so in our case it's just fine, we can carry over
             return ""
         except Exception:
             logger.exception("Error receiving data via TCP.")
@@ -271,101 +290,129 @@ class TCPServer:
 # Kafka Context Manager
 ####################################################################################################
 
-def handle_kafka_handshake(consumer: Consumer, producer: Producer, tcp_server: TCPServer, username: str) -> str:
-    given_topic = None
-    attempt = 0
-    while attempt < 2:
-        if attempt > 0:
-            tcp_server.send_system_message_to_client("SERVER_CONNECTION_RETRY", username)
-            
-        try:
-            handshake_msg = consumer.consume(num_messages=1, timeout=5) # timeout in s
-            if not handshake_msg:
-                logger.warning("No handshake message received from Kafka. Retrying.")
-                attempt += 1
-                continue
-            handshake_msg = handshake_msg[0]
-        # except Exception:
-        #     logger.exception("Error consuming handshake message from Kafka.")
-            if handshake_msg.error():
-                logger.error("Error consuming message: %s", handshake_msg.error().str())
-                attempt += 1
-                continue
-                
-            if handshake_msg:
-                kafka_msg = handshake_msg.value().decode("utf-8")
-                kafka_msg = json.loads(kafka_msg)
-                if kafka_msg['metadata'].get("to_user", "") != username:
-                    continue
-                
-                if kafka_msg.get("system_message") == "TOPIC_CREATED_SEND_HANDSHAKE_THERE":
-                    given_topic = kafka_msg["client_topic_handoff"]
-                    _confirm_and_ack(given_topic, consumer, producer, tcp_server, username)
-                    return given_topic
-            
-            tcp_server.send_system_message_to_client("SERVER_CONNECTION_FAILURE", username)
-            return None
-            # raise RuntimeError("Error consuming handshake message.")
-        
-        except Exception:
-            tcp_server.send_system_message_to_client("SERVER_CONNECTION_FAILURE", username)
-            logger.exception("Error consuming handshake message from Kafka.")
-            raise
-        
-    return None
 
-def _confirm_and_ack(given_topic: str, consumer: Consumer, producer: Producer, tcp_server: TCPServer, username: str):
-    try:
-        # ZWALONE! DO POPRAWY!
-        value = json.dumps(
-            {
-            "system_message": "HANDSHAKE_GLOBAL_TOPIC",
-            "metadata": {
-                "source":"client",
-                "username":username
-                }
-            }
-            )
-        producer.produce(given_topic, key=username, value=value)
-        consumer.subscribe([given_topic])
-        logger.info('Subscribed to Kafka topic "%s"', given_topic)
-        
-        handshake_msg = consumer.consume(num_messages=1, timeout=5) # timeout in s
-        if not handshake_msg:
-            raise RuntimeError("No handshake message received from Kafka after first handshake.")
-        handshake_msg = handshake_msg[0]
-        if handshake_msg.error():
-            logger.error("Error consuming message: %s", handshake_msg.error().str())
-                
-        if handshake_msg:
-            kafka_msg = handshake_msg.value().decode("utf-8")
-            kafka_msg = json.loads(kafka_msg)
-                
-            if kafka_msg.get("system_message") == "ACK":
-                tcp_server.send_system_message_to_client("SERVER_CONNECTION_SUCCESS", username)
-                return
-            
-            tcp_server.send_system_message_to_client("SERVER_CONNECTION_FAILURE", username)
-            return None
-            # raise RuntimeError("Error consuming handshake message.")
-        
-    except Exception:
-        tcp_server.send_system_message_to_client("SERVER_CONNECTION_FAILURE", username)
-        logger.exception("Error consuming handshake message from Kafka.")
-        raise
-    
-        
+# def handle_kafka_handshake(consumer: Consumer, producer: Producer, tcp_server: TCPServer, username: str) -> str:
+#     """
+#     ~~DEPRECATED!~~
+#     """
+#     given_topic = None
+#     attempt = 0
+#     while attempt < 2:
+#         if attempt > 0:
+#             tcp_server.send_system_message_to_client(
+#                 "SERVER_CONNECTION_RETRY", username)
+
+#         try:
+#             handshake_msg = consumer.consume(
+#                 num_messages=1, timeout=5)  # timeout in s
+#             if not handshake_msg:
+#                 logger.warning(
+#                     "No handshake message received from Kafka. Retrying.")
+#                 attempt += 1
+#                 continue
+#             handshake_msg = handshake_msg[0]
+#         # except Exception:
+#         #     logger.exception("Error consuming handshake message from Kafka.")
+#             if handshake_msg.error():
+#                 logger.error("Error consuming message: %s",
+#                              handshake_msg.error().str())
+#                 attempt += 1
+#                 continue
+
+#             if handshake_msg:
+#                 kafka_msg = handshake_msg.value().decode("utf-8")
+#                 kafka_msg = json.loads(kafka_msg)
+#                 if kafka_msg['metadata'].get("to_user", "") != username:
+#                     continue
+
+#                 if kafka_msg.get("system_message") == "TOPIC_CREATED_SEND_HANDSHAKE_THERE":
+#                     given_topic = kafka_msg["client_topic_handoff"]
+#                     _confirm_and_ack(given_topic, consumer,
+#                                      producer, tcp_server, username)
+#                     return given_topic
+
+#             tcp_server.send_system_message_to_client(
+#                 "SERVER_CONNECTION_FAILURE", username)
+#             return None
+#             # raise RuntimeError("Error consuming handshake message.")
+
+#         except Exception:
+#             tcp_server.send_system_message_to_client(
+#                 "SERVER_CONNECTION_FAILURE", username)
+#             logger.exception("Error consuming handshake message from Kafka.")
+#             raise
+
+#     return None
+
+
+# def _confirm_and_ack(given_topic: str, consumer: Consumer, producer: Producer, tcp_server: TCPServer, username: str):
+#     try:
+#         # ZWALONE! DO POPRAWY!
+#         value = json.dumps(
+#             {
+#                 "system_message": "HANDSHAKE_GLOBAL_TOPIC",
+#                 "metadata": {
+#                     "source": "client",
+#                     "username": username
+#                 }
+#             }
+#         )
+#         producer.produce(given_topic, key=username, value=value)
+#         consumer.subscribe([given_topic])
+#         logger.info('Subscribed to Kafka topic "%s"', given_topic)
+
+#         handshake_msg = consumer.consume(
+#             num_messages=1, timeout=5)  # timeout in s
+#         if not handshake_msg:
+#             raise RuntimeError(
+#                 "No handshake message received from Kafka after first handshake.")
+#         handshake_msg = handshake_msg[0]
+#         if handshake_msg.error():
+#             logger.error("Error consuming message: %s",
+#                          handshake_msg.error().str())
+
+#         if handshake_msg:
+#             kafka_msg = handshake_msg.value().decode("utf-8")
+#             kafka_msg = json.loads(kafka_msg)
+
+#             if kafka_msg.get("system_message") == "ACK":
+#                 tcp_server.send_system_message_to_client(
+#                     "SERVER_CONNECTION_SUCCESS", username)
+#                 return
+
+#             tcp_server.send_system_message_to_client(
+#                 "SERVER_CONNECTION_FAILURE", username)
+#             return None
+#             # raise RuntimeError("Error consuming handshake message.")
+
+#     except Exception:
+#         tcp_server.send_system_message_to_client(
+#             "SERVER_CONNECTION_FAILURE", username)
+#         logger.exception("Error consuming handshake message from Kafka.")
+#         raise
+
 
 @contextmanager
 def kafka_resources(data_json: dict, tcp_server: TCPServer = None):
     """
     A context manager that handles the creation of Kafka Admin Client, Producer,
     Consmer and a new topic for a specific client_id.
+
+    Args:
+        data_json (dict): An initial message from the client with it's username.
+        tcp_server (TCPServer, optional): the TCPServer object. Defaults to None.
+
+    Yields:
+        Dictionary: Giving away producer, consumer and username, as follows:
+            "producer": producer,
+            "consumer": consumer,
+            "username": username,
     """
     # admin = None
     producer = None
     consumer = None
-    username = data_json["metadata"]["username"].strip()  # a topic name based on the username
+    # a topic name based on the username
+    username = data_json["metadata"]["username"].strip()
 
     try:
         consumer_conf = {
@@ -375,9 +422,9 @@ def kafka_resources(data_json: dict, tcp_server: TCPServer = None):
             "enable.partition.eof": False  # we'll be hitting end of partition quite often
         }
         consumer = Consumer(consumer_conf)
-        establish_kafka_connection(consumer, tcp_server, username)
-        consumer.subscribe([HANDSHAKE_TOPIC])
-        
+        _establish_kafka_connection(consumer, tcp_server)
+        consumer.subscribe([CLIENT_HANDSHAKE_TOPIC])
+
         producer_conf = {
             'bootstrap.servers': BOOTSTRAP_SERVER,
             'acks': 'all'
@@ -395,13 +442,13 @@ def kafka_resources(data_json: dict, tcp_server: TCPServer = None):
         # except KafkaException:
         #     logger.exception(
         #         "KafkaException while producing message.")
-        
+
         # # Reading topic from Kafka handshake message and subscribing to it
         # given_topic = handle_kafka_handshake(consumer, producer, tcp_server, username)
         # logger.debug("Given topic: %s", given_topic)
         # if not given_topic:
         #     raise RuntimeError("Error consuming handshake message.")
-        
+
         # consumer.subscribe([given_topic])
         # logger.info('Subscribed to Kafka topic "%s"', given_topic)
 
@@ -409,7 +456,7 @@ def kafka_resources(data_json: dict, tcp_server: TCPServer = None):
             # "admin": admin,
             "producer": producer,
             "consumer": consumer,
-            "username": username,
+            # "username": username,
             # "topic": given_topic
         }
     # except RuntimeError:
@@ -418,9 +465,9 @@ def kafka_resources(data_json: dict, tcp_server: TCPServer = None):
     #     raise
     except Exception:
         logger.exception("Error setting up Kafka resources.")
-        tcp_server.send_system_message_to_client("SERVER_CONNECTION_FAILURE", username)
+        tcp_server.send_system_message_to_client("SERVER_CONNECTION_FAILURE")
         raise
-    
+
     finally:
         # Cleanup: close consumer, flush producer, optionally delete topic
         if consumer:
@@ -430,13 +477,12 @@ def kafka_resources(data_json: dict, tcp_server: TCPServer = None):
         if producer:
             producer.flush(3)  # ensure all queued messages are delivered
             logger.info("Flushed Kafka producer.")
-            
-        tcp_server.send_system_message_to_client("SERVER_CONNECTION_CLOSED", username)
+
+        tcp_server.send_system_message_to_client("SERVER_CONNECTION_CLOSED")
 
 
-
-def establish_kafka_connection(
-    consumer: Consumer, tcp_server: TCPServer, username, max_retries=3, wait_time=1
+def _establish_kafka_connection(
+    consumer: Consumer, tcp_server: TCPServer, max_retries=3, wait_time=1
 ):
     """
     Verifies the connection to Kafka by requesting cluster metadata.
@@ -452,14 +498,14 @@ def establish_kafka_connection(
             if attempt < max_retries - 1:
                 logger.warning("Kafka connection failed. Retrying.")
                 tcp_server.send_direct_message_to_client(
-                    "Kafka connection failed. Retrying.", username, MessageType.WARNING
+                    "Kafka connection failed. Retrying.", MessageType.WARNING
                 )
                 sleep(wait_time)
             else:
                 logger.error(
                     "Kafka connection failed after %d retries.", max_retries)
                 tcp_server.send_direct_message_to_client(
-                    f"Kafka connection failed after {max_retries} retries.", username, MessageType.ERROR
+                    f"Kafka connection failed after {max_retries} retries.", MessageType.ERROR
                 )
                 raise RuntimeError(
                     "Kafka cluster is unreachable. Check if the broker is running.") from e
@@ -488,20 +534,20 @@ def main():
                     "No initial message received from TCP client. Shutting down.")
                 return
 
+            client_id = None
             try:
                 data_json = json.loads(client_info)
                 if data_json["system_message"] == "REQUEST_SERVER_CONNECTION":
-                    client_id = data_json["metadata"].get("username", "").strip()
-                else:
-                    client_id = ""
+                    client_id = data_json["metadata"].get(
+                        "username", None).strip()
             except json.JSONDecodeError:
                 logger.exception(
                     "Invalid JSON received from TCP client. Shutting down.")
                 return
 
-            if not data_json.get("system_message", "") or not data_json["metadata"].get("username", ""):
+            if not client_id:
                 logger.error(
-                    "No valid 'username' in initial JSON. Shutting down.")
+                    "No valid 'username' or 'system_message' field in initial JSON. Shutting down.")
                 return
 
             # Enter Kafka context
@@ -509,14 +555,18 @@ def main():
                 producer: Producer = kafka_context["producer"]
                 consumer: Consumer = kafka_context["consumer"]
                 # topic = kafka_context["topic"]
-                username = kafka_context["username"]
+                # username = kafka_context["username"]
 
                 logger.info(
-                    "Kafka resources for client '%s' set up. Entering main loop.", username
+                    "Kafka resources for client '%s' set up. Entering main loop.", client_id
                 )
                 if DEBUG_MODE:
-                    tcp.send_system_message_to_client(
-                        "CONNECTED_TO_SERVER", username)
+                    tcp.send_system_message_to_client("CONNECTED_TO_SERVER")
+                    
+                # The message needs to be sent to Kafka as it's an handshake message to server
+                produce_msg_to_kafka(SERVER_HANDSHAKE_TOPIC, client_id, producer, client_info)
+                producer.poll(0)
+
 
                 # Main bridging loop
                 while True:
@@ -526,7 +576,7 @@ def main():
                         msg = consumer.consume(num_messages=1, timeout=0.1)
                         if msg:
                             msg = msg[0]
-                        
+
                     except Exception:
                         logger.exception("Error consuming message from Kafka.")
                     if msg and not msg.error():
@@ -546,38 +596,33 @@ def main():
                     # Godot -> TCP -> Kafka
                     tcp_msg = tcp.receive_message()
                     if tcp_msg:
-                        
+
                         # Handling Godot requests to Microserver
-                        system_message = json.loads(tcp_msg).get("system_message", "")
+                        system_message = json.loads(
+                            tcp_msg).get("system_message", "")
                         match system_message:
                             case "CLEANUP":
                                 logger.info(
                                     "Received CLEANUP message from Godot. Exiting.")
                                 break
                             # case "REQUEST_SERVER_CONNECTION":
-                                
+
                             case "MICROSERVER_SUBSCRIBE":
                                 subscribe_to = tcp_msg['microserver_subscribe_to']
                                 consumer.subscribe([subscribe_to])
-                                logger.debug('Subscribed to:"%s"', subscribe_to)
+                                logger.debug(
+                                    'Subscribed to:"%s"', subscribe_to)
                                 continue
                             case "MICROSERVER_PRODUCE_TO":
                                 produce_topic = tcp_msg['produce_topic']
-                                logger.debug('Changed topic to produce to, to: "%s"', produce_topic)
+                                logger.debug(
+                                    'Changed topic to produce to, to: "%s"', produce_topic)
                                 continue
                             case _:
                                 pass
 
                         # Produce the message to the Kafka topic with username as a key
-                        try:
-                            producer.produce(
-                                produce_topic, key=username, value=tcp_msg, on_delivery=_verify_delivery_kafka)
-                            # Delivery reports if needed here
-                            logger.debug(
-                                "Produced TCP -> Kafka message to topic '%s': %s", produce_topic, tcp_msg)
-                        except KafkaException:
-                            logger.exception(
-                                "KafkaException while producing message.")
+                        produce_msg_to_kafka(produce_topic, client_id, producer, tcp_msg)
                     producer.poll(0)
     except KeyboardInterrupt:
         logger.info("KeyboardInterrupt detected. Shutting down gracefully.")
@@ -585,6 +630,23 @@ def main():
         logger.exception("Unexpected error. Shutting down.")
     finally:
         logger.info("Exiting microserver.")
+
+def produce_msg_to_kafka(produce_topic: str, client_id: str, producer: Producer, message: str):
+    """
+    Producing a given message to a given topic
+
+    Args:
+        produce_topic (str): a topic to where the message will be sent
+        client_id (str): a username of a client
+        producer (Producer): Producer object
+        tcp_msg (str): a message to be sent to Kafka topic
+    """
+    try:
+        producer.produce(produce_topic, key=client_id, value=message, on_delivery=_verify_delivery_kafka)
+        # Delivery reports if needed here
+        logger.debug("Produced TCP -> Kafka message to topic '%s': %s", produce_topic, message)
+    except KafkaException:
+        logger.exception("KafkaException while producing message.")
 
 
 def _verify_delivery_kafka(err, _msg):

@@ -3,7 +3,11 @@ import json
 
 from .utils.logger import logger
 from .config import settings as _SETTINGS
-from .network.kafka import KafkaConnection, HANDSHAKE_TOPIC as _HANDSHAKE_TOPIC
+from .network.kafka import (
+    KafkaConnection,
+    CLIENT_HANDSHAKE_TOPIC as _CLIENT_HANDSHAKE_TOPIC,
+    SERVER_HANDSHAKE_TOPIC as _SERVER_HANDSHAKE_TOPIC
+)
 
 
 ####################################################################################################
@@ -44,14 +48,14 @@ def consume_and_handle(kafka: KafkaConnection):
             kafka_msg = _decode_msg(msg)
             
             
-            # Ignoring if the message was send by itself
-            if kafka_msg['metadata']['source'] == "server":
-                return
+            # # Ignoring if the message was send by itself
+            # if kafka_msg['metadata']['source'] == "server":
+            #     return
             
             system_message = kafka_msg.get("system_message", "")
 
             # Handling handhske messages from clients
-            if msg_topic == _HANDSHAKE_TOPIC:
+            if msg_topic == _SERVER_HANDSHAKE_TOPIC:
                 # Handshake requests
                 if system_message:
                     match system_message:
@@ -95,7 +99,7 @@ def _handshake_topic_creation(kafka: KafkaConnection, client_handshake_msg: dict
             
         kafka.update_subscription([dedicated_topic])
         kafka.send_data_to_user(
-            _HANDSHAKE_TOPIC,
+            _CLIENT_HANDSHAKE_TOPIC,
             username,
             data={"client_topic_handoff": dedicated_topic},
             system_message="TOPIC_CREATED_SEND_HANDSHAKE_THERE"

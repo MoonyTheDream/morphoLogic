@@ -23,7 +23,7 @@ func _inputHandler(message: String, strip = true) -> void:
 	if strip:
 		message.strip_edges()
 	self.select_all()
-	for s in inputList:
+	for s in inputList:							
 		if message == s:
 			return
 	_append(message)

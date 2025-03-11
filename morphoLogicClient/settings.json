@@ -1,6 +1,7 @@
 {
     "log_level_debug": true,
     "kafka_server": "localhost:9092",
-    "generalTopic": "serverGlobalTopic",
-    "handshakeTopic": "serverHandshakeTopic"
+    "generalTopic": "serverGeneralTopic",
+    "clientHandshakeTopic": "clientHandshakeTopic",
+    "serverandshakeTopic": "serverHandshakeTopic"
 }
