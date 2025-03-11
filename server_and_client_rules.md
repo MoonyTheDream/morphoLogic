@@ -60,3 +60,8 @@ Subscribing to new topic by client
 Setting topic to produce to:
 "system_message": "MICROSERVER_PRODUCE_TO"
 "produce_topic": "<the topic>"
+
+
+
+                                          morphoLogicClient
+morphoLogicEngine(server) <-> Kafka <-> (microserver <-> Godot)

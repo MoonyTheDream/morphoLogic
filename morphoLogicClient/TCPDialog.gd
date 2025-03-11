@@ -109,7 +109,8 @@ func send_tcp_message(data_to_send: Dictionary) -> void:
 			"timestamp": Time.get_datetime_string_from_system(true, true),
 			"session_token": "NOT_IMPLEMENTED_YET"
 		}
-	var wrapped_message = JSON.stringify(data_to_send)
+	var wrapped_message = JSON.stringify(data_to_send) +"\n"
+	
 
 	TCPClient.poll()
 	# var debug = TCPClient.get_status()

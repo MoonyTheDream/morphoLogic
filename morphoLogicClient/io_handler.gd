@@ -43,7 +43,7 @@ func parse_message(data: Dictionary) -> void:
 					TCPDialog.send_tcp_message(
 							{
 								"system_message": "MICROSERVER_PRODUCE_TO",
-								"microserver_subscribe_to": ClientData.global_topic
+								"produce_topic": ClientData.server_general_topic
 							}
 					)
 					TCPDialog.send_tcp_message({"system_message": "HANDSHAKE_GLOBAL_TOPIC"})
@@ -56,5 +56,6 @@ func _wait_for_ack():
 	var server_answer = await TCPDialog.new_data_arrived
 	if server_answer.get("system_message", "") == "ACK":
 		TCPDialog.new_data_arrived.connect(parse_message)
-		TextOutput.draw_new_message(tr("[color=yelow_green]Sccsessfuly Established Server Connection.[/color]"))
+		var success_msg = tr("[color=yelow_green]Sccsessfuly Established Server Connection.[/color]")
+		draw_message.emit(success_msg)
 

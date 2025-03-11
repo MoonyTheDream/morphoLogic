@@ -19,7 +19,7 @@ func load_settings(path: String = SETTINGS_FILE) -> Dictionary:
 	var content := file.get_as_text()
 	return JSON.parse_string(content)
 
-var global_topic = load_settings().get("generalTopic", "")
+var server_general_topic = load_settings().get("generalTopic", "")
 
 var version = "0.1.0"
 var username = null

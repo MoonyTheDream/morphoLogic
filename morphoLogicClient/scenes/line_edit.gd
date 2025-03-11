@@ -12,7 +12,9 @@ func _ready() -> void:
 	await get_tree().create_timer(0.30).timeout # Better UX and time for other services to start
 	
 	var username = await self.request_username()
+	# Username is needed in each message to Kafka
 	ClientData.username = username
+	# A method that will send the first message to Kafka with handshake
 	TCPDialog.initialize_server_connection()
 
 	self.text_submitted.disconnect(_inputHandler)

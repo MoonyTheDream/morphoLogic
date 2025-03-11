@@ -17,7 +17,7 @@ from .network.kafka import (
 
 def awake():
     "Entry point of the server."
-    print("The morphoLogic laws of physics bound itself into existance!")
+    print("The morphoLogic laws of physics bound itself into existence!")
     logger.info("Server version: %s", _SETTINGS.get("server_version", "ERROR"))
     logger.info("Waking up laws of nature.")
     with KafkaConnection() as kafka:
@@ -53,6 +53,9 @@ def consume_and_handle(kafka: KafkaConnection):
             #     return
             
             system_message = kafka_msg.get("system_message", "")
+            sending_user = kafka_msg['metadata']['username'] # this is also topic name
+            # The aboce WILL CHANGE. TOPIC PER USERNAME SHOULD BE TRACKING SOMEWHERE
+
 
             # Handling handhske messages from clients
             if msg_topic == _SERVER_HANDSHAKE_TOPIC:
@@ -71,7 +74,7 @@ def consume_and_handle(kafka: KafkaConnection):
                     match system_message:
                         # Handshake in dedicated topic handler
                         case "HANDSHAKE_GLOBAL_TOPIC":
-                            _check_and_acknowledge_client_topic(kafka, msg_topic, kafka_msg)
+                            _check_and_acknowledge_client_topic(kafka, sending_user, kafka_msg)
                         case _:
                             raise RuntimeError(
                                 f'Uknown system message from client side in topic {msg_topic}: "{system_message}"')
@@ -97,11 +100,11 @@ def _handshake_topic_creation(kafka: KafkaConnection, client_handshake_msg: dict
             dedicated_topic = username
         
             
-        kafka.update_subscription([dedicated_topic])
+        # kafka.update_subscription([dedicated_topic])
         kafka.send_data_to_user(
             _CLIENT_HANDSHAKE_TOPIC,
             username,
-            data={"client_topic_handoff": dedicated_topic},
+            data={"client_topic_handoff": dedicated_topic.topic},
             system_message="TOPIC_CREATED_SEND_HANDSHAKE_THERE"
         )
 
@@ -116,7 +119,7 @@ def _check_and_acknowledge_client_topic(kafka: KafkaConnection, msg_topic: str, 
     # logger.debug('Current subscribed: "%s"', [
     #              topic_partition.topic for topic_partition in current_subscription])
     
-    # Bez sensu to poniżej, przecież odczytaliśmy wiadomość
+    # Bez sensu to poniżej, przecież to dla nich jest ten topic
     # is_subscribed = False
     # for topic_partition in current_subscription:
     #     if msg_topic == topic_partition.topic:
@@ -124,12 +127,12 @@ def _check_and_acknowledge_client_topic(kafka: KafkaConnection, msg_topic: str, 
     #         break
     
     # Na razie taka beznadziejna walidacja, do zastąpienia czymś sensownym
-    if msg_topic == username:
-        kafka.send_data_to_user(msg_topic, username=username, system_message="ACK")
+    # if msg_topic == username:
+    kafka.send_data_to_user(msg_topic, username=username, system_message="ACK")
 
-    else:
-        # NOT IMPLEMENTED FULLY
-        logger.error('Client want to talk in wrong topic. Topic: "%s", Username: "%s"', msg_topic, username)
+    # else:
+    #     # NOT IMPLEMENTED FULLY
+    #     logger.error('Client want to talk in wrong topic. Topic: "%s", Username: "%s"', msg_topic, username)
 
 
 if __name__ == "__main__":

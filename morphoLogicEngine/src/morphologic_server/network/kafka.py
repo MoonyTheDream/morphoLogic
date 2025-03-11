@@ -132,7 +132,7 @@ class KafkaConnection:
                 for topic, future_topic in dict_future_topics.items():
                     b_topic = topic
                     future_topic.result()
-                logger.info('Created Kafka topic "%s"', topic.topic)
+                logger.info('Created Kafka topic "%s"', topic)
             except Exception:
                 logger.exception('Failed to create topic "%s".', b_topic)
                 raise  # re-raise to exit the context manager
@@ -185,7 +185,7 @@ class KafkaConnection:
             "system_message": system_message
         })
         wrapped_data = self._add_metadata(data, username)
-        wrapped_data = json.dumps(data)
+        wrapped_data = json.dumps(data, ensure_ascii=False).encode("utf-8")
         self.producer.produce(topic, value=wrapped_data)  # no key, as:
         # adding key might result in some consumers not consuming their message as each
         # consumer get's it's own partition when there's more that one consumers

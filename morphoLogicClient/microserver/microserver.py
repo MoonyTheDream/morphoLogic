@@ -564,7 +564,7 @@ def main():
                     tcp.send_system_message_to_client("CONNECTED_TO_SERVER")
                     
                 # The message needs to be sent to Kafka as it's an handshake message to server
-                produce_msg_to_kafka(SERVER_HANDSHAKE_TOPIC, client_id, producer, client_info)
+                produce_msg_to_kafka(SERVER_HANDSHAKE_TOPIC, client_id, producer, data_json)
                 producer.poll(0)
 
 
@@ -591,38 +591,42 @@ def main():
                                     'Consumed message from %s: "%s"', msg.topic(), kafka_msg)
                     elif msg and msg.error():
                         logger.debug("Error consuming message: %s",
-                                     msg.error().reason())
+                                     msg.error().str())
 
                     # Godot -> TCP -> Kafka
                     tcp_msg = tcp.receive_message()
                     if tcp_msg:
+                        
+                        msg_list = tcp_msg.split("\n")
+                        
+                        for msg in msg_list:
+                            # Handling Godot requests to Microserver
+                            msg: dict = json.loads(msg)
+                            logger.debug("Received TCP message: %s", msg)
+                            system_message = msg.get("system_message", "")
+                            match system_message:
+                                case "CLEANUP":
+                                    logger.info(
+                                        "Received CLEANUP message from Godot. Exiting.")
+                                    break
+                                # case "REQUEST_SERVER_CONNECTION":
 
-                        # Handling Godot requests to Microserver
-                        system_message = json.loads(
-                            tcp_msg).get("system_message", "")
-                        match system_message:
-                            case "CLEANUP":
-                                logger.info(
-                                    "Received CLEANUP message from Godot. Exiting.")
-                                break
-                            # case "REQUEST_SERVER_CONNECTION":
+                                case "MICROSERVER_SUBSCRIBE":
+                                    subscribe_to = msg['microserver_subscribe_to']
+                                    consumer.subscribe([subscribe_to])
+                                    logger.debug(
+                                        'Subscribed to:"%s"', subscribe_to)
+                                    continue
+                                case "MICROSERVER_PRODUCE_TO":
+                                    produce_topic = msg['produce_topic']
+                                    logger.debug(
+                                        'Changed topic to produce to, to: "%s"', produce_topic)
+                                    continue
+                                case _:
+                                    pass
 
-                            case "MICROSERVER_SUBSCRIBE":
-                                subscribe_to = tcp_msg['microserver_subscribe_to']
-                                consumer.subscribe([subscribe_to])
-                                logger.debug(
-                                    'Subscribed to:"%s"', subscribe_to)
-                                continue
-                            case "MICROSERVER_PRODUCE_TO":
-                                produce_topic = tcp_msg['produce_topic']
-                                logger.debug(
-                                    'Changed topic to produce to, to: "%s"', produce_topic)
-                                continue
-                            case _:
-                                pass
-
-                        # Produce the message to the Kafka topic with username as a key
-                        produce_msg_to_kafka(produce_topic, client_id, producer, tcp_msg)
+                            # Produce the message to the Kafka topic with username as a key
+                            produce_msg_to_kafka(produce_topic, client_id, producer, msg)
                     producer.poll(0)
     except KeyboardInterrupt:
         logger.info("KeyboardInterrupt detected. Shutting down gracefully.")
@@ -631,7 +635,7 @@ def main():
     finally:
         logger.info("Exiting microserver.")
 
-def produce_msg_to_kafka(produce_topic: str, client_id: str, producer: Producer, message: str):
+def produce_msg_to_kafka(produce_topic: str, client_id: str, producer: Producer, message: dict):
     """
     Producing a given message to a given topic
 
@@ -639,12 +643,17 @@ def produce_msg_to_kafka(produce_topic: str, client_id: str, producer: Producer,
         produce_topic (str): a topic to where the message will be sent
         client_id (str): a username of a client
         producer (Producer): Producer object
-        tcp_msg (str): a message to be sent to Kafka topic
+        message (dict): a message to be sent to Kafka topic
     """
     try:
-        producer.produce(produce_topic, key=client_id, value=message, on_delivery=_verify_delivery_kafka)
+        # logger.debug("Właśnie chcę wiedzieć: %s", message)
+        
+        message_to_send = json.dumps(message, ensure_ascii=False).encode("utf-8")
+        # logger.debug("Tu też chcę wiedzieć: %s", message_to_send)
+        
+        producer.produce(produce_topic, key=client_id, value=message_to_send, on_delivery=_verify_delivery_kafka)
         # Delivery reports if needed here
-        logger.debug("Produced TCP -> Kafka message to topic '%s': %s", produce_topic, message)
+        logger.debug("Produced TCP -> Kafka message to topic '%s': %s", produce_topic, message_to_send)
     except KafkaException:
         logger.exception("KafkaException while producing message.")
 
