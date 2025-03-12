@@ -136,7 +136,7 @@ class KafkaConnection:
             except Exception:
                 logger.exception('Failed to create topic "%s".', b_topic)
                 raise  # re-raise to exit the context manager
-
+        new_topics_list = [topic.topic if isinstance(topic, NewTopic) else topic for topic in new_topics_list]
         return new_topics_list
 
     def _topic_exists(self, topic: str) -> bool:

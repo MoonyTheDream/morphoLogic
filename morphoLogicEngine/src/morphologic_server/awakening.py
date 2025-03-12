@@ -99,12 +99,11 @@ def _handshake_topic_creation(kafka: KafkaConnection, client_handshake_msg: dict
         else:
             dedicated_topic = username
         
-            
         # kafka.update_subscription([dedicated_topic])
         kafka.send_data_to_user(
             _CLIENT_HANDSHAKE_TOPIC,
             username,
-            data={"client_topic_handoff": dedicated_topic.topic},
+            data={"client_topic_handoff": dedicated_topic},
             system_message="TOPIC_CREATED_SEND_HANDSHAKE_THERE"
         )
 

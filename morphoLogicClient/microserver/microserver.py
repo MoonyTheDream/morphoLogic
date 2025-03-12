@@ -653,7 +653,7 @@ def produce_msg_to_kafka(produce_topic: str, client_id: str, producer: Producer,
         
         producer.produce(produce_topic, key=client_id, value=message_to_send, on_delivery=_verify_delivery_kafka)
         # Delivery reports if needed here
-        logger.debug("Produced TCP -> Kafka message to topic '%s': %s", produce_topic, message_to_send)
+        logger.debug("Produced TCP -> Kafka message to topic '%s': %s", produce_topic, message)
     except KafkaException:
         logger.exception("KafkaException while producing message.")
 
