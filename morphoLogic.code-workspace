@@ -23,6 +23,21 @@
 				"debug_paths": false,
 				"debug_navigation": false,
 				"additional_options": ""
+			},
+			{
+				"name": "Python Debugger: Remote Attach",
+				"type": "debugpy",
+				"request": "attach",
+				"connect": {
+					"host": "localhost",
+					"port": 5678
+				},
+				"pathMappings": [
+					{
+						"localRoot": "${workspaceFolder}",
+						"remoteRoot": "."
+					}
+				]
 			}
 		]
 	}

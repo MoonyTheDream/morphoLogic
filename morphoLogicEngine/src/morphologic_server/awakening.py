@@ -1,4 +1,5 @@
 """The main module starting the server and all needed services."""
+import asyncio
 import json
 
 from .utils.logger import logger
@@ -9,20 +10,33 @@ from .network.kafka import (
     SERVER_HANDSHAKE_TOPIC as _SERVER_HANDSHAKE_TOPIC
 )
 
+import time
 
 ####################################################################################################
 # Configuration & Logging
 ####################################################################################################
 
+# Global stop event
+stop_event = asyncio.Event()
 
-def awake():
+async def awake():
     "Entry point of the server."
     print("The morphoLogic laws of physics bound itself into existence!")
     logger.info("Server version: %s", _SETTINGS.get("server_version", "ERROR"))
     logger.info("Waking up laws of nature.")
-    with KafkaConnection() as kafka:
+    # while not stop_event.is_set():
+    try:
         while True:
-            consume_and_handle(kafka)
+                # consume_and_handle(kafka)
+            # print("rzezc")
+            await asyncio.sleep(1)
+        # print("Keyboard Interrupt madafasak")
+    # with KafkaConnection() as kafka:
+        # while not stop_event.is_set():
+        #     # consume_and_handle(kafka)
+        #     time.sleep(1)
+    except asyncio.CancelledError:
+        logger.exception("ASYNKOEROROER")
     logger.info("Server closing down.")
 
 

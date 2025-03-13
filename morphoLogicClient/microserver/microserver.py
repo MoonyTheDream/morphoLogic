@@ -290,108 +290,6 @@ class TCPServer:
 # Kafka Context Manager
 ####################################################################################################
 
-
-# def handle_kafka_handshake(consumer: Consumer, producer: Producer, tcp_server: TCPServer, username: str) -> str:
-#     """
-#     ~~DEPRECATED!~~
-#     """
-#     given_topic = None
-#     attempt = 0
-#     while attempt < 2:
-#         if attempt > 0:
-#             tcp_server.send_system_message_to_client(
-#                 "SERVER_CONNECTION_RETRY", username)
-
-#         try:
-#             handshake_msg = consumer.consume(
-#                 num_messages=1, timeout=5)  # timeout in s
-#             if not handshake_msg:
-#                 logger.warning(
-#                     "No handshake message received from Kafka. Retrying.")
-#                 attempt += 1
-#                 continue
-#             handshake_msg = handshake_msg[0]
-#         # except Exception:
-#         #     logger.exception("Error consuming handshake message from Kafka.")
-#             if handshake_msg.error():
-#                 logger.error("Error consuming message: %s",
-#                              handshake_msg.error().str())
-#                 attempt += 1
-#                 continue
-
-#             if handshake_msg:
-#                 kafka_msg = handshake_msg.value().decode("utf-8")
-#                 kafka_msg = json.loads(kafka_msg)
-#                 if kafka_msg['metadata'].get("to_user", "") != username:
-#                     continue
-
-#                 if kafka_msg.get("system_message") == "TOPIC_CREATED_SEND_HANDSHAKE_THERE":
-#                     given_topic = kafka_msg["client_topic_handoff"]
-#                     _confirm_and_ack(given_topic, consumer,
-#                                      producer, tcp_server, username)
-#                     return given_topic
-
-#             tcp_server.send_system_message_to_client(
-#                 "SERVER_CONNECTION_FAILURE", username)
-#             return None
-#             # raise RuntimeError("Error consuming handshake message.")
-
-#         except Exception:
-#             tcp_server.send_system_message_to_client(
-#                 "SERVER_CONNECTION_FAILURE", username)
-#             logger.exception("Error consuming handshake message from Kafka.")
-#             raise
-
-#     return None
-
-
-# def _confirm_and_ack(given_topic: str, consumer: Consumer, producer: Producer, tcp_server: TCPServer, username: str):
-#     try:
-#         # ZWALONE! DO POPRAWY!
-#         value = json.dumps(
-#             {
-#                 "system_message": "HANDSHAKE_GLOBAL_TOPIC",
-#                 "metadata": {
-#                     "source": "client",
-#                     "username": username
-#                 }
-#             }
-#         )
-#         producer.produce(given_topic, key=username, value=value)
-#         consumer.subscribe([given_topic])
-#         logger.info('Subscribed to Kafka topic "%s"', given_topic)
-
-#         handshake_msg = consumer.consume(
-#             num_messages=1, timeout=5)  # timeout in s
-#         if not handshake_msg:
-#             raise RuntimeError(
-#                 "No handshake message received from Kafka after first handshake.")
-#         handshake_msg = handshake_msg[0]
-#         if handshake_msg.error():
-#             logger.error("Error consuming message: %s",
-#                          handshake_msg.error().str())
-
-#         if handshake_msg:
-#             kafka_msg = handshake_msg.value().decode("utf-8")
-#             kafka_msg = json.loads(kafka_msg)
-
-#             if kafka_msg.get("system_message") == "ACK":
-#                 tcp_server.send_system_message_to_client(
-#                     "SERVER_CONNECTION_SUCCESS", username)
-#                 return
-
-#             tcp_server.send_system_message_to_client(
-#                 "SERVER_CONNECTION_FAILURE", username)
-#             return None
-#             # raise RuntimeError("Error consuming handshake message.")
-
-#     except Exception:
-#         tcp_server.send_system_message_to_client(
-#             "SERVER_CONNECTION_FAILURE", username)
-#         logger.exception("Error consuming handshake message from Kafka.")
-#         raise
-
-
 @contextmanager
 def kafka_resources(data_json: dict, tcp_server: TCPServer = None):
     """
@@ -431,26 +329,6 @@ def kafka_resources(data_json: dict, tcp_server: TCPServer = None):
         }
         producer = Producer(producer_conf)
 
-        # # Handshake and request server for a topic name.
-        # data_json = json.dumps(data_json)
-        # try:
-        #     producer.produce(
-        #         HANDSHAKE_TOPIC, value=data_json)
-        #     # Delivery reports if needed here
-        #     logger.debug(
-        #         "Produced TCP -> Kafka message to topic '%s': %s", HANDSHAKE_TOPIC, data_json)
-        # except KafkaException:
-        #     logger.exception(
-        #         "KafkaException while producing message.")
-
-        # # Reading topic from Kafka handshake message and subscribing to it
-        # given_topic = handle_kafka_handshake(consumer, producer, tcp_server, username)
-        # logger.debug("Given topic: %s", given_topic)
-        # if not given_topic:
-        #     raise RuntimeError("Error consuming handshake message.")
-
-        # consumer.subscribe([given_topic])
-        # logger.info('Subscribed to Kafka topic "%s"', given_topic)
 
         yield {
             # "admin": admin,
@@ -459,10 +337,6 @@ def kafka_resources(data_json: dict, tcp_server: TCPServer = None):
             # "username": username,
             # "topic": given_topic
         }
-    # except RuntimeError:
-    #     logger.exception("Error setting up Kafka resources.")
-    #     tcp_server.send_system_message_to_client("SERVER_CONNECTION_FAILURE", username)
-    #     raise
     except Exception:
         logger.exception("Error setting up Kafka resources.")
         tcp_server.send_system_message_to_client("SERVER_CONNECTION_FAILURE")
@@ -662,9 +536,6 @@ def _verify_delivery_kafka(err, _msg):
     """Trzeba tu zrobić handling niedostarczonej wiadomości i/lub kontroler ilości wysłanych w kliencie vs dostarczonych"""
     if err:
         logger.debug("Error after producing message: %s", err)
-    # pass
-    # logger.debug(str(err))
-    # logger.debug(str(msg))
 
 
 if __name__ == "__main__":
