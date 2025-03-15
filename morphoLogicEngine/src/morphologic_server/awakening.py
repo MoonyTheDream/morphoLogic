@@ -25,18 +25,18 @@ async def awake():
     logger.info("Server version: %s", _SETTINGS.get("server_version", "ERROR"))
     logger.info("Waking up laws of nature.")
     # while not stop_event.is_set():
-    try:
-        while True:
+    # try:
+        # while True:
                 # consume_and_handle(kafka)
             # print("rzezc")
-            await asyncio.sleep(1)
+            # await asyncio.sleep(1)
         # print("Keyboard Interrupt madafasak")
-    # with KafkaConnection() as kafka:
-        # while not stop_event.is_set():
-        #     # consume_and_handle(kafka)
-        #     time.sleep(1)
-    except asyncio.CancelledError:
-        logger.exception("ASYNKOEROROER")
+    with KafkaConnection() as kafka:
+        while not stop_event.is_set():
+            consume_and_handle(kafka)
+            # time.sleep(1)
+    # except asyncio.CancelledError:
+    #     logger.exception("ASYNKOEROROER")
     logger.info("Server closing down.")
 
 

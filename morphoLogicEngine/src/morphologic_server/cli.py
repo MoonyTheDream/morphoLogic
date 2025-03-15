@@ -8,7 +8,7 @@ from .awakening import awake, stop_event as _stop_event, logger
 from .utils.async_cmd import AsyncCmd
 
 
-class MorphoLogicCmd(AsyncCmd):
+class MorphoLogicCmd(cmd.Cmd):
     """Command-line interface for the morphoLogic server."""
     stop = None
     intro = """
@@ -77,19 +77,26 @@ async def start_server(args):
             print("Awakening of the World. The Scribes are here too.")
     else:
         print("Awakening of the World.")
-    task_awake = asyncio.create_task(awake())
-    task_cmd = asyncio.create_task(MorphoLogicCmd().cmdloop())
-    try:
-        await asyncio.gather(
-            task_awake,
-            task_cmd    
-        )
-    except KeyboardInterrupt: #, asyncio.CancelledError):
-        logger.warning("Stars where switched off! Someone decided to just put them down.\n")
-        task_awake.cancel()
-        task_cmd.cancel()
+    # task_awake = asyncio.create_task(awake())
+    # task_cmd = asyncio.create_task(MorphoLogicCmd().cmdloop())
+    # try:
+    #     await asyncio.gather(
+    #         task_awake,
+    #         task_cmd    
+    #     )
+    # except KeyboardInterrupt: #, asyncio.CancelledError):
+    #     logger.warning("Stars where switched off! Someone decided to just put them down.\n")
+    #     task_awake.cancel()
+    #     task_cmd.cancel()
     # finally:
     #     sys.exit(1)
+    async with asyncio.TaskGroup() as tg:
+        task_awake = tg.create_task(awake())
+        print("TEST")
+        task_cmd = tg.create_task(run_cmdloop())
+        print("TEST2")
+        
+
 
 
 def main():

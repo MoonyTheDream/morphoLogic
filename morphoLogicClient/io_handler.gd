@@ -58,4 +58,3 @@ func _wait_for_ack():
 		TCPDialog.new_data_arrived.connect(parse_message)
 		var success_msg = tr("[color=yelow_green]Sccsessfuly Established Server Connection.[/color]")
 		draw_message.emit(success_msg)
-

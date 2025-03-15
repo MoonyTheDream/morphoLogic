@@ -19,11 +19,11 @@ func _ready() -> void:
 func run_python_microserver() -> bool:
 	# Executing Python script
 	var python_executable = ProjectSettings.globalize_path("res://")
-	python_executable += "microserver/kafka_env/bin/python3"
+	python_executable += "microserver/kafka_venv/bin/python3.13"
 	# if OS.get_name() == "Windows":
 	# 	python_executable = "kafka_env\\Scripts\\python.exe"
-	var script_path = ProjectSettings.globalize_path("res://")
-	script_path += "microserver/microserver.py"
+	var script_path = ProjectSettings.globalize_path("res://microserver/microserver.py")
+	# script_path += "microserver/microserver.py" 
 	
 	# Run the script
 	var microserver_process_id = OS.create_process(python_executable, [script_path])
