@@ -3,7 +3,7 @@ extends RichTextLabel
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
 	self.append_text(tr("Connecting...\n"))
-	var microserver_running = await TCPDialog.run_python_microserver()
+	var microserver_running = TCPDialog.run_python_microserver()
 	if microserver_running:
 		draw_new_message(tr("[color=yellow_green]Microserver Running.[/color]\n"))
 	else:

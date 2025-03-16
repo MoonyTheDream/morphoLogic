@@ -92,9 +92,9 @@ async def start_server(args):
     #     sys.exit(1)
     async with asyncio.TaskGroup() as tg:
         task_awake = tg.create_task(awake())
-        print("TEST")
-        task_cmd = tg.create_task(run_cmdloop())
-        print("TEST2")
+        # print("TEST")
+        # task_cmd = tg.create_task(run_cmdloop())
+        # print("TEST2")
         
 
 

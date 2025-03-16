@@ -5,21 +5,24 @@ import logging
 import os
 import socket
 import sys
-from contextlib import contextmanager
+# import asyncio.trsock
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import asynccontextmanager
 from enum import Enum
 from logging.handlers import RotatingFileHandler
-from time import gmtime, strftime, sleep
-
+from time import gmtime, strftime
 from confluent_kafka import Producer, Consumer, KafkaException  # , KafkaError
-# from confluent_kafka.admin import AdminClient, NewTopic
 
 ####################################################################################################
 # Configuration & Logging
 ####################################################################################################
 RUN_BY_GODOT = True
 MICROSERVER_VERSION = "0.1.0"
-SETTINGS_FILE = os.path.join("morphoLogicClient", "settings.json") if not RUN_BY_GODOT else "settings.json"
-loop = asyncio.new_event_loop()
+SETTINGS_FILE = os.path.join(
+    "morphoLogicClient", "settings.json") if not RUN_BY_GODOT else "settings.json"
+# loop = asyncio.new_event_loop()
+exiting_now = asyncio.Event()
+kafka_executor = ThreadPoolExecutor(max_workers=1)
 
 
 def get_gmt_time():
@@ -44,7 +47,6 @@ def load_settings(path=SETTINGS_FILE):
     Raises FileNotFoundError if file is missing.
     """
     if not os.path.exists(path):
-        # print("TUTAJ " + os.path.abspath(""))
         raise FileNotFoundError(f'Settings file "{path}" not found.')
 
     with open(path, "r", encoding="utf-8") as f:
@@ -61,13 +63,13 @@ GENERAL_TOPIC = os.getenv("KAFKA_GENERAL_TOPIC", _SETTINGS.get(
 CLIENT_HANDSHAKE_TOPIC = os.getenv("KAFKA_HANDSHAKE_TOPIC", _SETTINGS.get(
     "handshakeTopic", "clientHandshakeTopic"))
 SERVER_HANDSHAKE_TOPIC = os.getenv("KAFKA_HANDSHAKE_TOPIC", _SETTINGS.get(
-    "serverandshakeTopic", "serverHandshakeTopic"))
+    "serverHandshakeTopic", "serverHandshakeTopic"))
 
 
 # Get a log level from settings.json
-# Change to false in settings.json for .debug visible
+# Change to true in settings.json for .debug visible
 DEBUG_MODE = _SETTINGS.get("log_level_debug", False)
-loop.set_debug(DEBUG_MODE)
+# loop.set_debug(DEBUG_MODE)
 logger = logging.getLogger("mL microserver")
 
 
@@ -75,7 +77,8 @@ def setup_logger():
     """
     Prepares a rotating file logger and console logger
     """
-    log_file = os.path.join("morphoLogicClient", "microserver", "microserver.log") if not RUN_BY_GODOT else "microserver/microserver.log"
+    log_file = os.path.join("morphoLogicClient", "microserver",
+                            "microserver.log") if not RUN_BY_GODOT else "microserver/microserver.log"
     log_handler = RotatingFileHandler(
         log_file, maxBytes=4*1024*1024, backupCount=3  # 4MB per file, keep 3 backups
     )
@@ -118,7 +121,7 @@ class TCPServer:
         self.client_address = None
         self.reader = None
         self.writer = None
-        self.writer_reader_ready = False
+        self.writer_reader_ready = asyncio.Event()
 
     async def __aenter__(self):
         """
@@ -144,18 +147,21 @@ class TCPServer:
         logger.info("Kafka service listening on %s:%s",
                     self.HOST, self.port)
 
-        # *********** NEED CHANGES *************
-        # Głupia metoda, w przyszłości trzeba zrobić, żeby procesy między sobą to przekazały
-        # Przy pomocy Standard Pipes
-        with open(self.FILE_PORT_HANDLING, "w", encoding="utf-8") as f:
-            f.write(str(self.port))
-        # *********** NEED CHANGES *************
+        # # *********** NEED CHANGES *************
+        # # Głupia metoda, w przyszłości trzeba zrobić, żeby procesy między sobą to przekazały
+        # # Przy pomocy Standard Pipes
+        # with open(self.FILE_PORT_HANDLING, "w", encoding="utf-8") as f:
+        #     f.write(str(self.port))
+        # # *********** NEED CHANGES *************
+        sys.stdout.write("PORT_FOR_GODOT " + str(self.port))  # \n is crucial for Godot's read
+        sys.stdout.flush()  # Force immediate send
+        logger.debug("Sent port %d to Godot via pipe", self.port)
 
         self._configure_socket(self.sock)
         logger.debug("TCP server socket configured correctly.")
-        
+
         await self.wait_for_reader_and_writer()
-        
+
         # except Exception:
         #     logger.exception("Failed to set up or accept TCP connection.")
         #     self.cleanup()
@@ -174,15 +180,14 @@ class TCPServer:
         logger.info("Client connected.")
         self.reader = stream_reader
         self.writer = stream_writer
-        self.writer_reader_ready = True
+        self.writer_reader_ready.set()
 
     async def wait_for_reader_and_writer(self) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
         """
         Async method that waits until reader and writer are available
         (so until a connection is established)
         """
-        while not self.writer_reader_ready:
-            await asyncio.sleep(0.1)
+        await self.writer_reader_ready.wait()
         return self.reader, self.writer
 
     def _configure_socket(self, sock):
@@ -203,6 +208,7 @@ class TCPServer:
         """
         Cleanup the connection and the socket.
         """
+        exiting_now.set()
         if self.tcp_server and self.tcp_server.is_serving():
             try:
                 self.tcp_server.close()
@@ -268,14 +274,14 @@ class TCPServer:
         except Exception:
             logger.exception("Error receiving data via TCP.")
             return None
-        
+
 ####################################################################################################
 # Kafka Context Manager
 ####################################################################################################
 
 
-@contextmanager
-def kafka_resources(data_json: dict, tcp_server: TCPServer = None):
+@asynccontextmanager
+async def kafka_resources(data_json: dict, tcp_server: TCPServer = None):
     """
     A context manager that handles the creation of Kafka Admin Client, Producer,
     Consmer and a new topic for a specific client_id.
@@ -304,7 +310,7 @@ def kafka_resources(data_json: dict, tcp_server: TCPServer = None):
             "enable.partition.eof": False  # we'll be hitting end of partition quite often
         }
         consumer = Consumer(consumer_conf)
-        _establish_kafka_connection(consumer, tcp_server)
+        await _establish_kafka_connection(consumer, tcp_server)
         consumer.subscribe([CLIENT_HANDSHAKE_TOPIC])
 
         producer_conf = {
@@ -322,11 +328,13 @@ def kafka_resources(data_json: dict, tcp_server: TCPServer = None):
         }
     except Exception:
         logger.exception("Error setting up Kafka resources.")
-        tcp_server.send_system_message_to_client("SERVER_CONNECTION_FAILURE")
+        await tcp_server.send_system_message_to_client("SERVER_CONNECTION_FAILURE")
         raise
 
     finally:
         # Cleanup: close consumer, flush producer, optionally delete topic
+        exiting_now.set()
+
         if consumer:
             consumer.close()
             logger.info('Closed Kafka consumer.')
@@ -338,7 +346,7 @@ def kafka_resources(data_json: dict, tcp_server: TCPServer = None):
         # await tcp_server.send_system_message_to_client("SERVER_CONNECTION_CLOSED")
 
 
-def _establish_kafka_connection(
+async def _establish_kafka_connection(
     consumer: Consumer, tcp_server: TCPServer, max_retries=3, wait_time=1
 ):
     """
@@ -354,16 +362,14 @@ def _establish_kafka_connection(
         except KafkaException as e:
             if attempt < max_retries - 1:
                 logger.warning("Kafka connection failed. Retrying.")
-                tcp_server.send_direct_message_to_client(
-                    "Kafka connection failed. Retrying.", MessageType.WARNING
-                )
-                sleep(wait_time)
+                await tcp_server.send_system_message_to_client(
+                    "Kafka connection failed. Retrying.")
+                await asyncio.sleep(wait_time)
             else:
                 logger.error(
                     "Kafka connection failed after %d retries.", max_retries)
-                tcp_server.send_direct_message_to_client(
-                    f"Kafka connection failed after {max_retries} retries.", MessageType.ERROR
-                )
+                await tcp_server.send_system_message_to_client(
+                    f"Kafka connection failed after {max_retries} retries.")
                 raise RuntimeError(
                     "Kafka cluster is unreachable. Check if the broker is running.") from e
 
@@ -379,13 +385,15 @@ async def main():
     setup_logger()
     logger.info("Starting microserver.")
     produce_topic = GENERAL_TOPIC
+    loop = asyncio.get_running_loop()
+    loop.set_debug(DEBUG_MODE)
 
     try:
         async with TCPServer() as tcp:
             logger.info("TCP server established on port %d.", tcp.port)
 
             # Expect the first message from client to be JSON with "username"
-            client_info = await tcp.receive_message()
+            client_info = await asyncio.wait_for(tcp.receive_message(), timeout=60)
             if not client_info:
                 logger.error(
                     "No initial message received from TCP client. Shutting down.")
@@ -408,7 +416,7 @@ async def main():
                 return
 
             # Enter Kafka context
-            with kafka_resources(data_json, tcp) as kafka_context:
+            async with kafka_resources(data_json, tcp) as kafka_context:
                 producer: Producer = kafka_context["producer"]
                 consumer: Consumer = kafka_context["consumer"]
                 # topic = kafka_context["topic"]
@@ -425,97 +433,106 @@ async def main():
                                      client_id, producer, data_json)
                 producer.poll(0)
 
-                # Main bridging loop
-                # loop.run_forever()
-                # Kafka -> TCP -> Godot
-                asyncio.create_task(_kafka_to_tcp_handler(tcp, consumer))
-                # Godot -> TCP -> Kafka
-                asyncio.create_task(_tcp_to_kafka_handler(tcp,
-                               client_id, producer, consumer, produce_topic))
+                async with asyncio.TaskGroup() as tg:
+                    # Kafka -> TCP -> Godot
+                    tg.create_task(
+                        _kafka_to_tcp_handler(tcp, consumer))
+                    # Godot -> TCP -> Kafka
+                    tg.create_task(
+                        _tcp_to_kafka_handler(tcp, client_id, producer, consumer, produce_topic))
+                    # Main keep-alive loop
+                    # while not exiting_now.is_set():
+                    #     await asyncio.sleep(1)
 
-                # while loop.is_running():
-                while True: # TYMCZASOWO, TRZEBA ZROBIC ZE AZ SA TASKI
-                    await asyncio.sleep(0.1)
-
-    except KeyboardInterrupt:
-        logger.info("KeyboardInterrupt detected. Shutting down gracefully.")
-        loop.stop()
+    # except KeyboardInterrupt:
+    #     logger.info("KeyboardInterrupt detected. Shutting down gracefully.")
+    #     exiting_now.set()
     except Exception:
         logger.exception("Unexpected error. Shutting down.")
-        loop.stop()
+        exiting_now.set()
     finally:
         logger.info("Exiting microserver.")
+
 
 async def _tcp_to_kafka_handler(tcp: TCPServer, client_id, producer, consumer, produce_topic):
     """
     Async handler that reads tcp message asynchronously and then send it (not asyncronously)
     to the Kafka topic.
     """
-    tcp_msg = await tcp.receive_message()
-    if tcp_msg:
-        msg_list = tcp_msg.split("\n")
+    while not exiting_now.is_set():
+        tcp_msg = await tcp.receive_message()
+        if tcp_msg:
+            msg_list = tcp_msg.split("\n")
 
-        # for msg in msg_list:
-        # Handling Godot requests to Microserver
-        for msg in msg_list:
-            msg: dict = json.loads(msg)
-            logger.debug("Received TCP message: %s", msg)
-            system_message = msg.get("system_message", "")
-            
-            match system_message:
-                
-                case "CLEANUP":
-                    logger.info("Received CLEANUP message from Godot. Exiting.")
-                    # case "REQUEST_SERVER_CONNECTION":
+            # for msg in msg_list:
+            # Handling Godot requests to Microserver
+            for msg in msg_list:
+                try:
+                    msg: dict = json.loads(msg)
+                except (json.JSONDecodeError, TypeError):
+                    logger.exception("Error decoding JSON from TCP.")
+                    continue
 
-                case "MICROSERVER_SUBSCRIBE":
-                    subscribe_to = msg['microserver_subscribe_to']
-                    consumer.subscribe([subscribe_to])
-                    logger.debug('Subscribed to:"%s"', subscribe_to)
-                    
-                case "MICROSERVER_PRODUCE_TO":
-                    produce_topic = msg['produce_topic']
-                    logger.debug('Changed topic to produce to, to: "%s"', produce_topic)
-                
-                case _:
-                    pass
+                logger.debug("Received TCP message: %s", msg)
+                system_message = msg.get("system_message", "")
 
-                            # Produce the message to the Kafka topic with username as a key
-            produce_msg_to_kafka(
-                                produce_topic, client_id, producer, msg)
-        producer.poll(0)
-    asyncio.create_task(_tcp_to_kafka_handler(tcp,
-                               client_id, producer, consumer, produce_topic))
+                match system_message:
 
+                    case "CLEANUP":
+                        logger.info(
+                            "Received CLEANUP message from Godot. Exiting.")
+                        exiting_now.set()
+                        # case "REQUEST_SERVER_CONNECTION":
+
+                    case "MICROSERVER_SUBSCRIBE":
+                        subscribe_to = msg['microserver_subscribe_to']
+                        consumer.subscribe([subscribe_to])
+                        logger.debug('Subscribed to:"%s"', subscribe_to)
+
+                    case "MICROSERVER_PRODUCE_TO":
+                        produce_topic = msg['produce_topic']
+                        logger.debug(
+                            'Changed topic to produce to, to: "%s"', produce_topic)
+
+                    case _:
+                        # Produce the message to the Kafka topic with username as a key
+                        produce_msg_to_kafka(
+                            produce_topic, client_id, producer, msg)
+
+            producer.poll(0)
+    # tg.create_task(_tcp_to_kafka_handler(tg, tcp,
+    #                                      client_id, producer, consumer, produce_topic))
 
 
 async def _kafka_to_tcp_handler(tcp: TCPServer, consumer):
-    try:
-        msg = consumer.consume(num_messages=1, timeout=0.1)
-        if msg:
-            msg = msg[0] if isinstance(msg, list) else msg
+    loop = asyncio.get_running_loop()
+    while not exiting_now.is_set():
+        try:
+            # msg = consumer.consume(num_messages=1, timeout=0.1)
+            msg = await loop.run_in_executor(kafka_executor, lambda: consumer.consume(num_messages=1, timeout=1))
+            if msg:
+                msg = msg[0] if isinstance(msg, list) else msg
 
-    except Exception:
-        logger.exception("Error consuming message from Kafka.")
-        raise
-        
-    if msg and not msg.error():
-        kafka_msg = msg.value().decode("utf-8")
-        if kafka_msg:
-            sent = await tcp.send_message(kafka_msg)
-            if not sent:
-                logger.warning(
-                                    'Message from %s: "%s" not sent to Godot.', msg.topic(), kafka_msg)
-            else:
-                logger.debug(
-                                    'Consumed message from %s: "%s"', msg.topic(), kafka_msg)
-    elif msg and msg.error():
-        logger.debug("Error consuming message: %s",
-                                     msg.error().str())
-        
-    asyncio.create_task(_kafka_to_tcp_handler(tcp, consumer))
+        except Exception:
+            logger.exception("Error consuming message from Kafka.")
+            exiting_now.set()
+            raise
 
+        if msg and not msg.error():
+            kafka_msg = msg.value().decode("utf-8")
+            if kafka_msg:
+                sent = await tcp.send_message(kafka_msg)
+                if not sent:
+                    logger.warning(
+                        'Message from %s: "%s" not sent to Godot.', msg.topic(), kafka_msg)
+                else:
+                    logger.debug(
+                        'Consumed message from %s: "%s"', msg.topic(), kafka_msg)
+        elif msg and msg.error():
+            logger.debug("Error consuming message: %s",
+                        msg.error().str())
 
+    # tg.create_task(_kafka_to_tcp_handler(tg, tcp, consumer))
 
 
 def produce_msg_to_kafka(produce_topic: str, client_id: str, producer: Producer, message: dict):
@@ -551,4 +568,11 @@ def _verify_delivery_kafka(err, _msg):
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.warning("Keyobard Interrupt. Exiting.")
+    except asyncio.CancelledError:
+        logger.warning("asyncio.CancelledError. Exiting.")
+    finally:
+        logger.info("Succesfully closed microserver.")
