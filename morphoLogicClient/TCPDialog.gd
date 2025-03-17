@@ -4,15 +4,16 @@ extends Node
 var TCPClient = StreamPeerTCP.new()
 const SERVER_IP = "127.0.0.1"
 const TEMP_FILE_PATH = "res://temp_port.txt"
-var assigned_port = -1
+# var assigned_port = -1
 # var microserver_process = -1
 signal new_data_arrived(data)
-var root
+# var root
 
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
-	root = get_tree().root
+	pass
+	# root = get_tree().root
 
 func run_python_microserver() -> bool:
 	# Executing Python script
@@ -29,22 +30,22 @@ func run_python_microserver() -> bool:
 		return false
 	var m_stdio = microserver_process['stdio']
 	print("Python microserver started successfully. Process: %s" % microserver_process['pid'])
-	var connected = _initialize_tcp_connection(m_stdio)
+	var connected = await _initialize_tcp_connection(m_stdio)
 	if connected:
 		return true
 	print("Failed to start Python microserver. :(")
 	return false
 
 func _initialize_tcp_connection(m_stdio) -> bool:
-	var got_port = wait_for_port_from_pipe(m_stdio)
-	if !got_port:
+	var port = await wait_for_port_from_pipe(m_stdio)
+	if !port:
 		print("Failed to get a port to microserver.")
 		return false
-	if assigned_port == -1:
+	if port == -1:
 		print("No valid port assigned. Cannot connect.")
 		return false
 	m_stdio.close()
-	var connection_result = TCPClient.connect_to_host(SERVER_IP, assigned_port)
+	var connection_result = TCPClient.connect_to_host(SERVER_IP, port)
 	if connection_result == OK:
 		print("Connected to %s" % TCPClient.get_connected_host())
 		# connect("tree_exiting", _exit_tree())
@@ -52,21 +53,44 @@ func _initialize_tcp_connection(m_stdio) -> bool:
 	print("An error occured: %s" % connection_result)
 	return false
 
-func wait_for_port_from_pipe(m_stdio) -> int:
-	var available_bytes
+# func wait_for_port_from_pipe(m_stdio) -> int:
+# 	var available_bytes
+# 	var port = -1
+# 	while true:
+# 		available_bytes = 0
+# 		while available_bytes == 0:
+# 			available_bytes = m_stdio.get_length()
+# 		# 	port = m_stdio.get_as_text(true)
+# 		port = m_stdio.get_as_text()	
+# 		if "PORT_FOR_GODOT" in port:
+# 			port = port.split(" ")
+# 			assigned_port = port[1].to_int()
+# 			break
+# 	print("STDIO got port: %s" % port)
+# 	return true
+
+func wait_for_port_from_pipe(m_stdio, timeout_sec: float = 10.0) -> int:
+	var start_time = Time.get_ticks_msec()
 	var port = -1
-	while true:
-		available_bytes = 0
-		while available_bytes == 0:
-			available_bytes = m_stdio.get_length()
-		# 	port = m_stdio.get_as_text(true)
-		port = m_stdio.get_as_text()	
-		if "PORT_FOR_GODOT" in port:
-			port = port.split(" ")
-			assigned_port = port[1].to_int()
-			break
-	print("STDIO got port: %s" % port)
-	return true
+	
+	while (Time.get_ticks_msec() - start_time) < timeout_sec * 1000:
+		if m_stdio.get_length() > 0:
+			var output = m_stdio.get_as_text()
+			output = output.split("\n")
+			for line in output:
+				if "PORT_FOR_GODOT" in line:
+					print("OUTPUT: " + line)
+					var parts = line.split(" ")
+					if parts.size() > 1:
+						port = parts[1].to_int()
+						print("STDIO got port: '%d'" % port)
+						return port
+				else:
+					print(output)
+		await get_tree().process_frame # Non-blocking wait
+	
+	print("Timeout reached, no port received.")
+	return -1
 
 func initialize_server_connection():
 	send_tcp_message({"system_message": "REQUEST_SERVER_CONNECTION"})

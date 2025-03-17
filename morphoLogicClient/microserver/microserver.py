@@ -5,6 +5,7 @@ import logging
 import os
 import socket
 import sys
+
 # import asyncio.trsock
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
@@ -13,6 +14,7 @@ from logging.handlers import RotatingFileHandler
 from time import gmtime, strftime
 from confluent_kafka import Producer, Consumer, KafkaException  # , KafkaError
 
+# import debugpy
 ####################################################################################################
 # Configuration & Logging
 ####################################################################################################
@@ -153,7 +155,7 @@ class TCPServer:
         # with open(self.FILE_PORT_HANDLING, "w", encoding="utf-8") as f:
         #     f.write(str(self.port))
         # # *********** NEED CHANGES *************
-        sys.stdout.write("PORT_FOR_GODOT " + str(self.port))  # \n is crucial for Godot's read
+        sys.stdout.write("PORT_FOR_GODOT " + str(self.port) + "\n")  # \n is crucial for Godot's read
         sys.stdout.flush()  # Force immediate send
         logger.debug("Sent port %d to Godot via pipe", self.port)
 
@@ -568,6 +570,9 @@ def _verify_delivery_kafka(err, _msg):
 
 
 if __name__ == "__main__":
+    # debugpy.listen(('localhost', 5678))
+    # debugpy.wait_for_client()
+    # print("Debugger attached")
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
