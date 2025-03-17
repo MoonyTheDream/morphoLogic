@@ -3,5 +3,6 @@
     "kafka_server": "localhost:9092",
     "generalTopic": "serverGeneralTopic",
     "clientHandshakeTopic": "clientHandshakeTopic",
-    "serverandshakeTopic": "serverHandshakeTopic"
+    "serverandshakeTopic": "serverHandshakeTopic",
+    "debugpy": false
 }

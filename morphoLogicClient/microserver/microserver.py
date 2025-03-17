@@ -389,6 +389,14 @@ async def main():
     produce_topic = GENERAL_TOPIC
     loop = asyncio.get_running_loop()
     loop.set_debug(DEBUG_MODE)
+    
+    if _SETTINGS.get("debugpy", False):
+        import debugpy
+        debugpy.listen(('localhost', 5678))
+        logger.info("Debugger listened at  5678 localhost")
+        debugpy.wait_for_client()
+        print("Debugger attached")
+
 
     try:
         async with TCPServer() as tcp:
