@@ -8,7 +8,7 @@ from .awakening import awake, stop_event as _stop_event, logger
 from .utils.async_cmd import AsyncCmd
 
 
-class MorphoLogicCmd(cmd.Cmd):
+class MorphoLogicCmd(AsyncCmd):
     """Command-line interface for the morphoLogic server."""
     stop = None
     intro = """
@@ -47,9 +47,6 @@ Say help or just raise your eyebrows - ? - to learn more.
     #     """Show help information."""
     #     super().do_help(arg)
 
-async def run_cmdloop():
-    """Run the command loop asynchronously without blocking the server."""
-    await asyncio.to_thread(MorphoLogicCmd().cmdloop)
     
 # async def handle_commands_while_server_running():
 #     """
@@ -91,7 +88,8 @@ async def start_server(args):
     # finally:
     #     sys.exit(1)
     async with asyncio.TaskGroup() as tg:
-        task_awake = tg.create_task(awake())
+        tg.create_task(awake(tg))
+        tg.create_task(MorphoLogicCmd().cmdloop())
         # print("TEST")
         # task_cmd = tg.create_task(run_cmdloop())
         # print("TEST2")

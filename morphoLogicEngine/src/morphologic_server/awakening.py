@@ -2,6 +2,9 @@
 import asyncio
 import json
 
+from concurrent.futures import ThreadPoolExecutor
+
+
 from .utils.logger import logger
 from .config import settings as _SETTINGS
 from .network.kafka import (
@@ -12,6 +15,8 @@ from .network.kafka import (
 
 import time
 
+kafka_executor = ThreadPoolExecutor(max_workers=1)
+
 ####################################################################################################
 # Configuration & Logging
 ####################################################################################################
@@ -19,7 +24,7 @@ import time
 # Global stop event
 stop_event = asyncio.Event()
 
-async def awake():
+async def awake(tg: asyncio.TaskGroup):
     "Entry point of the server."
     print("The morphoLogic laws of physics bound itself into existence!")
     logger.info("Server version: %s", _SETTINGS.get("server_version", "ERROR"))
@@ -31,67 +36,72 @@ async def awake():
             # print("rzezc")
             # await asyncio.sleep(1)
         # print("Keyboard Interrupt madafasak")
-    with KafkaConnection() as kafka:
-        while not stop_event.is_set():
-            consume_and_handle(kafka)
+    tg.create_task(consume_and_handle())
+        # while True:
+        #     await asyncio.sleep(1)
             # time.sleep(1)
     # except asyncio.CancelledError:
     #     logger.exception("ASYNKOEROROER")
     logger.info("Server closing down.")
 
 
-def consume_and_handle(kafka: KafkaConnection):
+async def consume_and_handle():
     """
     A handler that consumes message from globalTopic and decides to which function
     it needs to be handled.
     """
     try:
-        msg = kafka.consumer.consume(num_messages=1, timeout=-1)
-        if msg:
-            if isinstance(msg, list):
-                msg = msg[0]
+    
+        loop = asyncio.get_running_loop()
+        with KafkaConnection() as kafka:
+            while True:
+                msg = await loop.run_in_executor(
+                        kafka_executor, lambda: kafka.consumer.consume(num_messages=1, timeout=1))
+                if msg:
+                    if isinstance(msg, list):
+                        msg = msg[0]
 
-            if msg.error():
-                logger.warning(
-                    "Error consuming message: %s", msg.error().str())
-                return
+                    if msg.error():
+                        logger.warning(
+                            "Error consuming message: %s", msg.error().str())
+                        return
 
-            # We want to know to which topic the message was sent
-            msg_topic = msg.topic()
-            # Other needed data from kafka message
-            kafka_msg = _decode_msg(msg)
-            
-            
-            # # Ignoring if the message was send by itself
-            # if kafka_msg['metadata']['source'] == "server":
-            #     return
-            
-            system_message = kafka_msg.get("system_message", "")
-            sending_user = kafka_msg['metadata']['username'] # this is also topic name
-            # The aboce WILL CHANGE. TOPIC PER USERNAME SHOULD BE TRACKING SOMEWHERE
+                    # We want to know to which topic the message was sent
+                    msg_topic = msg.topic()
+                    # Other needed data from kafka message
+                    kafka_msg = _decode_msg(msg)
+                    
+                    
+                    # # Ignoring if the message was send by itself
+                    # if kafka_msg['metadata']['source'] == "server":
+                    #     return
+                    
+                    system_message = kafka_msg.get("system_message", "")
+                    sending_user = kafka_msg['metadata']['username'] # this is also topic name
+                    # The aboce WILL CHANGE. TOPIC PER USERNAME SHOULD BE TRACKING SOMEWHERE
 
 
-            # Handling handhske messages from clients
-            if msg_topic == _SERVER_HANDSHAKE_TOPIC:
-                # Handshake requests
-                if system_message:
-                    match system_message:
-                        case "REQUEST_SERVER_CONNECTION":
-                            _handshake_topic_creation(kafka, kafka_msg)
-                        case _:
-                            raise RuntimeError(
-                                f'Uknown system message from client side in {msg_topic}: "{system_message}"')
+                    # Handling handhske messages from clients
+                    if msg_topic == _SERVER_HANDSHAKE_TOPIC:
+                        # Handshake requests
+                        if system_message:
+                            match system_message:
+                                case "REQUEST_SERVER_CONNECTION":
+                                    _handshake_topic_creation(kafka, kafka_msg)
+                                case _:
+                                    raise RuntimeError(
+                                        f'Uknown system message from client side in {msg_topic}: "{system_message}"')
 
-            else:
-                # System messages from client side handler
-                if system_message:
-                    match system_message:
-                        # Handshake in dedicated topic handler
-                        case "HANDSHAKE_GLOBAL_TOPIC":
-                            _check_and_acknowledge_client_topic(kafka, sending_user, kafka_msg)
-                        case _:
-                            raise RuntimeError(
-                                f'Uknown system message from client side in topic {msg_topic}: "{system_message}"')
+                    else:
+                        # System messages from client side handler
+                        if system_message:
+                            match system_message:
+                                # Handshake in dedicated topic handler
+                                case "HANDSHAKE_GLOBAL_TOPIC":
+                                    _check_and_acknowledge_client_topic(kafka, sending_user, kafka_msg)
+                                case _:
+                                    raise RuntimeError(
+                                        f'Uknown system message from client side in topic {msg_topic}: "{system_message}"')
 
     except Exception:
         logger.exception("Error in main loop of server.")
