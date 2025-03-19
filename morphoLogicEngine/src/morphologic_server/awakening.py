@@ -2,49 +2,27 @@
 import asyncio
 import json
 
-from concurrent.futures import ThreadPoolExecutor
-
-
-from .utils.logger import logger
-from .config import settings as _SETTINGS
+from morphologic_server import logger, settings as _SETTINGS
 from .network.kafka import (
     KafkaConnection,
     CLIENT_HANDSHAKE_TOPIC as _CLIENT_HANDSHAKE_TOPIC,
     SERVER_HANDSHAKE_TOPIC as _SERVER_HANDSHAKE_TOPIC
 )
 
-import time
+__all__ = ["awake"]
 
-kafka_executor = ThreadPoolExecutor(max_workers=1)
-
-####################################################################################################
-# Configuration & Logging
-####################################################################################################
-
-# Global stop event
-stop_event = asyncio.Event()
-
+# ################################################################################################ #
+#                                      INTRO AND MAIN FUNCTION                                     #
+# ################################################################################################ #
 async def awake(tg: asyncio.TaskGroup):
     "Entry point of the server."
     print("The morphoLogic laws of physics bound itself into existence!")
     logger.info("Server version: %s", _SETTINGS.get("server_version", "ERROR"))
     logger.info("Waking up laws of nature.")
-    # while not stop_event.is_set():
-    # try:
-        # while True:
-                # consume_and_handle(kafka)
-            # print("rzezc")
-            # await asyncio.sleep(1)
-        # print("Keyboard Interrupt madafasak")
+
     tg.create_task(consume_and_handle())
-        # while True:
-        #     await asyncio.sleep(1)
-            # time.sleep(1)
-    # except asyncio.CancelledError:
-    #     logger.exception("ASYNKOEROROER")
-    logger.info("Server closing down.")
 
-
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Consume And Handle ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 async def consume_and_handle():
     """
     A handler that consumes message from globalTopic and decides to which function
@@ -52,11 +30,9 @@ async def consume_and_handle():
     """
     try:
     
-        loop = asyncio.get_running_loop()
         with KafkaConnection() as kafka:
             while True:
-                msg = await loop.run_in_executor(
-                        kafka_executor, lambda: kafka.consumer.consume(num_messages=1, timeout=1))
+                msg = await asyncio.to_thread(lambda: kafka.consumer.consume(num_messages=1, timeout=1))
                 if msg:
                     if isinstance(msg, list):
                         msg = msg[0]
@@ -71,10 +47,6 @@ async def consume_and_handle():
                     # Other needed data from kafka message
                     kafka_msg = _decode_msg(msg)
                     
-                    
-                    # # Ignoring if the message was send by itself
-                    # if kafka_msg['metadata']['source'] == "server":
-                    #     return
                     
                     system_message = kafka_msg.get("system_message", "")
                     sending_user = kafka_msg['metadata']['username'] # this is also topic name
@@ -106,13 +78,13 @@ async def consume_and_handle():
     except Exception:
         logger.exception("Error in main loop of server.")
 
-
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Decode Msg ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 def _decode_msg(msg) -> dict:
     kafka_msg = msg.value().decode("utf-8")
     logger.debug('Consumed message from %s: "%s"', msg.topic(), kafka_msg)
     return json.loads(kafka_msg)
 
-
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Handshake ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 def _handshake_topic_creation(kafka: KafkaConnection, client_handshake_msg: dict):
     username = client_handshake_msg['metadata'].get("username", "")
     if username:  # tu można później dodać walidację, czy użytkownik istnieje i jaki topic itp.
@@ -131,7 +103,7 @@ def _handshake_topic_creation(kafka: KafkaConnection, client_handshake_msg: dict
             system_message="TOPIC_CREATED_SEND_HANDSHAKE_THERE"
         )
 
-
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ACK ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 def _check_and_acknowledge_client_topic(kafka: KafkaConnection, msg_topic: str, msg: dict):
     """
     After client's HANDSHAKE_GLOBAL_TOPIC check if the topic is subscribed and 
@@ -158,5 +130,5 @@ def _check_and_acknowledge_client_topic(kafka: KafkaConnection, msg_topic: str, 
     #     logger.error('Client want to talk in wrong topic. Topic: "%s", Username: "%s"', msg_topic, username)
 
 
-if __name__ == "__main__":
-    awake()
+# if __name__ == "__main__":
+#     awake()

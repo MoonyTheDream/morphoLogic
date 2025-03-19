@@ -4,7 +4,7 @@ import sys
 
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from ..config import settings as _SETTINGS
+from morphologic_server import settings as _SETTINGS
 
 def setup_logger():
     """

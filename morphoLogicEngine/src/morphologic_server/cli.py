@@ -1,10 +1,11 @@
 import argparse
 import asyncio
-import cmd
+# import cmd
 import debugpy
-import sys
+# import sys
 
-from .awakening import awake, stop_event as _stop_event, logger
+from morphologic_server import logger, TerminateTaskGroup, force_terminate_task_group
+from .awakening import awake
 from .utils.async_cmd import AsyncCmd
 
 
@@ -17,10 +18,10 @@ Say help or just raise your eyebrows - ? - to learn more.
 """
     prompt = "(morphoLogicServer) "
     
-    def do_stop(self, _):
+    async def do_stop(self, _):
         """Stop the server."""
         print("Stars are fading... All the Heaven's batteries are turning off.")
-        _stop_event.set()
+        await force_terminate_task_group()
         return True # Exits the cmd loop
     
     def do_debug(self, _):
@@ -87,9 +88,12 @@ async def start_server(args):
     #     task_cmd.cancel()
     # finally:
     #     sys.exit(1)
-    async with asyncio.TaskGroup() as tg:
-        tg.create_task(awake(tg))
-        tg.create_task(MorphoLogicCmd().cmdloop())
+    try:
+        async with asyncio.TaskGroup() as tg:
+            tg.create_task(awake(tg))
+            tg.create_task(MorphoLogicCmd().cmdloop())
+    except* TerminateTaskGroup:
+        logger.info("Terminating tasks.")
         # print("TEST")
         # task_cmd = tg.create_task(run_cmdloop())
         # print("TEST2")
@@ -121,6 +125,8 @@ def main():
         #     print("Server shutdown requested by KeyboardInterrupt.\n")
     else:
         parser.print_help()
+        
+    logger.info("Closing down the morphoLogic Server.")
     
 if __name__ == "__main__":
     main()

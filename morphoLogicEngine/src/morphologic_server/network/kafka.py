@@ -10,9 +10,10 @@ from time import sleep
 from confluent_kafka import Producer, Consumer, KafkaException  # , KafkaError
 from confluent_kafka.admin import AdminClient, NewTopic
 
-from ..utils.logger import logger
+from morphologic_server import logger, settings as _SETTINGS
+
+
 from ..utils.time_helpers import get_gmt_time
-from ..config import settings as _SETTINGS
 
 BOOTSTRAP_SERVER = os.getenv(
     "KAFKA_BOOTSTRAP_SERVER", _SETTINGS.get("kafka_server", "localhost:9092"))

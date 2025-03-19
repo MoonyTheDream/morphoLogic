@@ -80,10 +80,6 @@ def setup_logger():
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
     
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Asyncio Setup ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-kafka_executor = ThreadPoolExecutor(max_workers=1)
-
-# ------------------------------------------------------------------------------------------------ #
 
 # ################################################################################################ #
 #                                    TCP SERVER CONTEXT MANAGER                                    #
@@ -482,12 +478,10 @@ async def _tcp_to_kafka_handler(tcp: TCPServer, client_id, producer, consumer, p
 
 
 async def _kafka_to_tcp_handler(tcp: TCPServer, consumer):
-    loop = asyncio.get_running_loop()
     while True:
         try:
             # msg = consumer.consume(num_messages=1, timeout=0.1)
-            msg = await loop.run_in_executor(
-                kafka_executor, lambda: consumer.consume(num_messages=1, timeout=1))
+            msg = await asyncio.to_thread(lambda: consumer.consume(num_messages=1, timeout=1))
             if msg:
                 msg = msg[0] if isinstance(msg, list) else msg
 
