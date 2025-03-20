@@ -6,7 +6,6 @@ import os
 import socket
 import sys
 
-from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from logging.handlers import RotatingFileHandler
 from time import gmtime, strftime
@@ -23,6 +22,7 @@ MICROSERVER_VERSION = "0.2.0"
 SETTINGS_FILE = os.path.join(
     "morphoLogicClient", "settings.json") if not RUN_BY_GODOT else "settings.json"
 
+
 def load_settings(path=SETTINGS_FILE):
     """
     Loads global settings from JSON file.
@@ -34,10 +34,11 @@ def load_settings(path=SETTINGS_FILE):
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
+
 _SETTINGS = load_settings()
 # Allow environment variable overrides for Kafka bootstrap server and general topic
 BOOTSTRAP_SERVER = os.getenv("KAFKA_BOOTSTRAP_SERVER",
-    _SETTINGS.get("kafka_server", "localhost:9092"))
+                             _SETTINGS.get("kafka_server", "localhost:9092"))
 GENERAL_TOPIC = os.getenv("KAFKA_GENERAL_TOPIC", _SETTINGS.get(
     "generalTopic", "serverGeneralTopic"))
 CLIENT_HANDSHAKE_TOPIC = os.getenv("KAFKA_HANDSHAKE_TOPIC", _SETTINGS.get(
@@ -52,9 +53,11 @@ DEBUG_MODE = _SETTINGS.get("log_level_debug", False)
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Logger Setup ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 logger = logging.getLogger("mL microserver")
 
+
 def get_gmt_time():
     """Wrapper to get strigified GMT time"""
     return strftime("%Y-%m-%d %H:%M:%S", gmtime())
+
 
 def setup_logger():
     """
@@ -79,11 +82,15 @@ def setup_logger():
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
-    
 
-# ################################################################################################ #
-#                                    TCP SERVER CONTEXT MANAGER                                    #
-# ################################################################################################ #
+
+########  ######  ########        ######  ##          ###     ######   ######
+   ##    ##    ## ##     ##      ##    ## ##         ## ##   ##    ## ##    ##
+   ##    ##       ##     ##      ##       ##        ##   ##  ##       ##
+   ##    ##       ########       ##       ##       ##     ##  ######   ######
+   ##    ##       ##             ##       ##       #########       ##       ##
+   ##    ##    ## ##             ##    ## ##       ##     ## ##    ## ##    ##
+   ##     ######  ##              ######  ######## ##     ##  ######   ######
 class TCPServer:
     """
     Context manager that binds a TCP server to a dynamic port, waits for a single clinet connection
@@ -127,7 +134,7 @@ class TCPServer:
         self.port = self.sock.getsockname()[1]
         logger.info("Kafka service listening on %s:%s",
                     self.HOST, self.port)
-        
+
         # Godot will listen until it will receive PORT_FOR_GODOT message through pipe.
         # Then i stops listening to stdio and switch to tcp with given port.
         sys.stdout.write("PORT_FOR_GODOT " + str(self.port) + "\n")
@@ -246,9 +253,13 @@ class TCPServer:
             return None
 
 
-# ################################################################################################ #
-#                                       KAFKA CONTEXT MANAGER                                      #
-# ################################################################################################ #
+##     ##    ###    ######## ##     ##    ###          ######  ######## ##      ## ########
+##    ##    ## ##   ##       ##    ##    ## ##        ##    ##    ##     ##    ##     ##
+##   ##    ##   ##  ##       ##   ##    ##   ##       ##          ##      ##  ##      ##
+#####     ##     ## ######   #####     ##     ##      ##          ##       ####       ##
+##   ##   ######### ##       ##   ##   #########      ##          ##      ##  ##      ##
+##    ##  ##     ## ##       ##    ##  ##     ##      ##    ##    ##     ##    ##     ##
+##     ## ##     ## ##       ##     ## ##     ##       ######     ##    ##      ##    ##
 @asynccontextmanager
 async def kafka_resources(data_json: dict, tcp_server: TCPServer = None):
     """
@@ -336,18 +347,23 @@ async def _establish_kafka_connection(
                     "Kafka cluster is unreachable. Check if the broker is running.") from e
 
 
-# ################################################################################################ #
-#                                             MAIN LOOP                                            #
-# ################################################################################################ #
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Task Group Terminator ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 class TerminateTaskGroup(Exception):
     """Exception raised to terminate a teask group."""
-    
+
+
 async def force_terminate_task_group():
     """Used to force termination of a task group."""
     raise TerminateTaskGroup()
 # ------------------------------------------------------------------------------------------------ #
 
+##     ##    ###    #### ##    ##      ##        #######   #######  ########
+###   ###   ## ##    ##  ###   ##      ##       ##     ## ##     ## ##     ##
+#### ####  ##   ##   ##  ####  ##      ##       ##     ## ##     ## ##     ##
+## ### ## ##     ##  ##  ## ## ##      ##       ##     ## ##     ## ########
+##     ## #########  ##  ##  ####      ##       ##     ## ##     ## ##
+##     ## ##     ##  ##  ##   ###      ##       ##     ## ##     ## ##
+##     ## ##     ## #### ##    ##      ########  #######   #######  ##
 async def main():
     """
     Main function: sets up logging, creates a TCP server and waits for a single client.
@@ -428,7 +444,7 @@ async def main():
         logger.exception("Unexpected error. Shutting down.")
     finally:
         logger.info("Exiting microserver.")
-    
+
 
 async def _tcp_to_kafka_handler(tcp: TCPServer, client_id, producer, consumer, produce_topic):
     """
@@ -502,7 +518,6 @@ async def _kafka_to_tcp_handler(tcp: TCPServer, consumer):
         elif msg and msg.error():
             logger.debug("Error consuming message: %s",
                          msg.error().str())
-
 
 
 def produce_msg_to_kafka(produce_topic: str, client_id: str, producer: Producer, message: dict):
