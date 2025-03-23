@@ -7,6 +7,7 @@ const TEMP_FILE_PATH = "res://temp_port.txt"
 # var assigned_port = -1
 # var microserver_process = -1
 signal new_data_arrived(data)
+var tcp_t
 # var root
 
 
@@ -94,15 +95,18 @@ func wait_for_port_from_pipe(m_stdio, timeout_sec: float = 10.0) -> int:
 
 func initialize_server_connection():
 	send_tcp_message({"system_message": "REQUEST_SERVER_CONNECTION"})
-	var tcp_t = Thread.new()
+	tcp_t = Thread.new()
 	tcp_t.start(continously_receive_messages)
 
 func _exit_tree():
 	# Make sure Python processed is killed (to death) when exiting godot
 	send_tcp_message({"system_message" = "CLEANUP"})
+	print("Python microserver has been kindly asked to kill itself.")
 
-	print("[GODOT] Python microserver has been slain.")
-
+	# Stop the thread properly
+	if tcp_t and tcp_t.is_started():
+		tcp_t.wait_to_finish()
+		print("TCP thread stopped correctly.")
 
 func continously_receive_messages() -> void:
 	while true:

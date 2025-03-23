@@ -1,6 +1,7 @@
 # LANGUAGE translation for morphoLogicClient for the following files:
 # res://scenes/line_edit.gd
 # res://scenes/rich_text_label.gd
+# res://io_handler.gd
 #
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
 #
@@ -44,18 +45,22 @@ msgstr ""
 msgid "[color=tomato]Failed to launch Microserver![/color]\n"
 msgstr ""
 
-#: scenes/rich_text_label.gd
+#: io_handler.gd
 msgid "[color=yellow_green]Succsessfully connected to server.[/color]\n"
 msgstr ""
 
-#: scenes/rich_text_label.gd
+#: io_handler.gd
 msgid "[color=gold]Trouble Connecting to Server. Retrying.[/color]\n"
 msgstr ""
 
-#: scenes/rich_text_label.gd
+#: io_handler.gd
 msgid "[color=tomato]Failure Connecting to Server.[/color]\n"
 msgstr ""
 
-#: scenes/rich_text_label.gd
+#: io_handler.gd
 msgid "[color=tomato]UKNOWN SYSTEM MESSAGE! REPORT ISSUE TO DEVS.[/color]\n"
+msgstr ""
+
+#: io_handler.gd
+msgid "[color=green_yellow]Succsessfuly Established Server Connection.[/color]\n"
 msgstr ""

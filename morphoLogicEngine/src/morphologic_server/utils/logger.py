@@ -8,6 +8,17 @@ from pathlib import Path
 from morphologic_server import settings as _SETTINGS
 
 
+# 888
+# 888
+# 888
+# 888  .d88b.   .d88b.   .d88b.   .d88b.  888d888
+# 888 d88""88b d88P"88b d88P"88b d8P  Y8b 888P"
+# 888 888  888 888  888 888  888 88888888 888
+# 888 Y88..88P Y88b 888 Y88b 888 Y8b.     888
+# 888  "Y88P"   "Y88888  "Y88888  "Y8888  888
+#                   888      888
+#              Y8b d88P Y8b d88P
+#               "Y88P"   "Y88P"
 def setup_logger():
     """
     Prepares a rotating file logger and console logger

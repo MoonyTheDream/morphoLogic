@@ -54,23 +54,29 @@ msgstr "[color=yellow_green]Częściowo odzyskano samoświadomość.[/color]\n"
 msgid "[color=tomato]Failed to launch Microserver![/color]\n"
 msgstr "[color=tomato]Nie udało się uruchomić Mircoservera![/color]\n"
 
-#: scenes/rich_text_label.gd
+#: io_handler.gd
 msgid "[color=yellow_green]Succsessfully connected to server.[/color]\n"
 msgstr "[color=yellow_green]Odzyskano kontakt z rzeczywistością.[/color]\n"
 
-#: scenes/rich_text_label.gd
+#: io_handler.gd
 msgid "[color=gold]Trouble Connecting to Server. Retrying.[/color]\n"
 msgstr ""
 "[color=gold]Problem z połączeniem z Serwerem. Próbuję ponownie.[/color]\n"
 
-#: scenes/rich_text_label.gd
+#: io_handler.gd
 msgid "[color=tomato]Failure Connecting to Server.[/color]\n"
 msgstr ""
-"[color=tomato]Nie udało się połączyć z Serwerem! Smuteczek. :( Śpij, "
-"Słodki Książę.[/color]\n"
+"[color=tomato]Nie udało się połączyć z Serwerem! Smuteczek. :( Śpij, Słodki "
+"Książę.[/color]\n"
 
-#: scenes/rich_text_label.gd
+#: io_handler.gd
 msgid "[color=tomato]UKNOWN SYSTEM MESSAGE! REPORT ISSUE TO DEVS.[/color]\n"
 msgstr ""
-"[color=tomato]NIEZNANA WIADOMOŚĆ SYSTEMOWA! ZGŁOŚ PROBLEM TWÓRCOM.[/"
-"color]\n"
+"[color=tomato]NIEZNANA WIADOMOŚĆ SYSTEMOWA! ZGŁOŚ PROBLEM TWÓRCOM.[/color]\n"
+
+#: io_handler.gd
+msgid ""
+"[color=green_yellow]Succsessfuly Established Server Connection.[/color]\n"
+msgstr ""
+"[color=yellow_green]Taaak... Poznaję Ciebie, to miejsce i ten czas. To był "
+"głęboki sen, ale wszystko nabiera teraz kształtu i sensu.[/color]\n"

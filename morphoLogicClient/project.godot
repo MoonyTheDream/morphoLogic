@@ -14,7 +14,7 @@ config/name="morphoLogicClient"
 config/version="0.1.0"
 run/main_scene="res://scenes/prototype.tscn"
 config/features=PackedStringArray("4.4", "GL Compatibility")
-boot_splash/bg_color=Color(0.219086, 0.329064, 0.344614, 1)
+boot_splash/bg_color=Color(0.460273, 0.624563, 0.647919, 1)
 config/icon="uid://d2rakuvfhfult"
 
 [autoload]
@@ -22,6 +22,11 @@ config/icon="uid://d2rakuvfhfult"
 ClientData="*res://ClientData.gd"
 TCPDialog="*res://TCPDialog.gd"
 InputHandler="*res://io_handler.gd"
+
+[debug]
+
+file_logging/enable_file_logging=true
+file_logging/log_path="res://logs/godot.log"
 
 [display]
 
@@ -83,6 +88,10 @@ enter_key={
 locale/translations=PackedStringArray("res://locale/pl/pl_PL.mo")
 locale/translations_pot_files=PackedStringArray("res://scenes/line_edit.gd", "res://scenes/rich_text_label.gd", "res://io_handler.gd")
 locale/test="pl"
+
+[morphoLogic]
+
+loogging/print_debug_messages_on_client=true
 
 [rendering]
 
