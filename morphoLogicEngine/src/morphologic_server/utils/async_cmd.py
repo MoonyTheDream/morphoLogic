@@ -42,12 +42,15 @@ listings of documented functions, miscellaneous topics, and undocumented
 functions respectively.
 """
 
-import asyncio, inspect, string, sys
+import asyncio
+import inspect
+import string
+import sys
 
 from asyncio.coroutines import iscoroutinefunction
 
 
-__all__ = ["Cmd"]
+__all__ = ["AsyncCmd"]
 
 PROMPT = '(Cmd) '
 IDENTCHARS = string.ascii_letters + string.digits + '_'
@@ -157,8 +160,7 @@ class AsyncCmd:
                     except ImportError:
                         pass
         except asyncio.CancelledError:
-            print("MORDA")
-
+            pass
 
 
     def precmd(self, line):
