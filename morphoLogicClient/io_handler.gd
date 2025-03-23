@@ -56,5 +56,5 @@ func _wait_for_ack():
 	var server_answer = await TCPDialog.new_data_arrived
 	if server_answer.get("system_message", "") == "ACK":
 		TCPDialog.new_data_arrived.connect(parse_message)
-		var success_msg = tr("[color=yelow_green]Sccsessfuly Established Server Connection.[/color]")
+		var success_msg = tr("[color=green_yellow]Succsessfuly Established Server Connection.[/color]\n")
 		draw_message.emit(success_msg)
