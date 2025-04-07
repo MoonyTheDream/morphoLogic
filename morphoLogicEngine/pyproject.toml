@@ -17,7 +17,8 @@ dependencies = [
     "asyncpg>=0.30.0",
     "alembic>=1.15.1",
     "psycopg2>=2.9.10",
-    "shapely>=2.1.0"
+    "shapely>=2.1.0",
+    "ptpython>=3.0.29"
 ]
 
 [tool.hatch.build]

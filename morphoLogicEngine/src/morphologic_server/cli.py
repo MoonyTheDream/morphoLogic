@@ -5,6 +5,7 @@ import argparse
 import asyncio
 import debugpy
 
+from ptpython.repl import embed
 from morphologic_server import (
     logger,
     TerminateTaskGroup,
@@ -13,6 +14,7 @@ from morphologic_server import (
 )
 from .awakening import awake
 from .utils.async_cmd import AsyncCmd
+
 
 # ------------------------------------------------------------------------------------------------ #
 
@@ -45,6 +47,24 @@ Say help or just raise your eyebrows - ? - to learn more.
         debugpy.listen(("localhost", 5678))
         debugpy.wait_for_client()
         print("Debugger attached")
+
+    async def do_shell(self, _):
+        """Drop into async-aware interactive shell."""
+        from morphologic_server import force_terminate_task_group  # context here
+
+        banner = "morphoLogic async shell\nType `await ...` freely — Ctrl-D to exit."
+
+        # Define your local namespace
+        context = {
+            "force_terminate_task_group": force_terminate_task_group,
+            "asyncio": asyncio,
+            "logger": logger,
+            "tg": asyncio.current_task()
+            .get_coro()
+            .cr_frame.f_locals.get("tg", None),  # if accessible
+        }
+        # Start ptpython with asyncio support
+        await embed(globals=context, return_asyncio_coroutine=True, title=banner)
 
     def do_detach(self, _):
         """Exiting Cmd Handler but letting server still run."""
