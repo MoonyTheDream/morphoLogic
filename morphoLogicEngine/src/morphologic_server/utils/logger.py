@@ -7,6 +7,11 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from morphologic_server import settings as _SETTINGS
 
+formatter = logging.Formatter(
+    "%(asctime)s [%(levelname)s][%(name)s]: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+
 
 # 888
 # 888
@@ -32,10 +37,6 @@ def setup_logger():
         maxBytes=4 * 1024 * 1024,
         backupCount=4,  # 4MB per file, keep 4 backups
     )
-    formatter = logging.Formatter(
-        "%(asctime)s [%(levelname)s][%(name)s]: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
     log_handler.setFormatter(formatter)
 
     staged_logger.setLevel(logging.DEBUG if debug_mode else logging.INFO)
@@ -45,14 +46,35 @@ def setup_logger():
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(formatter)
     staged_logger.addHandler(console_handler)
+    
     return staged_logger
 
 
 logger = setup_logger()
 
-
+def check_if_logging_to_console():
+    """
+    Checks if the logger is logging to the console.
+    """
+    if len(logger.handlers) > 1:
+        return True
+    return False
+    
+    
+    
 def remove_console_handler():
     """
     Removes the console handler from the logger
     """
     logger.removeHandler(logger.handlers[1])
+
+
+def add_console_handler():
+    """
+    Adds the console handler to the logger
+    """
+    global logger
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+    # return staged_logger

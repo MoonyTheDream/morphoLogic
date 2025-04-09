@@ -10,7 +10,9 @@ from morphologic_server import (
     logger,
     TerminateTaskGroup,
     force_terminate_task_group,
+    check_if_logging_to_console,
     remove_console_handler,
+    add_console_handler
 )
 from .awakening import awake
 from .utils.async_cmd import AsyncCmd
@@ -19,9 +21,17 @@ from .utils.async_cmd import AsyncCmd
 # ------------------------------------------------------------------------------------------------ #
 
 
-# ################################################################################################ #
-#                                             CMD LOOP                                             #
-# ################################################################################################ #
+#  .d8888b.  888b     d888 8888888b.       888
+# d88P  Y88b 8888b   d8888 888  "Y88b      888
+# 888    888 88888b.d88888 888    888      888
+# 888        888Y88888P888 888    888      888      .d88b.   .d88b.  88888b.
+# 888        888 Y888P 888 888    888      888     d88""88b d88""88b 888 "88b
+# 888    888 888  Y8P  888 888    888      888     888  888 888  888 888  888
+# Y88b  d88P 888   "   888 888  .d88P      888     Y88..88P Y88..88P 888 d88P
+#  "Y8888P"  888       888 8888888P"       88888888 "Y88P"   "Y88P"  88888P"
+#                                                                    888
+#                                                                    888
+#                                                                    888
 class MorphoLogicCmd(AsyncCmd):
     """
     Command-line interface for the morphoLogic server.
@@ -48,36 +58,49 @@ Say help or just raise your eyebrows - ? - to learn more.
         debugpy.wait_for_client()
         print("Debugger attached")
 
-    async def do_shell(self, _):
+    async def do_shell(self, arg):
         """Drop into async-aware interactive shell."""
         from morphologic_server import force_terminate_task_group  # context here
 
-        banner = "morphoLogic async shell\nType `await ...` freely — Ctrl-D to exit."
-
+        banner = "morphoLogic async shell Type `await ...` freely — Ctrl-D to exit."
+        print(banner)
+        
+        log_to_console = check_if_logging_to_console()
+        if log_to_console:
+            print("Detaching logger while shell is active.")
+            remove_console_handler()
         # Define your local namespace
-        context = {
+        context = { 
             "force_terminate_task_group": force_terminate_task_group,
             "asyncio": asyncio,
             "logger": logger,
-            "tg": asyncio.current_task()
-            .get_coro()
-            .cr_frame.f_locals.get("tg", None),  # if accessible
+            # "tg": asyncio.current_task()
+            # .get_coro()
+            # .cr_frame.f_locals.get("tg", None),  # if accessible
         }
         # Start ptpython with asyncio support
         await embed(globals=context, return_asyncio_coroutine=True, title=banner)
+        
+        # global logger
+        if log_to_console:
+            add_console_handler()
+            print("Logging attached again.")
+        self.do_help(arg)
+
+
 
     def do_detach(self, _):
         """Exiting Cmd Handler but letting server still run."""
-        print("Detaching from Cmd Handler. The Server will keep running.")
+        print("Detaching from Cmd Handler. The Server will keep running.\nCtrl + C to stop the server.")
         return True
 
     def default(self, line):
         """Handle unknown commands."""
         print(f"Unknown command: {line}")
 
-    def do_exit(self, arg):
+    async def do_exit(self, arg):
         """Alias for stopping the server."""
-        return self.do_stop(arg)
+        return await self.do_stop(arg)
 
 
 #          888                     888

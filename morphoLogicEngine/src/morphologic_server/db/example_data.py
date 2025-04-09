@@ -2,7 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from geoalchemy2 import shape
 from shapely.geometry import Point
-from models import Account, CharacterSoul, GameObject, Character, ObjectType
+from morphologic_server.db.models import Account, CharacterSoul, GameObject, Character, ObjectType
 
 # Set up the database connection (example: SQLite in memory)
 engine = create_engine("postgresql://morphoLogicServer:morphoLogicTEST@109.241.128.160:5436/morphoLogicDB")

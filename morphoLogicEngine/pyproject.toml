@@ -16,9 +16,10 @@ dependencies = [
     "GeoAlchemy2>=0.17.1",
     "asyncpg>=0.30.0",
     "alembic>=1.15.1",
-    "psycopg2>=2.9.10",
+    "psycopg>=3.2.6",
     "shapely>=2.1.0",
-    "ptpython>=3.0.29"
+    "ptpython>=3.0.29",
+    "pytest>=8.3.5"
 ]
 
 [tool.hatch.build]

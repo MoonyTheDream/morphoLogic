@@ -255,8 +255,9 @@ class AsyncCmd:
         command entered.
 
         """
-        if self.lastcmd:
-            return await self.onecmd(self.lastcmd)
+        return self.do_help(None)
+        # if self.lastcmd:
+        #     return await self.onecmd(self.lastcmd)
 
     def default(self, line):
         """Called on an input line when the command prefix is not recognized.
