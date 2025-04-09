@@ -4,6 +4,7 @@
     "kafka_server": "localhost:9092",
     "generalTopic": "serverGeneralTopic",
     "clientHandshakeTopic": "clientHandshakeTopic",
-    "serverHandshakeTopic": "serverHandshakeTopic"
+    "serverHandshakeTopic": "serverHandshakeTopic",
+    "db_address": "morphoLogicServer:morphoLogicTEST@109.241.128.160:5436/morphoLogicDB"
 
 }

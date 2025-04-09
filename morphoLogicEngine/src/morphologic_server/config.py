@@ -2,6 +2,7 @@
 import os
 import json
 
+# from enum import Enum
 from pathlib import Path
 
 def load_settings():
@@ -17,3 +18,5 @@ def load_settings():
         return json.load(f)
 
 settings = load_settings()
+
+# class Settings(Enum)
