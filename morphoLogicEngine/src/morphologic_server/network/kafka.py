@@ -17,17 +17,16 @@ from morphologic_server import logger, settings as _SETTINGS
 from ..utils.time_helpers import get_gmt_time
 
 BOOTSTRAP_SERVER = os.getenv(
-    "KAFKA_BOOTSTRAP_SERVER", _SETTINGS.get("kafka_server", "localhost:9092")
+    "KAFKA_BOOTSTRAP_SERVER", _SETTINGS.KAFKA_SERVER
 )
 GENERAL_TOPIC = os.getenv(
-    "KAFKA_GENERAL_TOPIC", _SETTINGS.get("generalTopic", "serverGeneralTopic")
+    "KAFKA_GENERAL_TOPIC", _SETTINGS.GENERAL_TOPIC
 )
 CLIENT_HANDSHAKE_TOPIC = os.getenv(
-    "KAFKA_HANDSHAKE_TOPIC", _SETTINGS.get("handshakeTopic", "clientHandshakeTopic")
+    "KAFKA_HANDSHAKE_TOPIC", _SETTINGS.CLIENT_HANDSHAKE_TOPIC
 )
 SERVER_HANDSHAKE_TOPIC = os.getenv(
-    "KAFKA_HANDSHAKE_TOPIC",
-    _SETTINGS.get("serverandshakeTopic", "serverHandshakeTopic"),
+    "KAFKA_HANDSHAKE_TOPIC", _SETTINGS.SERVER_HANDSHAKE_TOPIC
 )
 
 
@@ -218,7 +217,7 @@ class KafkaConnection:
                 "metadata": {
                     "source": "server",
                     "to_user": username,
-                    "server_version": _SETTINGS.get("server_version", "ERROR"),
+                    "server_version": _SETTINGS.SERVER_VERSION,
                     "timestamp": get_gmt_time(),
                 }
             }

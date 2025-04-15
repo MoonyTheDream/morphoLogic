@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 
 from morphologic_server import settings
 
-_DEBUG = settings.get("log_level_debug")
+_DEBUG = settings.LOG_LEVEL_DEBUG
 
 DATABASE_URL = "postgresql+asyncpg://morphoLogicServer:morphologic@localhost:5432/morphoLogicDB"
 

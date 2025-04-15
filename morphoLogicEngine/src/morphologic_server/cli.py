@@ -61,7 +61,8 @@ Say help or just raise your eyebrows - ? - to learn more.
     async def do_shell(self, arg):
         """Drop into async-aware interactive shell."""
         from morphologic_server import force_terminate_task_group  # context here
-
+        from morphologic_server.db.models import TerrainType
+        from morphologic_server.db import api as db_api
         banner = "morphoLogic async shell Type `await ...` freely — Ctrl-D to exit."
         print(banner)
         
@@ -74,6 +75,8 @@ Say help or just raise your eyebrows - ? - to learn more.
             "force_terminate_task_group": force_terminate_task_group,
             "asyncio": asyncio,
             "logger": logger,
+            "db_api": db_api,
+            "TerrainType": TerrainType,
             # "tg": asyncio.current_task()
             # .get_coro()
             # .cr_frame.f_locals.get("tg", None),  # if accessible

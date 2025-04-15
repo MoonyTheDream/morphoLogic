@@ -30,7 +30,7 @@ def setup_logger():
     """
     staged_logger = logging.getLogger("morphoLogic Server")
 
-    debug_mode = _SETTINGS.get("log_level_debug", False)
+    debug_mode = _SETTINGS.LOG_LEVEL_DEBUG
     log_file = Path(__file__).resolve().parents[3] / "logs/server_logs.log"
     log_handler = RotatingFileHandler(
         log_file,

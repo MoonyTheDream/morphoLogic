@@ -14,6 +14,8 @@ from sqlalchemy import Enum, String, Text, Integer, Index, ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB
 from geoalchemy2 import Geometry
 
+STANDARD_LENGTH = 60
+
 
 # ------------------------------------------------------------------------------------------------ #
 class Base(DeclarativeBase):
@@ -30,8 +32,8 @@ class Account(Base):
 
     __tablename__ = "accounts"
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(50))
-    email: Mapped[str] = mapped_column(String(60))
+    name: Mapped[str] = mapped_column(String(STANDARD_LENGTH))
+    email: Mapped[str] = mapped_column(String(STANDARD_LENGTH))
     # password_hash: Mapped[str] = mapped_column(String(255))
 
     # Relationship to character souls
@@ -58,7 +60,7 @@ class CharacterSoul(Base):
     account: Mapped["Account"] = relationship(
         back_populates="character_souls",
         foreign_keys=account_id,
-        )
+    )
 
     # Permissions: 0 - admin, 1 - builder, 2 - player
     permission_level: Mapped[int] = mapped_column(Integer)
@@ -76,6 +78,46 @@ class CharacterSoul(Base):
     # -------------------------------------------------------------------------------------------- #
 
 
+class TerrainType(E):
+    """Simple Enum representing available Terrain Types in DB Tables"""
+
+    SOIL = "soil"
+    SAND = "sand"
+    ROCK = "rock"
+    WATER = "water"
+
+
+class Terrain(Base):
+    """
+    Class representing a table with each playable area in the game.
+    """
+
+    __tablename__ = "terrain"
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    # Spatial location as a 3D point in SRID 3857 (meteres, not really 3D)
+    location: Mapped[str] = mapped_column(
+        Geometry(geometry_type="POINTZ", srid=3857))
+
+    # Type of terrain, like forest, desert, water, etc.
+    type: Mapped[str] = mapped_column(Enum(TerrainType), default=TerrainType.SOIL)
+
+
+class Area(Base):
+    """
+    Class representing a table of areas in the game.
+    It's a helper class to use for example as building, or a room, or any other area that might
+    need to query for all objects inside to interact with it in some way.
+    It do not need Z, as it's main purpose is to do spatial queries.
+    """
+
+    __tablename__ = "areas"
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    polygon: Mapped[str] = mapped_column(
+        Geometry(geometry_type="POLYGON", srid=3857))
+
+
 class ObjectType(E):
     """Simple Enum representing available Object Types in DB Tables"""
 
@@ -91,14 +133,15 @@ class GameObject(Base):
 
     __tablename__ = "game_objects"
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(50))
+    name: Mapped[str] = mapped_column(String(STANDARD_LENGTH))
     description: Mapped[Optional[str]] = mapped_column(Text)
 
     # Object type for inheritance
     object_type: Mapped[ObjectType] = mapped_column(Enum(ObjectType))
 
     # Spatial location as a 3D point in SRID 3857 (meteres, not really 3D)
-    location: Mapped[str] = mapped_column(Geometry(geometry_type="POINTZ", srid=3857))
+    location: Mapped[str] = mapped_column(
+        Geometry(geometry_type="POINTZ", srid=3857))
 
     # JSONB column to store dynamic attributes
     attributes: Mapped[dict] = mapped_column(JSONB, default=dict)
@@ -122,7 +165,8 @@ class GameObject(Base):
     puppeted_by_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("character_souls.id", ondelete="SET NULL")
     )
-    puppeted_by: Mapped["CharacterSoul"] = relationship(back_populates="puppeting")
+    puppeted_by: Mapped["CharacterSoul"] = relationship(
+        back_populates="puppeting")
     # -------------------------------------------------------------------------------------------- #
 
     __table_args__ = (
@@ -144,7 +188,8 @@ class Character(GameObject):
 
     __tablename__ = "characters"
 
-    id: Mapped[int] = mapped_column(ForeignKey("game_objects.id"), primary_key=True)
+    id: Mapped[int] = mapped_column(
+        ForeignKey("game_objects.id"), primary_key=True)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Character Specific Fields ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     # Relationship to account. It is allowed for a Character to exist without soul. It does not

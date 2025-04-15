@@ -23,7 +23,7 @@ __all__ = ["awake"]
 async def awake(tg: asyncio.TaskGroup):
     "Entry point of the server."
     print("The morphoLogic laws of physics bound itself into existence!")
-    logger.info("Server version: %s", _SETTINGS.get("server_version", "ERROR"))
+    logger.info("Server version: %s", _SETTINGS.SERVER_VERSION)
     logger.info("Waking up laws of nature.")
 
     tg.create_task(consume_and_handle())
