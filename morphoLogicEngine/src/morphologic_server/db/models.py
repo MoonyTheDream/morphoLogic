@@ -18,14 +18,14 @@ STANDARD_LENGTH = 60
 
 
 # ------------------------------------------------------------------------------------------------ #
-class Base(DeclarativeBase):
+class BaseDB(DeclarativeBase):
     """
     Base class for all database models.
     """
     pass
 
 
-class Account(Base):
+class AccountDB(BaseDB):
     """
     Class representing a table with player accounts.
     """
@@ -37,12 +37,13 @@ class Account(Base):
     # password_hash: Mapped[str] = mapped_column(String(255))
 
     # Relationship to character souls
-    character_souls: Mapped[Optional[List["CharacterSoul"]]] = relationship(
-        back_populates="account", cascade="all, delete-orphan"
+    character_souls: Mapped[Optional[List["CharacterSoulDB"]]] = relationship(
+        back_populates="account", cascade="all, delete-orphan",
+        lazy="selectin"
     )
 
 
-class CharacterSoul(Base):
+class CharacterSoulDB(BaseDB):
     """
     Unlike Character, the CharacterSouls is an entity that can puppet other GameObjects (usually
     just it's own Character).
@@ -57,23 +58,26 @@ class CharacterSoul(Base):
 
     # Relation with Account
     account_id: Mapped[int] = mapped_column(Integer, ForeignKey("accounts.id"))
-    account: Mapped["Account"] = relationship(
+    account: Mapped["AccountDB"] = relationship(
         back_populates="character_souls",
         foreign_keys=account_id,
+        lazy="selectin"
     )
 
     # Permissions: 0 - admin, 1 - builder, 2 - player
     permission_level: Mapped[int] = mapped_column(Integer)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Object This Soul Is Puppeting ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    bound_character: Mapped["Character"] = relationship(
+    bound_character: Mapped["CharacterDB"] = relationship(
         back_populates="soul", passive_deletes=True,
-        foreign_keys="Character.soul_id"
+        foreign_keys="CharacterDB.soul_id",
+        lazy="selectin"
     )
-    puppeting: Mapped[Optional["GameObject"]] = relationship(
+    puppeting: Mapped[Optional["GameObjectDB"]] = relationship(
         back_populates="puppeted_by",
         passive_deletes=True,
-        foreign_keys="GameObject.puppeted_by_id"
+        foreign_keys="GameObjectDB.puppeted_by_id",
+        lazy="selectin"
     )
     # -------------------------------------------------------------------------------------------- #
 
@@ -87,7 +91,7 @@ class TerrainType(E):
     WATER = "water"
 
 
-class Terrain(Base):
+class TerrainDB(BaseDB):
     """
     Class representing a table with each playable area in the game.
     """
@@ -103,7 +107,7 @@ class Terrain(Base):
     type: Mapped[str] = mapped_column(Enum(TerrainType), default=TerrainType.SOIL)
 
 
-class Area(Base):
+class AreaDB(BaseDB):
     """
     Class representing a table of areas in the game.
     It's a helper class to use for example as building, or a room, or any other area that might
@@ -126,7 +130,7 @@ class ObjectType(E):
     # NPC = "npc"
 
 
-class GameObject(Base):
+class GameObjectDB(BaseDB):
     """
     Representing a table of all game objects in the game, with position and attributes.
     """
@@ -150,14 +154,16 @@ class GameObject(Base):
     container_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("game_objects.id", ondelete="SET NULL")
     )
-    container: Mapped["GameObject"] = relationship(
+    container: Mapped["GameObjectDB"] = relationship(
         back_populates="stored",
         remote_side=id,
         foreign_keys=[container_id],
         passive_deletes=True,
+        lazy="selectin"
     )
-    stored: Mapped[List["GameObject"]] = relationship(
+    stored: Mapped[List["GameObjectDB"]] = relationship(
         back_populates="container",
+        lazy="selectin"
     )
     # -------------------------------------------------------------------------------------------- #
 
@@ -165,8 +171,9 @@ class GameObject(Base):
     puppeted_by_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("character_souls.id", ondelete="SET NULL")
     )
-    puppeted_by: Mapped["CharacterSoul"] = relationship(
-        back_populates="puppeting")
+    puppeted_by: Mapped["CharacterSoulDB"] = relationship(
+        back_populates="puppeting",
+        lazy="selectin")
     # -------------------------------------------------------------------------------------------- #
 
     __table_args__ = (
@@ -180,7 +187,7 @@ class GameObject(Base):
 
 
 # ------------------------------------------------------------------------------------------------ #
-class Character(GameObject):
+class CharacterDB(GameObjectDB):
     """
     A table represents game objects that are playable characters. It is seperated from soul as if
     a CharacterSoul puppet something else that the Character itself should stay where it was before.
@@ -197,16 +204,17 @@ class Character(GameObject):
     soul_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("character_souls.id", ondelete="SET NULL")
     )
-    soul: Mapped["CharacterSoul"] = relationship(
+    soul: Mapped["CharacterSoulDB"] = relationship(
         back_populates="bound_character",
+        lazy="selectin"
     )
 
     # Name inheritance
-    name: Mapped[str] = column_property(GameObject.name)
+    name: Mapped[str] = column_property(GameObjectDB.name)
 
     # ------------------------------------------------------------------------------------------------ #
 
     __mapper_args__ = {
         "polymorphic_identity": ObjectType.CHARACTER,
-        "inherit_condition": id == GameObject.id,
+        "inherit_condition": id == GameObjectDB.id,
     }

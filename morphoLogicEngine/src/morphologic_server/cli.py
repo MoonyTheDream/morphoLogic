@@ -12,13 +12,37 @@ from morphologic_server import (
     force_terminate_task_group,
     check_if_logging_to_console,
     remove_console_handler,
-    add_console_handler
+    add_console_handler,
 )
 from .awakening import awake
 from .utils.async_cmd import AsyncCmd
 
 
 # ------------------------------------------------------------------------------------------------ #
+
+
+async def run_python_shell():
+    """Coroutine to run the python shell."""
+    from morphologic_server.db.models import TerrainType
+    from morphologic_server.archetypes import base as archetypes
+
+    banner = "morphoLogic async shell Type `await ...` freely — Ctrl-D to exit."
+    print(banner)
+
+    # Define your local namespace
+    context = {
+        "force_terminate_task_group": force_terminate_task_group,
+        "asyncio": asyncio,
+        "logger": logger,
+        "db_api": archetypes,
+        "TerrainType": TerrainType,
+        "find_account": archetypes.find_account,
+        # "tg": asyncio.current_task()
+        # .get_coro()
+        # .cr_frame.f_locals.get("tg", None),  # if accessible
+    }
+    # Start ptpython with asyncio support
+    await embed(globals=context, return_asyncio_coroutine=True, title=banner)
 
 
 #  .d8888b.  888b     d888 8888888b.       888
@@ -60,41 +84,25 @@ Say help or just raise your eyebrows - ? - to learn more.
 
     async def do_shell(self, arg):
         """Drop into async-aware interactive shell."""
-        from morphologic_server import force_terminate_task_group  # context here
-        from morphologic_server.db.models import TerrainType
-        from morphologic_server.db import api as db_api
-        banner = "morphoLogic async shell Type `await ...` freely — Ctrl-D to exit."
-        print(banner)
-        
+
         log_to_console = check_if_logging_to_console()
         if log_to_console:
             print("Detaching logger while shell is active.")
             remove_console_handler()
-        # Define your local namespace
-        context = { 
-            "force_terminate_task_group": force_terminate_task_group,
-            "asyncio": asyncio,
-            "logger": logger,
-            "db_api": db_api,
-            "TerrainType": TerrainType,
-            # "tg": asyncio.current_task()
-            # .get_coro()
-            # .cr_frame.f_locals.get("tg", None),  # if accessible
-        }
-        # Start ptpython with asyncio support
-        await embed(globals=context, return_asyncio_coroutine=True, title=banner)
-        
+
+        await run_python_shell()
+
         # global logger
         if log_to_console:
             add_console_handler()
             print("Logging attached again.")
         self.do_help(arg)
 
-
-
     def do_detach(self, _):
         """Exiting Cmd Handler but letting server still run."""
-        print("Detaching from Cmd Handler. The Server will keep running.\nCtrl + C to stop the server.")
+        print(
+            "Detaching from Cmd Handler. The Server will keep running.\nCtrl + C to stop the server."
+        )
         return True
 
     def default(self, line):
@@ -133,6 +141,21 @@ async def start_server(args):
         logger.warning("Keyboard Interrupt. Shutting down the server.")
 
 
+#          888               888 888
+#          888               888 888
+#          888               888 888
+# .d8888b  88888b.   .d88b.  888 888
+# 88K      888 "88b d8P  Y8b 888 888
+# "Y8888b. 888  888 88888888 888 888
+#      X88 888  888 Y8b.     888 888
+#  88888P' 888  888  "Y8888  888 888
+async def just_shell(args):
+    """
+    Run just the python shell.
+    """
+    await run_python_shell()
+
+
 # ------------------------------------------------------------------------------------------------ #
 
 
@@ -160,6 +183,12 @@ def main():
     )
     start.add_argument("-l", "--log", action="store_true", help="Enable logging")
     start.set_defaults(func=start_server)
+
+    shell = subparsers.add_parser(
+        "shell",
+        help='Drop into async-aware interactive shell ("%(prog)s shell -h" for options)',
+    )
+    shell.set_defaults(func=just_shell)
 
     args = parser.parse_args()
 

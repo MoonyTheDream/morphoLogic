@@ -1,20 +1,18 @@
 """SQLAlchemy with Async Support - connecting PostreSQL database with asyncpg"""
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
 
-from morphologic_server import settings
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
-_DEBUG = settings.LOG_LEVEL_DEBUG
+from morphologic_server import settings, logger
 
-DATABASE_URL = "postgresql+asyncpg://morphoLogicServer:morphologic@localhost:5432/morphoLogicDB"
+try:
+    engine = create_async_engine("postgresql+asyncpg://" + settings.DB_ADDRESS)
+except Exception as e:
+    logger.exception("Failed to connect to the database: %s", e)
+    raise
+
+DBAsyncSession = async_sessionmaker(
+    engine,
+    expire_on_commit=False,
+)
 
 
-# Create the async engnine
-engine = create_async_engine(DATABASE_URL, echo=_DEBUG)
-
-# Create the async session
-async_session = sessionmaker(
-    engine, expire_on_commit=False, class_=AsyncSession
-    )
-
-# ------------------------------------------------------------------------------------------------ #
