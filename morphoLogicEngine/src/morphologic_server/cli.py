@@ -35,8 +35,9 @@ async def run_python_shell():
         "asyncio": asyncio,
         "logger": logger,
         "db_api": archetypes,
-        "TerrainType": TerrainType,
-        "find_account": archetypes.find_account,
+        "self": archetypes.temp_self
+        # "TerrainType": TerrainType,
+        # "find_account": archetypes.find_account,
         # "tg": asyncio.current_task()
         # .get_coro()
         # .cr_frame.f_locals.get("tg", None),  # if accessible

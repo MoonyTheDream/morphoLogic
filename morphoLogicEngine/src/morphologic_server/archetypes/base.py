@@ -2,6 +2,8 @@
 
 import asyncio
 
+from typing import Optional, Type
+
 from sqlalchemy import select
 from geoalchemy2 import shape
 
@@ -55,68 +57,109 @@ class Archetypes:
     linked_db_obj = BaseDB
 
 
-async def find_account(account_name: str):
-    """
-    Find account by name.
-    If "#[int]" is being searched, it will be searched by ID.
-    :param account_name: Name of the account to search for.
-    :return: Account object if found, None otherwise.
-    """
-    async with DBAsyncSession() as session:
+    async def find_account(self, account_name: str):
+        """
+        Find account by name.
+        If "#[int]" is being searched, it will be searched by ID.
+        :param account_name: Name of the account to search for.
+        :return: Account object if found, None otherwise.
+        """
+        async with DBAsyncSession() as session:
 
-        if account_name.startswith("#"):
-            try:
-                account_id = int(account_name[1:])
-            except ValueError:
-                logger.warning(
-                    "Invalid account ID format: %s. Expected format: #[int].",
-                    account_name,
+            if account_name.startswith("#"):
+                try:
+                    account_id = int(account_name[1:])
+                except ValueError:
+                    logger.warning(
+                        "Invalid account ID format: %s. Expected format: #[int].",
+                        account_name,
+                    )
+                    return None
+                stmt = select(AccountDB).where(AccountDB.id == account_id)
+
+            else:
+                # If account name is not a number, search by name
+                stmt = select(AccountDB).where(AccountDB.name == account_name)
+            result = await session.execute(stmt)
+            account = result.scalars().first()
+
+            if account:
+                return Account(account)
+            return None
+
+
+    async def search(self, name_or_id: str, archetype: Type["Archetypes"]):
+        """
+        Search for an object by name or ID.
+        If "#[int]" is being searched, it will be searched by ID.
+
+        :param name_or_id: Name or ID of the object to search for.
+        :param archetype: The archetype class to search in.
+        :return: Object if found, None otherwise.
+        """
+        model = archetype.linked_db_obj
+
+        async with DBAsyncSession() as session:
+            if name_or_id.startswith("#"):
+                try:
+                    object_id = int(name_or_id[1:])
+                except ValueError:
+                    logger.warning(
+                        "Invalid object ID format: %s. Expected format: #[int].", name_or_id
+                    )
+                    return None
+                stmt = select(model).where(model.id == object_id)
+            else:
+                # If name_or_id is not a number, search by name
+                stmt = select(model).where(model.name == name_or_id)
+            result = await session.execute(stmt)
+            obj = result.scalars().first()
+
+            return archetype(obj) if obj else None
+
+
+    async def simple_query(self, value, attribute: str, model: Type["Archetypes"]):
+        """Simple query to find rows from specified table by attribute.
+
+        Args:
+            value (any): the value to search for
+            attribute (str): an atttribute to search for
+            model (Archetypes): the model to search in
+
+        Returns:
+            Archetypes: Returns object or objects if found, None otherwise.
+        """
+        async with DBAsyncSession() as session:
+            stmt = select(model.linked_db_obj).where(
+                getattr(model.linked_db_obj, attribute) == value
+            )
+            result = await session.execute(stmt)
+            obj = result.scalars().all()
+
+            if obj:
+                return [model(o) for o in obj] if len(obj) > 1 else model(obj[0])
+            return None
+        
+    async def search_by_xy(self, x: float, y: float, archetype: Type["Archetypes"]):
+        """Search for an object by coordinates."""
+        point = from_shape(
+            Point(x, y), srid=3857
+        )
+        model = archetype.linked_db_obj
+        async with DBAsyncSession() as session:
+            stmt = select(model).where(
+                ST_DWithin(
+                    ST_Force2D(model.location),
+                    ST_Force2D(point),
+                    0.1,
                 )
-                return None
-            stmt = select(AccountDB).where(AccountDB.id == account_id)
+            )
+            result = await session.execute(stmt)
+            obj = result.scalars().first()
 
-        else:
-            # If account name is not a number, search by name
-            stmt = select(AccountDB).where(AccountDB.name == account_name)
-        result = await session.execute(stmt)
-        account = result.scalars().first()
+            return archetype(obj) if obj else None
 
-        if account:
-            return Account(account)
-        return None
-
-
-async def search(name_or_id: str, archetype: Archetypes):
-    """
-    Search for an object by name or ID.
-    If "#[int]" is being searched, it will be searched by ID.
-
-    :param name_or_id: Name or ID of the object to search for.
-    :param archetype: The archetype class to search in.
-    :return: Object if found, None otherwise.
-    """
-    model = archetype.linked_db_obj
-
-    async with DBAsyncSession() as session:
-        if name_or_id.startswith("#"):
-            try:
-                object_id = int(name_or_id[1:])
-            except ValueError:
-                logger.warning(
-                    "Invalid object ID format: %s. Expected format: #[int].", name_or_id
-                )
-                return None
-            stmt = select(model).where(model.id == object_id)
-        else:
-            # If name_or_id is not a number, search by name
-            stmt = select(model).where(model.name == name_or_id)
-        result = await session.execute(stmt)
-        obj = result.scalars().first()
-
-        if obj:
-            return archetype(obj)
-        return None
-
+temp_self = Archetypes()
 
 #        d8888                                            888
 #       d88888                                            888
@@ -323,7 +366,7 @@ class Character(GameObject):
         super().__init__(db_obj)
         self.soul_id = db_obj.soul_id
         self.soul: CharacterSoulDB
-        
+
     @property
     def soul(self):
         """Return character soul linked to this character"""
@@ -333,46 +376,55 @@ class Character(GameObject):
         else:
             return None
 
-# async def get_account_by_id(account_id: int) -> Account:
-#     """Get account from DB"""
-
-#     async with DBAsyncSession() as session:
-#         stmt = select(Account).where(Account.id == account_id)
-#         result = await session.execute(stmt)
-#         account = result.scalars().first()
-
-#         if account:
-#             return account
-#         else:
-#             return None
 
 
-# async def get_account_by_name_or_email(name_or_email: str) -> Account:
-#     """Get account from DB by name or email"""
-#     if "@" in name_or_email:
-#         # If the name_or_email contains '@', it's an email
-#         stmt = select(Account).where(Account.email == name_or_email)
-#     else:
-#         # Otherwise, it's a name
-#         stmt = select(Account).where(Account.name == name_or_email)
-#     async with DBAsyncSession() as session:
-#         result = await session.execute(stmt)
-#         account = result.scalars().first()
+# 88888888888                               d8b
+#     888                                   Y8P
+#     888
+#     888   .d88b.  888d888 888d888 8888b.  888 88888b.
+#     888  d8P  Y8b 888P"   888P"      "88b 888 888 "88b
+#     888  88888888 888     888    .d888888 888 888  888
+#     888  Y8b.     888     888    888  888 888 888  888
+#     888   "Y8888  888     888    "Y888888 888 888  888
 
-#         if account:
-#             return account
-#         else:
-#             return None
+class Terrain(Archetypes):
+    """Class representing a terrain in the game"""
+
+    linked_db_obj = TerrainDB
+
+    def __init__(self, db_obj: TerrainDB):
+        self._db_obj = db_obj
+        self.id = db_obj.id
+        self.location = shape.to_shape(db_obj.location)
+        self.type = db_obj.type
+        
+    async def find_nearby(self, distance_m=1.0):
+        """Find nearby terrain by coordinates and distance"""
+        x, y = self.location.x, self.location.y
+        if x is None or y is None:
+            logger.warning(
+                "Terrain %s has no coordinates. Cannot find nearby terrain.",
+                self.id,
+            )
+            return None
+        
+        point = from_shape(
+            Point(x, y), srid=3857
+        )
+        async with DBAsyncSession() as session:
+            stmt = select(TerrainDB).where(
+                ST_DWithin(TerrainDB.location, point, distance_m)
+            )
+            result = await session.execute(stmt)
+            terrain = result.scalars().all()
+
+            if terrain:
+                return [Terrain(t) for t in terrain]
+            else:
+                return None
+            
 
 
-# # 88888888888                               d8b
-# #     888                                   Y8P
-# #     888
-# #     888   .d88b.  888d888 888d888 8888b.  888 88888b.
-# #     888  d8P  Y8b 888P"   888P"      "88b 888 888 "88b
-# #     888  88888888 888     888    .d888888 888 888  888
-# #     888  Y8b.     888     888    888  888 888 888  888
-# #     888   "Y8888  888     888    "Y888888 888 888  888
 
 
 # async def get_terrain_by_id(terrain_id: int) -> Terrain:
