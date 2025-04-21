@@ -35,7 +35,8 @@ async def run_python_shell():
         "asyncio": asyncio,
         "logger": logger,
         "db_api": archetypes,
-        "self": archetypes.temp_self
+        "self": await archetypes.get_self(),
+        "create_account": archetypes.create_account,
         # "TerrainType": TerrainType,
         # "find_account": archetypes.find_account,
         # "tg": asyncio.current_task()

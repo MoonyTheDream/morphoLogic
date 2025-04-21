@@ -1,14 +1,13 @@
 """API for saving and querrying data from DB"""
 
-import asyncio
-
-from typing import Optional, Type
+from typing import Optional, Type, Tuple, Union
 
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from geoalchemy2 import shape
 
-from geoalchemy2.functions import ST_DWithin, ST_Equals, ST_Force2D
-from geoalchemy2.shape import from_shape, to_shape
+from geoalchemy2.functions import ST_DWithin, ST_Force2D
+from geoalchemy2.shape import from_shape #, to_shape
 from shapely.geometry import Point, Polygon
 
 from morphologic_server import logger
@@ -26,15 +25,398 @@ from morphologic_server.db.models import (
     STANDARD_LENGTH as _DB_STANDARD_LENGTH,
 )
 
-# __all__ = [
-#     "add_or_edit_terrain",
-# ]
+DEFAULT_SPAWN_LOCATION = from_shape(Point(0, 0, 0), srid=3857)
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ EXCEPTIONS ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+class PermissionDeniedError(Exception):
+    """Custom exception for permission denied errors."""
+
+
+class ObjectNotFoundError(Exception):
+    """Custom exception for object not found errors."""
+
+
+# class DBError(Exception):
+#     """Custom exception for database errors."""
+# ------------------------------------------------------------------------------------------------ #
 
 
 def convert_object_location_to_point(ob):
     """Convert a location of an object to a Shapely Point."""
     ob.location = shape.to_shape(ob.location)
     return ob
+
+
+async def better():
+    async with DBAsyncSession() as session:
+            result = await session.execute(
+                select(GameObjectDB)
+                .options(
+                    selectinload(GameObjectDB.stored),     # one-to-many children
+                    selectinload(GameObjectDB.container),  # many-to-one parent
+                )
+                .where(GameObjectDB.id == 17)
+            )
+            return result.scalar_one_or_none()
+
+
+# ------------------------------------------------------------------------------------------------ #
+#                        8888888b.  888888b.
+#                        888  "Y88b 888  "88b
+#                        888    888 888  .88P
+#                        888    888 8888888K.
+#                        888    888 888  "Y88b
+#                        888    888 888    888
+#                        888  .d88P 888   d88P
+#                        8888888P"  8888888P"
+#
+#
+# 8888888888                         888    d8b
+# 888                                888    Y8P
+# 888                                888
+# 8888888 888  888 88888b.   .d8888b 888888 888  .d88b.  88888b.  .d8888b
+# 888     888  888 888 "88b d88P"    888    888 d88""88b 888 "88b 88K
+# 888     888  888 888  888 888      888    888 888  888 888  888 "Y8888b.
+# 888     Y88b 888 888  888 Y88b.    Y88b.  888 Y88..88P 888  888      X88
+# 888      "Y88888 888  888  "Y8888P  "Y888 888  "Y88P"  888  888  88888P'
+# ------------------------------------------------------------------------------------------------ #
+
+
+# ************************************************************************************************ #
+#                                             SEACHING                                             #
+# ************************************************************************************************ #
+async def find_account(account_name: str):
+    """
+    Finds account by name.
+    If "#<int>" is being searched, it will be searched by ID.
+
+    Args:
+        account_name (str): Name or #ID of the account to search for.
+
+    Returns:
+        Account: if found, None otherwise.
+    """
+    async with DBAsyncSession() as session:
+
+        if account_name.startswith("#"):
+            try:
+                account_id = int(account_name[1:])
+            except ValueError:
+                logger.warning(
+                    "Invalid account ID format: %s. Expected format: #[int].",
+                    account_name,
+                )
+                return None
+            stmt = select(AccountDB).where(AccountDB.id == account_id)
+
+        else:
+            # If account name is not a number, search by name
+            stmt = select(AccountDB).where(AccountDB.name == account_name)
+        result = await session.execute(stmt)
+        account = result.scalars().first()
+
+        if account:
+            return Account(account)
+        return None
+
+
+async def search(name_or_id: str, archetype: Type["Archetypes"]):
+    """Search for an object  by name or ID.
+    If "#[int]" is being searched, it will be searched by ID.
+
+    Args:
+        name_or_id (str): Name or I#ID of the object to search for.
+        archetype (Archetypes): The archetype class to search in.
+
+    Returns:
+        Object: if found, None otherwise.
+    """
+    model = archetype.linked_db_obj
+
+    async with DBAsyncSession() as session:
+        if isinstance(model, GameObjectDB) or issubclass(model, GameObjectDB):
+            if name_or_id.startswith("#"):
+                result = await session.execute(
+                    select(model)
+                    .options(
+                        selectinload(model.stored),     # one-to-many children
+                        selectinload(model.container),  # many-to-one parent
+                    )
+                    .where(model.id == name_or_id[1:])
+                )
+                obj = result.scalar_one_or_none()
+                return archetype(obj) if obj else None
+            result = await session.execute(
+                    select(model)
+                    .options(
+                        selectinload(model.stored),     # one-to-many children
+                        selectinload(model.container),  # many-to-one parent
+                    )
+                    .where(model.name == name_or_id)
+                )
+            obj = result.scalar_one_or_none()
+            return archetype(obj) if obj else None
+        else:
+            if name_or_id.startswith("#"):
+                try:
+                    object_id = int(name_or_id[1:])
+                except ValueError:
+                    logger.warning(
+                        "Invalid object ID format: %s. Expected format: #[int].",
+                        name_or_id,
+                    )
+                    return None
+                stmt = select(model).where(model.id == object_id)
+            else:
+                # If name_or_id is not a number, search by name
+                stmt = select(model).where(model.name == name_or_id)
+            result = await session.execute(stmt)
+            obj = result.scalars().first()
+
+            return archetype(obj) if obj else None
+
+
+async def simple_query(value, attribute: str, model: Type["Archetypes"]):
+    """Simple query to find rows from specified table by attribute.
+
+    Args:
+        value (any): the value to search for
+        attribute (str): an atttribute to search for
+        model (Archetypes): the model to search in
+
+    Returns:
+        Archetypes: Returns object or objects if found, None otherwise.
+    """
+    async with DBAsyncSession() as session:
+        stmt = select(model.linked_db_obj).where(
+            getattr(model.linked_db_obj, attribute) == value
+        )
+        result = await session.execute(stmt)
+        obj = result.scalars().all()
+
+        if obj:
+            return [model(o) for o in obj] if len(obj) > 1 else model(obj[0])
+        return None
+
+
+async def search_by_xy(x: float, y: float, archetype: Type["Archetypes"]):
+    """Search for an object by XY coordinates.
+
+    Args:
+        x (float): x coordinate
+        y (float): y coordinate
+        archetype (Archetypes child): The archetype class to search in.
+    Returns:
+        Object: if found, None otherwise.
+    """
+    point = from_shape(Point(x, y), srid=3857)
+    model = archetype.linked_db_obj
+    async with DBAsyncSession() as session:
+        stmt = select(model).where(
+            ST_DWithin(
+                ST_Force2D(model.location),
+                ST_Force2D(point),
+                0.1,
+            )
+        )
+        result = await session.execute(stmt)
+        obj = result.scalars().first()
+
+        return archetype(obj) if obj else None
+
+
+# ************************************************************************************************ #
+#                                             CREATING                                             #
+# ************************************************************************************************ #
+async def create_account(name: str, email: str) -> Optional["Account"]:
+    """Creates an account in the database.
+
+    Returns:
+        Account: Archetypes Accheptor object if created, None otherwise.
+    """
+    async with DBAsyncSession() as session:
+        account = AccountDB(name=name, email=email, permission_level=2)
+        session.add(account)
+        await session.commit()
+        await session.refresh(account)
+        return Account(account)
+
+
+async def create_character_and_soul(
+    account_id,
+    name: str,
+    description: str = "",
+    location=None,
+    permission_level: int = 2,
+) -> Optional[list["Character", "CharacterSoul"]]:
+    """Creates a character and a character soul in the database.
+
+    Returns:
+        List[Character, CharacterSoul]: Archetypes Character and CharacterSoul objects if created,
+            None otherwise.
+    """
+    if location is None:
+        location = DEFAULT_SPAWN_LOCATION
+
+    async with DBAsyncSession() as session:
+        character = CharacterDB(
+            name=name,
+            description=description,
+            location=location,
+            # soul_id=character_soul.id,
+        )
+        character_soul = CharacterSoulDB(
+            aura=0,
+            account_id=account_id,
+            permission_level=permission_level,
+            bound_character=character,
+        )
+        session.add(character_soul)
+        await session.commit()
+        await session.refresh(character_soul)
+        await session.refresh(character)
+
+        return [Character(character), CharacterSoul(character_soul)]
+
+
+async def create_character(
+    name: str,
+    soul: "CharacterSoul",
+    description: str = "",
+    location=None,
+    attributes: dict = None,
+    container: "GameObject" = None,
+    stored: list["GameObject"] = None,
+) -> Optional["Character"]:
+    """Creates a character in the database.
+
+    Returns:
+        Character: Archetypes Character object if created, None otherwise.
+    """
+    if location is None:
+        location = DEFAULT_SPAWN_LOCATION
+
+    async with DBAsyncSession() as session:
+        character = CharacterDB(
+            name=name,
+            soul=soul,
+            description=description,
+            location=location,
+            attributes=attributes,
+            container=container,
+            stored=stored,
+        )
+        session.add(character)
+        await session.commit()
+        await session.refresh(character)
+        return Character(character)
+
+
+async def create_or_edit_terrain(
+    x: int, y: int, z: int = 0, terrain_type: TerrainType = TerrainType.SOIL
+) -> Type["Terrain"]:
+    """Add or edit terrain in DB
+    Args:
+        x (int): x coordinate
+        y (int): y coordinate
+        z (int, optional): z coordinate. Defaults to 0.
+        terrain_type (TerrainType, optional): type of terrain. Defaults to TerrainType.SOIL.
+
+    Returns:
+        Terrain: Created or updated terrain object.
+    """
+    async with DBAsyncSession() as session:
+        point3d = Point(float(x), float(y), float(z))
+        point_geom = shape.from_shape(point3d, srid=3857)
+
+        # First check if the terrain already exists
+        stmt = select(TerrainDB).where(
+            ST_DWithin(
+                ST_Force2D(TerrainDB.location),
+                ST_Force2D(point_geom),
+                0.1,
+            )
+        )
+        result = await session.execute(stmt)
+        terrain = result.scalars().first()
+
+        if terrain:
+            # Terrain already exists, update it
+            old_point = shape.to_shape(terrain.location)
+            new_point = Point(old_point.x, old_point.y, float(z))
+
+            terrain.location = shape.from_shape(new_point, srid=3857)
+            terrain.type = terrain_type
+        else:
+            # Terrain doesn't exist, create a new one
+
+            terrain = TerrainDB(location=point_geom, type=terrain_type)
+            session.add(terrain)
+
+        await session.commit()
+        await session.refresh(terrain)
+        return Terrain(terrain)
+
+
+async def create_area(
+    polygon: list[Tuple[float, float]], name: str
+) -> Optional["Area"]:
+    """Creates an area in the database.
+
+    Returns:
+        Area: Archetypes Area object if created, None otherwise.
+    """
+    async with DBAsyncSession() as session:
+        polygon = Polygon(polygon)
+        area = AreaDB(polygon=shape.from_shape(polygon, srid=3857), name=name)
+        session.add(area)
+        await session.commit()
+        await session.refresh(area)
+        return Area(area)
+
+
+async def create_game_object(
+    name: str,
+    description: str = "",
+    location=None,
+    attributes: dict = None,
+    container: "GameObject" = None,
+    stored: Union[list["GameObject"], "GameObject"] = None,
+) -> Optional["GameObject"]:
+    """Creates a game object in the database.
+
+    Returns:
+        GameObject: Archetypes GameObject object if created, None otherwise.
+    """
+    if location is None:
+        location = DEFAULT_SPAWN_LOCATION
+    else:
+        location = from_shape(location, srid=3857)
+        
+    kwargs = {}
+    if container is not None:
+        container = container.db_obj
+        kwargs["container"] = container
+    if stored is not None:
+        if not isinstance(stored, list):
+            stored = [stored]
+        stored = [stored.db_obj for obj in stored]
+        kwargs["stored"] = stored
+        
+
+    async with DBAsyncSession() as session:
+        game_object = GameObjectDB(
+            name=name,
+            description=description,
+            location=location,
+            attributes=attributes,
+            **kwargs
+        )
+        session.add(game_object)
+        await session.commit()
+        await session.refresh(game_object)
+        return GameObject(game_object)
 
 
 # ------------------------------------------------------------------------------------------------ #
@@ -60,72 +442,47 @@ class Archetypes:
 
     async def save(self):
         """Save the object to the database."""
-        # Compare self to self._db_obj and match the attributes
         if self._db_obj is not None:
             async with DBAsyncSession() as session:
+                # Attributes of this class always mirror _db_obj attributes
+                # So we can just pass the _db_obj to the SQLAlchemy session
                 session.add(self._db_obj)
                 await session.commit()
                 await session.refresh(self._db_obj)
 
+    @property
+    def db_obj(self):
+        """Return the database object."""
+        return self._db_obj
+
+    # ******************************************************************************************** #
+    #                                           WRAPPERS                                           #
+    # ******************************************************************************************** #
     async def find_account(self, account_name: str):
         """
-        Find account by name.
-        If "#[int]" is being searched, it will be searched by ID.
-        :param account_name: Name of the account to search for.
-        :return: Account object if found, None otherwise.
+        Finds account by name.
+        If "#<int>" is being searched, it will be searched by ID.
+
+        Args:
+            account_name (str): Name or #ID of the account to search for.
+
+        Returns:
+            Account: if found, None otherwise.
         """
-        async with DBAsyncSession() as session:
-
-            if account_name.startswith("#"):
-                try:
-                    account_id = int(account_name[1:])
-                except ValueError:
-                    logger.warning(
-                        "Invalid account ID format: %s. Expected format: #[int].",
-                        account_name,
-                    )
-                    return None
-                stmt = select(AccountDB).where(AccountDB.id == account_id)
-
-            else:
-                # If account name is not a number, search by name
-                stmt = select(AccountDB).where(AccountDB.name == account_name)
-            result = await session.execute(stmt)
-            account = result.scalars().first()
-
-            if account:
-                return Account(account)
-            return None
+        return await find_account(account_name)
 
     async def search(self, name_or_id: str, archetype: Type["Archetypes"]):
-        """
-        Search for an object by name or ID.
+        """Search for an object  by name or ID.
         If "#[int]" is being searched, it will be searched by ID.
 
-        :param name_or_id: Name or ID of the object to search for.
-        :param archetype: The archetype class to search in.
-        :return: Object if found, None otherwise.
+        Args:
+            name_or_id (str): Name or I#ID of the object to search for.
+            archetype (Archetypes): The archetype class to search in.
+
+        Returns:
+            Object: if found, None otherwise.
         """
-        model = archetype.linked_db_obj
-
-        async with DBAsyncSession() as session:
-            if name_or_id.startswith("#"):
-                try:
-                    object_id = int(name_or_id[1:])
-                except ValueError:
-                    logger.warning(
-                        "Invalid object ID format: %s. Expected format: #[int].",
-                        name_or_id,
-                    )
-                    return None
-                stmt = select(model).where(model.id == object_id)
-            else:
-                # If name_or_id is not a number, search by name
-                stmt = select(model).where(model.name == name_or_id)
-            result = await session.execute(stmt)
-            obj = result.scalars().first()
-
-            return archetype(obj) if obj else None
+        return await search(name_or_id, archetype)
 
     async def simple_query(self, value, attribute: str, model: Type["Archetypes"]):
         """Simple query to find rows from specified table by attribute.
@@ -138,74 +495,35 @@ class Archetypes:
         Returns:
             Archetypes: Returns object or objects if found, None otherwise.
         """
-        async with DBAsyncSession() as session:
-            stmt = select(model.linked_db_obj).where(
-                getattr(model.linked_db_obj, attribute) == value
-            )
-            result = await session.execute(stmt)
-            obj = result.scalars().all()
-
-            if obj:
-                return [model(o) for o in obj] if len(obj) > 1 else model(obj[0])
-            return None
+        return await simple_query(value, attribute, model)
 
     async def search_by_xy(self, x: float, y: float, archetype: Type["Archetypes"]):
-        """Search for an object by coordinates."""
-        point = from_shape(Point(x, y), srid=3857)
-        model = archetype.linked_db_obj
-        async with DBAsyncSession() as session:
-            stmt = select(model).where(
-                ST_DWithin(
-                    ST_Force2D(model.location),
-                    ST_Force2D(point),
-                    0.1,
-                )
-            )
-            result = await session.execute(stmt)
-            obj = result.scalars().first()
+        """Search for an object by XY coordinates.
 
-            return archetype(obj) if obj else None
+        Args:
+            x (float): x coordinate
+            y (float): y coordinate
+            archetype (Archetypes child): The archetype class to search in.
+        Returns:
+            Object: if found, None otherwise.
+        """
+        return await search_by_xy(x, y, archetype)
 
-    async def add_or_edit_terrain(
+    async def create_or_edit_terrain(
         self, x: int, y: int, z: int = 0, terrain_type: TerrainType = TerrainType.SOIL
     ) -> Type["Terrain"]:
-        """Add or edit terrain in DB"""
+        """Add or edit terrain in DB
+        Args:
+            x (int): x coordinate
+            y (int): y coordinate
+            z (int, optional): z coordinate. Defaults to 0.
+            terrain_type (TerrainType, optional): type of terrain. Defaults to TerrainType.SOIL.
 
-        async with DBAsyncSession() as session:
-            point3d = Point(float(x), float(y), float(z))
-            point_geom = shape.from_shape(point3d, srid=3857)
+        Returns:
+            Terrain: Created or updated terrain object.
+        """
 
-            # First check if the terrain already exists
-            stmt = select(TerrainDB).where(
-                ST_DWithin(
-                    ST_Force2D(TerrainDB.location),
-                    ST_Force2D(point_geom),
-                    0.1,
-                )
-            )
-            result = await session.execute(stmt)
-            terrain = result.scalars().first()
-
-            if terrain:
-                # Terrain already exists, update it
-                old_point = shape.to_shape(terrain.location)
-                new_point = Point(old_point.x, old_point.y, float(z))
-
-                terrain.location = shape.from_shape(new_point, srid=3857)
-                terrain.type = terrain_type
-            else:
-                # Terrain doesn't exist, create a new one
-
-                terrain = TerrainDB(location=point_geom, type=terrain_type)
-                session.add(terrain)
-
-            await session.commit()
-            await session.refresh(terrain)
-            return Terrain(terrain)
-
-
-# Tymczasowo, żeby móc w shell'u korzystać z self
-temp_self = Archetypes()
+        return await create_or_edit_terrain(x=x, y=y, z=z, terrain_type=terrain_type)
 
 
 #        d8888                                            888
@@ -262,6 +580,21 @@ class Account(Archetypes):
             )
         self._db_obj.email = value
 
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Permission Level ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    @property
+    def permission_level(self) -> int:
+        """Return permission level of this account"""
+        return self._db_obj.permission_level
+
+    @permission_level.setter
+    def permission_level(self, value: int):
+        """Set permission level of this account"""
+        if value not in [0, 1, 2]:
+            raise ValueError(
+                "Permission level must be 0 (admin), 1 (builder) or 2 (player)."
+            )
+        self._db_obj.permission_level = value
+
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Character Souls ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     @property
     def character_souls(self) -> list["CharacterSoul"]:
@@ -276,6 +609,12 @@ class Account(Archetypes):
                 e,
             )
             return []
+
+
+# Tymczasowo, żeby móc w shell'u korzystać z self
+async def get_self():
+    """Get self object for testing purposes."""
+    return await search("MoonyTheDream", Character)
 
 
 #  .d8888b.  888                                        888
@@ -388,194 +727,6 @@ class CharacterSoul(Archetypes):
             return None
 
 
-#  .d8888b.                                   .d88888b.  888       d8b                   888
-# d88P  Y88b                                 d88P" "Y88b 888       Y8P                   888
-# 888    888                                 888     888 888                             888
-# 888         8888b.  88888b.d88b.   .d88b.  888     888 88888b.  8888  .d88b.   .d8888b 888888
-# 888  88888     "88b 888 "888 "88b d8P  Y8b 888     888 888 "88b "888 d8P  Y8b d88P"    888
-# 888    888 .d888888 888  888  888 88888888 888     888 888  888  888 88888888 888      888
-# Y88b  d88P 888  888 888  888  888 Y8b.     Y88b. .d88P 888 d88P  888 Y8b.     Y88b.    Y88b.
-#  "Y8888P88 "Y888888 888  888  888  "Y8888   "Y88888P"  88888P"   888  "Y8888   "Y8888P  "Y888
-#                                                                  888
-#                                                                 d88P
-#                                                               888P"
-class GameObject(Archetypes):
-    """Class representing a game object in the game"""
-
-    linked_db_obj = GameObjectDB
-
-    def __init__(self, db_obj: GameObjectDB):
-        self._db_obj = db_obj
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ID ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    @property
-    def id(self):
-        """Return ID"""
-        return self._db_obj.id
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Name ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    @property
-    def name(self):
-        """Return name"""
-        return self._db_obj.name
-
-    @name.setter
-    def name(self, value: str):
-        """Set name"""
-        if len(value) > _DB_STANDARD_LENGTH:
-            raise ValueError(
-                f"The name cannot be longer than {_DB_STANDARD_LENGTH} characters."
-            )
-        self._db_obj.name = value
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Description ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    @property
-    def description(self):
-        """Return description"""
-        return self._db_obj.description
-
-    @description.setter
-    def description(self, value: str):
-        """Set description"""
-        self._db_obj.description = value
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Object Type ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    @property
-    def object_type(self):
-        """Return object type"""
-        return self._db_obj.object_type
-
-    @object_type.setter
-    def object_type(self, value: ObjectType):
-        """Set object type"""
-        self._db_obj.object_type = value
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Location ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    @property
-    def location(self):
-        """Return location"""
-        return shape.to_shape(self._db_obj.location)
-
-    @location.setter
-    def location(self, x: float = None, y: float = None, z: float = None):
-        """Set location"""
-
-        # Check if x, y, z are None and set them to previous values
-        previous = shape.to_shape(self._db_obj.location)
-        for attr in ["x", "y", "z"]:
-            if locals()[attr] is None:
-                locals()[attr] = getattr(previous, attr)
-
-        if x is None or y is None or z is None:
-            raise ValueError("Coordinates cannot be None.")
-
-        point = Point(float(x), float(y), float(z))
-        self._db_obj.location = shape.from_shape(point, srid=3857)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Attributes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    @property
-    def attributes(self) -> dict:
-        """Return attributes"""
-        return self._db_obj.attributes
-
-    @attributes.setter
-    def attributes(self, value: dict):
-        """Set attributes"""
-        if not isinstance(value, dict):
-            raise ValueError("Attributes must be a dictionary.")
-        self._db_obj.attributes = value
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Container ID ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    @property
-    def container_id(self):
-        """Return container ID"""
-        return self._db_obj.container_id
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Container ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    @property
-    def container(self):
-        """Return container linked to this game object"""
-        try:
-            container = GameObject(self._db_obj.container)
-            return container
-        except Exception as e:
-            logger.warning(
-                "Failed to get container for game object %s: %s",
-                self._db_obj.id,
-                e,
-            )
-            return None
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Stored ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    @property
-    def stored(self):
-        """Return game objects stored in this game object"""
-        try:
-            items = [GameObject(item) for item in self._db_obj.stored]
-            return items
-        except Exception as e:
-            logger.warning(
-                "Failed to get stored items for game object %s: %s",
-                self._db_obj.id,
-                e,
-            )
-            return None
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Puppeted By ID ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    @property
-    def puppeted_by_id(self):
-        """Return ID of character soul linked to this game object"""
-        return self._db_obj.puppeted_by_id
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Puppeted By ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    @property
-    def puppeted_by(self):
-        """Return character soul linked to this game object"""
-        try:
-            character_soul = CharacterSoul(self._db_obj.puppeted_by)
-            return character_soul
-        except Exception as e:
-            logger.warning(
-                "Failed to get puppeted by character soul for game object %s: %s",
-                self._db_obj.id,
-                e,
-            )
-            return None
-
-
-#  .d8888b.  888                                        888
-# d88P  Y88b 888                                        888
-# 888    888 888                                        888
-# 888        88888b.   8888b.  888d888 8888b.   .d8888b 888888 .d88b.  888d888
-# 888        888 "88b     "88b 888P"      "88b d88P"    888   d8P  Y8b 888P"
-# 888    888 888  888 .d888888 888    .d888888 888      888   88888888 888
-# Y88b  d88P 888  888 888  888 888    888  888 Y88b.    Y88b. Y8b.     888
-#  "Y8888P"  888  888 "Y888888 888    "Y888888  "Y8888P  "Y888 "Y8888  888
-class Character(GameObject):
-    """Class representing a character in the game"""
-
-    linked_db_obj = CharacterDB
-
-    def __init__(self, db_obj: CharacterDB):
-        super().__init__(db_obj)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Soul ID ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    @property
-    def soul_id(self):
-        """Return character soul ID"""
-        return self._db_obj.soul_id
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Soul ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    @property
-    def soul(self) -> Optional[CharacterSoulDB]:
-        """Return character soul linked to this character"""
-        if self._db_obj.soul:
-            character_soul = CharacterSoul(self._db_obj.soul)
-            return character_soul
-        else:
-            return None
-
-
 # 88888888888                               d8b
 #     888                                   Y8P
 #     888
@@ -658,6 +809,15 @@ class Terrain(Archetypes):
             else:
                 return None
 
+
+#        d8888
+#       d88888
+#      d88P888
+#     d88P 888 888d888 .d88b.   8888b.
+#    d88P  888 888P"  d8P  Y8b     "88b
+#   d88P   888 888    88888888 .d888888
+#  d8888888888 888    Y8b.     888  888
+# d88P     888 888     "Y8888  "Y888888
 class Area(Archetypes):
     """Class representing an area in the game"""
 
@@ -671,15 +831,306 @@ class Area(Archetypes):
     def id(self):
         """Return area ID"""
         return self._db_obj.id
-    
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Area ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Polygon ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     @property
     def area(self):
         """Return area"""
         return shape.to_shape(self._db_obj.area)
+
     @area.setter
     def area(self, value):
         """Set area"""
         polygon = Polygon(value)
         self._db_obj.area = shape.from_shape(polygon, srid=3857)
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Name ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    @property
+    def name(self):
+        """Return area name"""
+        return self._db_obj.name
+
+    @name.setter
+    def name(self, value: str):
+        """Set area name"""
+        if len(value) > _DB_STANDARD_LENGTH:
+            raise ValueError(
+                f"Area name cannot be longer than {_DB_STANDARD_LENGTH} characters."
+            )
+        self._db_obj.name = value
+
+
+#  .d8888b.                                   .d88888b.  888       d8b                   888
+# d88P  Y88b                                 d88P" "Y88b 888       Y8P                   888
+# 888    888                                 888     888 888                             888
+# 888         8888b.  88888b.d88b.   .d88b.  888     888 88888b.  8888  .d88b.   .d8888b 888888
+# 888  88888     "88b 888 "888 "88b d8P  Y8b 888     888 888 "88b "888 d8P  Y8b d88P"    888
+# 888    888 .d888888 888  888  888 88888888 888     888 888  888  888 88888888 888      888
+# Y88b  d88P 888  888 888  888  888 Y8b.     Y88b. .d88P 888 d88P  888 Y8b.     Y88b.    Y88b.
+#  "Y8888P88 "Y888888 888  888  888  "Y8888   "Y88888P"  88888P"   888  "Y8888   "Y8888P  "Y888
+#                                                                  888
+#                                                                 d88P
+#                                                               888P"
+class GameObject(Archetypes):
+    """Class representing a game object in the game"""
+
+    linked_db_obj = GameObjectDB
+
+    def __init__(self, db_obj: GameObjectDB):
+        self._db_obj = db_obj
+
+    def permission_level_is(self, permission_levels: int | list[int]) -> bool:
+        """Check if the character soul has the required permission level.
+
+        Args:
+            permission_level (int | list[int]): desired permission level or list of permission levels
+
+        Returns:
+            bool: True if the character soul has the required permission level, False otherwise
+        """
+        permission_levels = (
+            permission_levels
+            if isinstance(permission_levels, list)
+            else [permission_levels]
+        )
+        return self._db_obj.puppeted_by.permission_level in permission_levels
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ DELETE ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    async def delete(self, target_object: Type[Archetypes] = None) -> dict:
+        """Deletes self or given object from DB.
+
+        Args:
+            target_object (Type[Archetypes], optional): Target object to delete. The target is self
+                if not provided. Defaults to None.
+
+        Returns:
+            dict: {success: bool, message: str} - success is True if the object was deleted,
+                False otherwise.
+        """
+        # First we check if the permission level of puppeting souls is 0 or 1 (admin or builder)
+        if self.permission_level_is([0, 1]):
+            # If target_object is None, we delete self
+            if target_object is None:
+                async with DBAsyncSession() as session:
+                    await session.delete(self._db_obj)
+                    await session.commit()
+                    # self._db_obj = None
+                del self
+                return {"success": True, "message": "Calling object deleted."}
+            # If target_object is not None, we delete it
+            if target_object is not None:
+                async with DBAsyncSession() as session:
+                    await session.delete(target_object.db_obj)
+                    await session.commit()
+                    # self._db_obj = None
+                del target_object
+                return {"success": True, "message": "Target object deleted."}
+        raise PermissionDeniedError(
+            "Permission denied. The puppeting soul of the caller object don't have permission to delete this object."
+        )
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ID ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    @property
+    def id(self):
+        """Return ID"""
+        return self._db_obj.id
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Name ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    @property
+    def name(self):
+        """Return name"""
+        return self._db_obj.name
+
+    @name.setter
+    def name(self, value: str):
+        """Set name"""
+        if len(value) > _DB_STANDARD_LENGTH:
+            raise ValueError(
+                f"The name cannot be longer than {_DB_STANDARD_LENGTH} characters."
+            )
+        self._db_obj.name = value
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Description ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    @property
+    def description(self):
+        """Return description"""
+        return self._db_obj.description
+
+    @description.setter
+    def description(self, value: str):
+        """Set description"""
+        self._db_obj.description = value
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Object Type ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    @property
+    def object_type(self):
+        """Return object type"""
+        return self._db_obj.object_type
+
+    @object_type.setter
+    def object_type(self, value: ObjectType):
+        """Set object type"""
+        self._db_obj.object_type = value
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Location ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    @property
+    def location(self):
+        """Return location"""
+        return shape.to_shape(self._db_obj.location)
+
+    @location.setter
+    def location(self, value: tuple[float, float, float]):
+        """Set location from (x, y, z), using previous value for any missing ones."""
+
+        for i in value:
+            if i is None:
+                raise ValueError("Coordinates cannot be None.")
+
+        point = Point(value)
+        self._db_obj.location = shape.from_shape(point, srid=3857)
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Attributes ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    @property
+    def attributes(self) -> dict:
+        """Return attributes"""
+        return self._db_obj.attributes
+
+    @attributes.setter
+    def attributes(self, value: dict):
+        """Set attributes"""
+        if not isinstance(value, dict):
+            raise ValueError("Attributes must be a dictionary.")
+        self._db_obj.attributes = value
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Container ID ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    @property
+    def container_id(self):
+        """Return container ID"""
+        return self._db_obj.container_id
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Container ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    @property
+    def container(self):
+        """Return container linked to this game object"""
+        try:
+            container = GameObject(self._db_obj.container) if self._db_obj.container else None
+            return container
+        except Exception as e:
+            logger.warning(
+                "Failed to get container for game object %s: %s",
+                self._db_obj.id,
+                e,
+            )
+            return None
         
+    # async def container(self):
+    #     async with DBAsyncSession() as session:
+    #         result = await session.execute(
+    #             select(GameObjectDB)
+    #             .options(
+    #                 selectinload(GameObjectDB.stored),     # one-to-many children
+    #                 selectinload(GameObjectDB.container),  # many-to-one parent
+    #             )
+    #             .where(GameObjectDB.id == self.container_id)
+    #         )
+    #         return result.scalar_one_or_none()
+        
+    # async def container(self):
+    #     """Return container linked to this game object"""
+    #     # container = search(f"#{self._db_obj.container_id}", GameObject)
+    #     # return container if container else None
+    #     async with DBAsyncSession() as session:
+    #         session.add(self._db_obj)
+    #         container = self._db_obj.container
+    #         return GameObject(container) if container else None
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Stored ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    @property
+    def stored(self):
+        """Return game objects stored in this game object"""
+        try:
+            items = [GameObject(item) for item in self._db_obj.stored] if self._db_obj.stored else []
+            return items
+        except Exception as e:
+            logger.warning(
+                "Failed to get stored items for game object %s: %s",
+                self._db_obj.id,
+                e,
+            )
+            return None
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Puppeted By ID ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    @property
+    def puppeted_by_id(self):
+        """Return ID of character soul linked to this game object"""
+        return self._db_obj.puppeted_by_id
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Puppeted By ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    @property
+    def puppeted_by(self):
+        """Return character soul linked to this game object"""
+        try:
+            character_soul = CharacterSoul(self._db_obj.puppeted_by) if self._db_obj.puppeted_by else None
+            return character_soul
+        except Exception as e:
+            logger.warning(
+                "Failed to get puppeted by character soul for game object %s: %s",
+                self._db_obj.id,
+                e,
+            )
+            return None
+
+
+#  .d8888b.  888                                        888
+# d88P  Y88b 888                                        888
+# 888    888 888                                        888
+# 888        88888b.   8888b.  888d888 8888b.   .d8888b 888888 .d88b.  888d888
+# 888        888 "88b     "88b 888P"      "88b d88P"    888   d8P  Y8b 888P"
+# 888    888 888  888 .d888888 888    .d888888 888      888   88888888 888
+# Y88b  d88P 888  888 888  888 888    888  888 Y88b.    Y88b. Y8b.     888
+#  "Y8888P"  888  888 "Y888888 888    "Y888888  "Y8888P  "Y888 "Y8888  888
+class Character(GameObject):
+    """Class representing a character in the game"""
+
+    linked_db_obj = CharacterDB
+
+    def __init__(self, db_obj: CharacterDB):
+        super().__init__(db_obj)
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Soul ID ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    @property
+    def soul_id(self):
+        """Return character soul ID"""
+        return self._db_obj.soul_id
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Soul ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    @property
+    def soul(self) -> Optional[CharacterSoulDB]:
+        """Return character soul linked to this character"""
+        if self._db_obj.soul:
+            character_soul = CharacterSoul(self._db_obj.soul)
+            return character_soul
+        else:
+            return None
+        
+    async def create_game_object(
+        self,
+        name: str,
+        description: str = "",
+        location=None,
+        attributes: dict = None,
+        container: "GameObject" = None,
+        stored: Union[list["GameObject"], "GameObject"] = None,
+    ) -> Optional["GameObject"]:
+        
+        if location is None:
+            location = self.location
+            
+        return await create_game_object(
+            name=name,
+            description=description,
+            location=location,
+            attributes=attributes,
+            container=container,
+            stored=stored,
+        )   
