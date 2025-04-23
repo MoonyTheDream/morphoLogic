@@ -135,46 +135,46 @@ async def search(name_or_id: str, archetype: Type["Archetypes"]):
     model = archetype.linked_db_obj
 
     async with DBAsyncSession() as session:
-        if isinstance(model, GameObjectDB) or issubclass(model, GameObjectDB):
-            if name_or_id.startswith("#"):
-                result = await session.execute(
-                    select(model)
-                    .options(
-                        selectinload(model.stored),     # one-to-many children
-                        selectinload(model.container),  # many-to-one parent
-                    )
-                    .where(model.id == name_or_id[1:])
+        # if isinstance(model, GameObjectDB) or issubclass(model, GameObjectDB):
+        #     if name_or_id.startswith("#"):
+        #         result = await session.execute(
+        #             select(model)
+        #             .options(
+        #                 selectinload(model.stored),     # one-to-many children
+        #                 selectinload(model.container),  # many-to-one parent
+        #             )
+        #             .where(model.id == name_or_id[1:])
+        #         )
+        #         obj = result.scalar_one_or_none()
+        #         return archetype(obj) if obj else None
+        #     result = await session.execute(
+        #             select(model)
+        #             .options(
+        #                 selectinload(model.stored),     # one-to-many children
+        #                 selectinload(model.container),  # many-to-one parent
+        #             )
+        #             .where(model.name == name_or_id)
+        #         )
+        #     obj = result.scalar_one_or_none()
+        #     return archetype(obj) if obj else None
+        # else:
+        if name_or_id.startswith("#"):
+            try:
+                object_id = int(name_or_id[1:])
+            except ValueError:
+                logger.warning(
+                    "Invalid object ID format: %s. Expected format: #[int].",
+                    name_or_id,
                 )
-                obj = result.scalar_one_or_none()
-                return archetype(obj) if obj else None
-            result = await session.execute(
-                    select(model)
-                    .options(
-                        selectinload(model.stored),     # one-to-many children
-                        selectinload(model.container),  # many-to-one parent
-                    )
-                    .where(model.name == name_or_id)
-                )
-            obj = result.scalar_one_or_none()
-            return archetype(obj) if obj else None
+                return None
+            stmt = select(model).where(model.id == object_id)
         else:
-            if name_or_id.startswith("#"):
-                try:
-                    object_id = int(name_or_id[1:])
-                except ValueError:
-                    logger.warning(
-                        "Invalid object ID format: %s. Expected format: #[int].",
-                        name_or_id,
-                    )
-                    return None
-                stmt = select(model).where(model.id == object_id)
-            else:
-                # If name_or_id is not a number, search by name
-                stmt = select(model).where(model.name == name_or_id)
-            result = await session.execute(stmt)
-            obj = result.scalars().first()
+            # If name_or_id is not a number, search by name
+            stmt = select(model).where(model.name == name_or_id)
+        result = await session.execute(stmt)
+        obj = result.scalars().first()
 
-            return archetype(obj) if obj else None
+        return archetype(obj) if obj else None
 
 
 async def simple_query(value, attribute: str, model: Type["Archetypes"]):
@@ -1009,55 +1009,29 @@ class GameObject(Archetypes):
         return self._db_obj.container_id
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Container ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    @property
-    def container(self):
+        
+    async def container(self):
         """Return container linked to this game object"""
-        try:
-            container = GameObject(self._db_obj.container) if self._db_obj.container else None
-            return container
-        except Exception as e:
-            logger.warning(
-                "Failed to get container for game object %s: %s",
-                self._db_obj.id,
-                e,
-            )
+        if not self.container_id:
             return None
-        
-    # async def container(self):
-    #     async with DBAsyncSession() as session:
-    #         result = await session.execute(
-    #             select(GameObjectDB)
-    #             .options(
-    #                 selectinload(GameObjectDB.stored),     # one-to-many children
-    #                 selectinload(GameObjectDB.container),  # many-to-one parent
-    #             )
-    #             .where(GameObjectDB.id == self.container_id)
-    #         )
-    #         return result.scalar_one_or_none()
-        
-    # async def container(self):
-    #     """Return container linked to this game object"""
-    #     # container = search(f"#{self._db_obj.container_id}", GameObject)
-    #     # return container if container else None
-    #     async with DBAsyncSession() as session:
-    #         session.add(self._db_obj)
-    #         container = self._db_obj.container
-    #         return GameObject(container) if container else None
+        async with DBAsyncSession() as session:
+            result = await session.execute(
+                select(GameObjectDB).where(GameObjectDB.id == self.container_id)
+            )
+            container = result.scalar_one_or_none()
+            return GameObject(container) if container else None
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Stored ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    @property
-    def stored(self):
+    async def stored(self):
         """Return game objects stored in this game object"""
-        try:
-            items = [GameObject(item) for item in self._db_obj.stored] if self._db_obj.stored else []
-            return items
-        except Exception as e:
-            logger.warning(
-                "Failed to get stored items for game object %s: %s",
-                self._db_obj.id,
-                e,
+        # container = search(f"#{self._db_obj.container_id}", GameObject)
+        # return container if container else None
+        async with DBAsyncSession() as session:
+            result = await session.execute(
+                select(GameObjectDB).where(GameObjectDB.container_id == self.id)
             )
-            return None
+            children = result.scalars().all()
+            return [GameObject(obj) for obj in children]
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Puppeted By ID ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     @property

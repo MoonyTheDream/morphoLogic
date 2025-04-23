@@ -218,10 +218,10 @@ class GameObjectDB(BaseDB):
         remote_side=id,
         foreign_keys=[container_id],
         passive_deletes=True,
-        lazy="selectin",
+        lazy="noload",
     )
     stored: Mapped[List["GameObjectDB"]] = relationship(
-        back_populates="container", lazy="selectin"
+        back_populates="container", lazy="noload"
     )
     # -------------------------------------------------------------------------------------------- #
 
