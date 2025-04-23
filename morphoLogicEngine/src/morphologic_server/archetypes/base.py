@@ -1,5 +1,6 @@
 """API for saving and querrying data from DB"""
 
+from abc import ABC  # , abstractmethod
 from typing import Optional, Type, Tuple, Union
 
 from sqlalchemy import select
@@ -7,7 +8,7 @@ from sqlalchemy.orm import selectinload
 from geoalchemy2 import shape
 
 from geoalchemy2.functions import ST_DWithin, ST_Force2D
-from geoalchemy2.shape import from_shape #, to_shape
+from geoalchemy2.shape import from_shape  # , to_shape
 from shapely.geometry import Point, Polygon
 
 from morphologic_server import logger
@@ -46,19 +47,6 @@ def convert_object_location_to_point(ob):
     """Convert a location of an object to a Shapely Point."""
     ob.location = shape.to_shape(ob.location)
     return ob
-
-
-async def better():
-    async with DBAsyncSession() as session:
-            result = await session.execute(
-                select(GameObjectDB)
-                .options(
-                    selectinload(GameObjectDB.stored),     # one-to-many children
-                    selectinload(GameObjectDB.container),  # many-to-one parent
-                )
-                .where(GameObjectDB.id == 17)
-            )
-            return result.scalar_one_or_none()
 
 
 # ------------------------------------------------------------------------------------------------ #
@@ -393,7 +381,7 @@ async def create_game_object(
         location = DEFAULT_SPAWN_LOCATION
     else:
         location = from_shape(location, srid=3857)
-        
+
     kwargs = {}
     if container is not None:
         container = container.db_obj
@@ -403,7 +391,6 @@ async def create_game_object(
             stored = [stored]
         stored = [stored.db_obj for obj in stored]
         kwargs["stored"] = stored
-        
 
     async with DBAsyncSession() as session:
         game_object = GameObjectDB(
@@ -411,7 +398,7 @@ async def create_game_object(
             description=description,
             location=location,
             attributes=attributes,
-            **kwargs
+            **kwargs,
         )
         session.add(game_object)
         await session.commit()
@@ -434,12 +421,23 @@ async def create_game_object(
 # ------------------------------------------------------------------------------------------------ #
 
 
-class Archetypes:
+# Abstract class for all archetypes in the game
+class Archetypes(ABC):
     """Base class for all archetypes in the game."""
 
     linked_db_obj = BaseDB
     _db_obj = None
 
+    @property
+    def db_obj(self):
+        """Return the database object."""
+        return self._db_obj
+
+    # ******************************************************************************************** #
+    #                                            METHODS                                           #
+    # ******************************************************************************************** #
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Save ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     async def save(self):
         """Save the object to the database."""
         if self._db_obj is not None:
@@ -450,10 +448,27 @@ class Archetypes:
                 await session.commit()
                 await session.refresh(self._db_obj)
 
-    @property
-    def db_obj(self):
-        """Return the database object."""
-        return self._db_obj
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Refresh ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    async def refresh(self):
+        """Refresh the object from the database."""
+        async with DBAsyncSession() as session:
+            refreshed = await session.execute(
+                select(self._db_obj.__class__).where(
+                    self._db_obj.__class__.id == self._db_obj.id
+                )
+            )
+            refreshed = refreshed.scalars().first()
+            if refreshed:
+                self._db_obj = refreshed
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Delete ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    async def delete(self):
+        """Deletes the object from the database."""
+        async with DBAsyncSession() as session:
+            await session.delete(self._db_obj)
+            await session.commit()
+            # self._db_obj = None
+        return {"success": True, "message": "Calling object deleted from database."}
 
     # ******************************************************************************************** #
     #                                           WRAPPERS                                           #
@@ -508,22 +523,6 @@ class Archetypes:
             Object: if found, None otherwise.
         """
         return await search_by_xy(x, y, archetype)
-
-    async def create_or_edit_terrain(
-        self, x: int, y: int, z: int = 0, terrain_type: TerrainType = TerrainType.SOIL
-    ) -> Type["Terrain"]:
-        """Add or edit terrain in DB
-        Args:
-            x (int): x coordinate
-            y (int): y coordinate
-            z (int, optional): z coordinate. Defaults to 0.
-            terrain_type (TerrainType, optional): type of terrain. Defaults to TerrainType.SOIL.
-
-        Returns:
-            Terrain: Created or updated terrain object.
-        """
-
-        return await create_or_edit_terrain(x=x, y=y, z=z, terrain_type=terrain_type)
 
 
 #        d8888                                            888
@@ -726,6 +725,184 @@ class CharacterSoul(Archetypes):
             )
             return None
 
+    # ******************************************************************************************** #
+    #                                            METHODS                                           #
+    # ******************************************************************************************** #
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Create Wrappers ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    async def create_account(self, name: str, email: str) -> Optional["Account"]:
+        """Creates an account in the database.
+
+        Returns:
+            Account: Archetypes Accheptor object if created, None otherwise.
+        """
+        self.check_permissions()
+        
+        return await create_account(name=name, email=email)
+
+    async def create_character_and_soul(
+        self,
+        account_id,
+        name: str,
+        description: str = "",
+        location=None,
+        permission_level: int = 2,
+    ) -> Optional[list["Character", "CharacterSoul"]]:
+        """Creates a character and a character soul in the database.
+
+        Returns:
+            List[Character, CharacterSoul]: Archetypes Character and CharacterSoul objects if created,
+                None otherwise.
+        """
+        self.check_permissions()
+
+        return await create_character_and_soul(
+            account_id=account_id,
+            name=name,
+            description=description,
+            location=location,
+            permission_level=permission_level,
+        )
+
+    async def create_character(
+        self,
+        name: str,
+        soul: "CharacterSoul",
+        description: str = "",
+        location=None,
+        attributes: dict = None,
+        container: "GameObject" = None,
+        stored: list["GameObject"] = None,
+    ) -> Optional["Character"]:
+        """Creates a character in the database.
+
+        Returns:
+            Character: Archetypes Character object if created, None otherwise.
+        """
+        self.check_permissions()
+
+        return await create_character(
+            name=name,
+            soul=soul,
+            description=description,
+            location=location,
+            attributes=attributes,
+            container=container,
+            stored=stored,
+        )
+
+    async def create_or_edit_terrain(
+        self, x: int, y: int, z: int = 0, terrain_type: TerrainType = TerrainType.SOIL
+    ) -> Type["Terrain"]:
+        """Add or edit terrain in DB
+        Args:
+            x (int): x coordinate
+            y (int): y coordinate
+            z (int, optional): z coordinate. Defaults to 0.
+            terrain_type (TerrainType, optional): type of terrain. Defaults to TerrainType.SOIL.
+
+        Returns:
+            Terrain: Created or updated terrain object.
+        """
+        self.check_permissions()
+        
+        return await create_or_edit_terrain(
+            x=x, y=y, z=z, terrain_type=terrain_type
+        )
+
+
+    async def create_area(
+        self, polygon: list[Tuple[float, float]], name: str
+    ) -> Optional["Area"]:
+        """Creates an area in the database.
+
+        Returns:
+            Area: Archetypes Area object if created, None otherwise.
+        """
+        self.check_permissions()
+        
+        return await create_area(
+            polygon=polygon,
+            name=name,
+        )
+
+    async def create_game_object(
+        self,
+        name: str,
+        description: str = "",
+        location=None,
+        attributes: dict = None,
+        container: "GameObject" = None,
+        stored: Union[list["GameObject"], "GameObject"] = None,
+    ) -> Optional["GameObject"]:
+        """Creates a game object in the database.
+
+        Returns:
+            GameObject: Archetypes GameObject object if created, None otherwise.
+        """
+        self.check_permissions()
+
+        return await create_game_object(
+            name=name,
+            description=description,
+            location=location,
+            attributes=attributes,
+            container=container,
+            stored=stored,
+        )
+
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ DELETE ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    def permission_level_is(self, permission_levels: int | tuple[int]) -> bool:
+        """Check if the soul has the required permission level.
+
+        Args:
+            permission_level (int | list[int]): desired permission level or list of permission
+                levels
+
+        Returns:
+            bool: True if the character soul has the required permission level, False otherwise
+        """
+        permission_levels = (
+            permission_levels
+            if isinstance(permission_levels, tuple)
+            else (permission_levels,)
+        )
+        return self.permission_level in permission_levels
+
+    def check_permissions(self, permission_levels: int | tuple[int] = (0, 1)) -> None:
+        """Check if the soul has the required permission level.
+
+        Args:
+            permission_level (int | tuple[int]): desired permission level or list of permission
+                levels
+
+        Returns:
+            None: Raises PermissionDeniedError if the character soul doesn't have the required
+                permission level
+        """
+        if not self.permission_level_is(permission_levels):
+            raise PermissionDeniedError(
+                "Permission denied. The puppeting soul of the caller object don't have permission to delete this object."
+            )
+
+    async def delete_object(self, target_object: Type[Archetypes]) -> dict:
+        """Deletes given object from DB.
+
+        Args:
+            target_object (Type[Archetypes]): Target object to delete.
+
+        Returns:
+            dict: {success: bool, message: str} - success is True if the object was deleted,
+                False otherwise.
+        """
+        # First we check if the permission level of the souls is 0 or 1 (admin or builder)
+        self.check_permissions()
+        async with DBAsyncSession() as session:
+            await session.delete(target_object.db_obj)
+            await session.commit()
+        return {"success": True, "message": "Target object deleted."}
+
 
 # 88888888888                               d8b
 #     888                                   Y8P
@@ -879,56 +1056,6 @@ class GameObject(Archetypes):
     def __init__(self, db_obj: GameObjectDB):
         self._db_obj = db_obj
 
-    def permission_level_is(self, permission_levels: int | list[int]) -> bool:
-        """Check if the character soul has the required permission level.
-
-        Args:
-            permission_level (int | list[int]): desired permission level or list of permission levels
-
-        Returns:
-            bool: True if the character soul has the required permission level, False otherwise
-        """
-        permission_levels = (
-            permission_levels
-            if isinstance(permission_levels, list)
-            else [permission_levels]
-        )
-        return self._db_obj.puppeted_by.permission_level in permission_levels
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ DELETE ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    async def delete(self, target_object: Type[Archetypes] = None) -> dict:
-        """Deletes self or given object from DB.
-
-        Args:
-            target_object (Type[Archetypes], optional): Target object to delete. The target is self
-                if not provided. Defaults to None.
-
-        Returns:
-            dict: {success: bool, message: str} - success is True if the object was deleted,
-                False otherwise.
-        """
-        # First we check if the permission level of puppeting souls is 0 or 1 (admin or builder)
-        if self.permission_level_is([0, 1]):
-            # If target_object is None, we delete self
-            if target_object is None:
-                async with DBAsyncSession() as session:
-                    await session.delete(self._db_obj)
-                    await session.commit()
-                    # self._db_obj = None
-                del self
-                return {"success": True, "message": "Calling object deleted."}
-            # If target_object is not None, we delete it
-            if target_object is not None:
-                async with DBAsyncSession() as session:
-                    await session.delete(target_object.db_obj)
-                    await session.commit()
-                    # self._db_obj = None
-                del target_object
-                return {"success": True, "message": "Target object deleted."}
-        raise PermissionDeniedError(
-            "Permission denied. The puppeting soul of the caller object don't have permission to delete this object."
-        )
-
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ID ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     @property
     def id(self):
@@ -1009,7 +1136,7 @@ class GameObject(Archetypes):
         return self._db_obj.container_id
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Container ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-        
+
     async def container(self):
         """Return container linked to this game object"""
         if not self.container_id:
@@ -1044,7 +1171,11 @@ class GameObject(Archetypes):
     def puppeted_by(self):
         """Return character soul linked to this game object"""
         try:
-            character_soul = CharacterSoul(self._db_obj.puppeted_by) if self._db_obj.puppeted_by else None
+            character_soul = (
+                CharacterSoul(self._db_obj.puppeted_by)
+                if self._db_obj.puppeted_by
+                else None
+            )
             return character_soul
         except Exception as e:
             logger.warning(
@@ -1086,7 +1217,7 @@ class Character(GameObject):
             return character_soul
         else:
             return None
-        
+
     async def create_game_object(
         self,
         name: str,
@@ -1096,10 +1227,10 @@ class Character(GameObject):
         container: "GameObject" = None,
         stored: Union[list["GameObject"], "GameObject"] = None,
     ) -> Optional["GameObject"]:
-        
+
         if location is None:
             location = self.location
-            
+
         return await create_game_object(
             name=name,
             description=description,
@@ -1107,4 +1238,4 @@ class Character(GameObject):
             attributes=attributes,
             container=container,
             stored=stored,
-        )   
+        )
