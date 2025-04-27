@@ -57,17 +57,21 @@ async def consume_and_handle():
                     msg_topic = msg.topic()
                     # Other needed data from kafka message
                     kafka_msg = _decode_msg(msg)
-
-                    system_message = kafka_msg.get("system_message", "")
+                    payload = kafka_msg["payload"]
+                    payload_type = payload["type"]
+                    content = payload["content"]
+                    
+                    # system_message = kafka_msg.get("system_message", "")
+                    
                     # this is also topic name
                     sending_user = kafka_msg["metadata"]["username"]
-                    # The aboce WILL CHANGE. TOPIC PER USERNAME SHOULD BE TRACKING SOMEWHERE
+                    # The above WILL CHANGE. TOPIC PER USERNAME SHOULD BE TRACKING SOMEWHERE
 
                     # Handling handhske messages from clients
-                    if msg_topic == _SERVER_HANDSHAKE_TOPIC:
-                        # Handshake requests
-                        if system_message:
-                            match system_message:
+                    if payload_type == "system_message":
+                        if msg_topic == _SERVER_HANDSHAKE_TOPIC:
+                            # Handshake requests
+                            match content:
                                 case "REQUEST_SERVER_CONNECTION":
                                     _handshake_topic_creation(kafka, kafka_msg)
                                 case _:
@@ -75,7 +79,7 @@ async def consume_and_handle():
                                         f'Uknown system message from client side in {msg_topic}: "{system_message}"'
                                     )
 
-                    else:
+                    elif payload_type == "system_message":
                         # System messages from client side handler
                         if system_message:
                             match system_message:
@@ -117,8 +121,8 @@ def _handshake_topic_creation(kafka: KafkaConnection, client_handshake_msg: dict
         kafka.send_data_to_user(
             _CLIENT_HANDSHAKE_TOPIC,
             username,
-            data={"client_topic_handoff": dedicated_topic},
-            system_message="TOPIC_CREATED_SEND_HANDSHAKE_THERE",
+            content=(dedicated_topic),
+            payload_type="client_topic_handoff",
         )
 
 

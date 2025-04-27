@@ -37,9 +37,9 @@ func _append(message: String) -> void:
 		inputList.pop_front()
 		inputList.append(message)
 
-func _send_to_tcp(message: String) -> void:
-	_inputHandler(message)
-	TCPDialog.send_tcp_message({"client_input": message})
+func _send_to_tcp(content: String, type: String = "client_input") -> void:
+	_inputHandler(content)
+	TCPDialog.send_tcp_message(type, content)
 	
 func _up():
 	_if_at_zero(true)

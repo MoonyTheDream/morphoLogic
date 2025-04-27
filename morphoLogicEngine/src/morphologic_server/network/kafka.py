@@ -190,18 +190,19 @@ class KafkaConnection:
         self,
         topic: str,
         username: str,
-        data: dict = None,
-        direct_message="",
-        system_message="",
+        content: str,
+        payload_type: str = "server_message",
     ):
         """Wrapper for sending message. Add more preferences here later if needed"""
-        if data is None:
-            data = {}
-        data.update(
-            {"dicrect_message": direct_message, "system_message": system_message}
-        )
-        wrapped_data = self._add_metadata(data, username)
-        wrapped_data = json.dumps(data, ensure_ascii=False).encode("utf-8")
+        # if data is None:
+        payload_data: dict = {}
+        payload_data['payload']['content'] = content
+        payload_data['payload']['type'] = payload_type
+        # data.update(
+        #     {"dicrect_message": direct_message, "system_message": system_message}
+        # )
+        wrapped_data = self._add_metadata(payload_data, username)
+        wrapped_data = json.dumps(payload_data, ensure_ascii=False).encode("utf-8")
         self.producer.produce(topic, value=wrapped_data)  # no key, as:
         # adding key might result in some consumers not consuming their message as each
         # consumer get's it's own partition when there's more that one consumers

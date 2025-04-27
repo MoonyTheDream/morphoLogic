@@ -1,9 +1,9 @@
 # Communication between Server and Clinet
 Type: *JSON*
 
-## HANDSHAKE
+## HANDSHAKE (type:content of payload)
 client in *serverHandshakeTopic* -> "system_message": "REQUEST_SERVER_CONNECTION"
-server in *clientHandshakeTopic* -> {"system_message": "TOPIC_CREATED_SEND_HANDSHAKE_THERE", "client_topic_handoff": <dedicated_topic>}
+server in *clientHandshakeTopic* -> {"client_topic_handoff": "<dedicated_topic>"}
 client in *serverGeneralTopic* -> "system_message": "HANDSHAKE_GLOBAL_TOPIC"
 server in <dedicated_topic> -> "system_message": "ACK"
 
@@ -14,14 +14,19 @@ In case of not receiving "ACK" message after a timeout Godot will send an error 
 ## Client -> Server
 {
   "metadata": {
-    "source": "client"
+    "source": "client",
     "username": "<username>",
     "client_version": "<client_version>",
     "timestamp": "<timestamp>",
     "client_ip": "<client.ip>"
   },
-  "client_input": "<string sent by an user>",
-  "system_message": "optional system message like 'HANSHAKE'" // created only by microserver
+  "payload": {
+    "type": "<client_input|system_message>",
+    "content": "<the actual payload>"
+  }
+}
+  <!-- "client_input": "<string sent by an user>",
+  "system_message": "optional system message like 'HANSHAKE'" // created only by microserver -->
 }
 ## Server -> Client
 {
@@ -31,7 +36,6 @@ In case of not receiving "ACK" message after a timeout Godot will send an error 
     "server_version": "<client_version>",
     "timestamp": "<timestamp>"
   },
-  "direct_messages": ["strings to show on the client", "can be more than one"],
   "system_message": "optional system message like 'connected to server'",
   "obejcts": {
     "id_of_object_01": {

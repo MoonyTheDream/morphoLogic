@@ -4,7 +4,8 @@ from abc import ABC  # , abstractmethod
 from typing import Optional, Type, Tuple, Union
 
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
+
+# from sqlalchemy.orm import selectinload
 from geoalchemy2 import shape
 
 from geoalchemy2.functions import ST_DWithin, ST_Force2D
@@ -123,29 +124,6 @@ async def search(name_or_id: str, archetype: Type["Archetypes"]):
     model = archetype.linked_db_obj
 
     async with DBAsyncSession() as session:
-        # if isinstance(model, GameObjectDB) or issubclass(model, GameObjectDB):
-        #     if name_or_id.startswith("#"):
-        #         result = await session.execute(
-        #             select(model)
-        #             .options(
-        #                 selectinload(model.stored),     # one-to-many children
-        #                 selectinload(model.container),  # many-to-one parent
-        #             )
-        #             .where(model.id == name_or_id[1:])
-        #         )
-        #         obj = result.scalar_one_or_none()
-        #         return archetype(obj) if obj else None
-        #     result = await session.execute(
-        #             select(model)
-        #             .options(
-        #                 selectinload(model.stored),     # one-to-many children
-        #                 selectinload(model.container),  # many-to-one parent
-        #             )
-        #             .where(model.name == name_or_id)
-        #         )
-        #     obj = result.scalar_one_or_none()
-        #     return archetype(obj) if obj else None
-        # else:
         if name_or_id.startswith("#"):
             try:
                 object_id = int(name_or_id[1:])
@@ -610,12 +588,6 @@ class Account(Archetypes):
             return []
 
 
-# Tymczasowo, żeby móc w shell'u korzystać z self
-async def get_self():
-    """Get self object for testing purposes."""
-    return await search("MoonyTheDream", Character)
-
-
 #  .d8888b.  888                                        888
 # d88P  Y88b 888                                        888
 # 888    888 888                                        888
@@ -729,7 +701,7 @@ class CharacterSoul(Archetypes):
     #                                            METHODS                                           #
     # ******************************************************************************************** #
 
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Create Wrappers ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ <Create> Wrappers ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     async def create_account(self, name: str, email: str) -> Optional["Account"]:
         """Creates an account in the database.
 
@@ -737,7 +709,7 @@ class CharacterSoul(Archetypes):
             Account: Archetypes Accheptor object if created, None otherwise.
         """
         self.check_permissions()
-        
+
         return await create_account(name=name, email=email)
 
     async def create_character_and_soul(
@@ -805,11 +777,8 @@ class CharacterSoul(Archetypes):
             Terrain: Created or updated terrain object.
         """
         self.check_permissions()
-        
-        return await create_or_edit_terrain(
-            x=x, y=y, z=z, terrain_type=terrain_type
-        )
 
+        return await create_or_edit_terrain(x=x, y=y, z=z, terrain_type=terrain_type)
 
     async def create_area(
         self, polygon: list[Tuple[float, float]], name: str
@@ -820,7 +789,7 @@ class CharacterSoul(Archetypes):
             Area: Archetypes Area object if created, None otherwise.
         """
         self.check_permissions()
-        
+
         return await create_area(
             polygon=polygon,
             name=name,
@@ -850,7 +819,6 @@ class CharacterSoul(Archetypes):
             container=container,
             stored=stored,
         )
-
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ DELETE ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     def permission_level_is(self, permission_levels: int | tuple[int]) -> bool:
@@ -1218,24 +1186,9 @@ class Character(GameObject):
         else:
             return None
 
-    async def create_game_object(
-        self,
-        name: str,
-        description: str = "",
-        location=None,
-        attributes: dict = None,
-        container: "GameObject" = None,
-        stored: Union[list["GameObject"], "GameObject"] = None,
-    ) -> Optional["GameObject"]:
 
-        if location is None:
-            location = self.location
-
-        return await create_game_object(
-            name=name,
-            description=description,
-            location=location,
-            attributes=attributes,
-            container=container,
-            stored=stored,
-        )
+# ------------------------------------------------------------------------------------------------ #
+# Tymczasowo, żeby móc w shell'u korzystać z self
+async def get_self():
+    """Get self object for testing purposes."""
+    return await search("MoonyTheDream", Character)
