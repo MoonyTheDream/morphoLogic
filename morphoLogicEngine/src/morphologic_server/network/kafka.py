@@ -195,9 +195,14 @@ class KafkaConnection:
     ):
         """Wrapper for sending message. Add more preferences here later if needed"""
         # if data is None:
-        payload_data: dict = {}
-        payload_data['payload']['content'] = content
-        payload_data['payload']['type'] = payload_type
+        payload_data: dict = {
+            "payload": {
+                "type": payload_type,
+                "content": content,
+            }
+        }
+        # payload_data['payload']['content'] = content
+        # payload_data['payload']['type'] = payload_type
         # data.update(
         #     {"dicrect_message": direct_message, "system_message": system_message}
         # )

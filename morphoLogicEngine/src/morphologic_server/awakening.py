@@ -68,21 +68,13 @@ async def consume_and_handle():
                     # The above WILL CHANGE. TOPIC PER USERNAME SHOULD BE TRACKING SOMEWHERE
 
                     # Handling handhske messages from clients
-                    if payload_type == "system_message":
-                        if msg_topic == _SERVER_HANDSHAKE_TOPIC:
-                            # Handshake requests
+                    match payload_type:
+                        case "system_message":
                             match content:
+                        # if msg_topic == _SERVER_HANDSHAKE_TOPIC:
+                        #     # Handshake requests
                                 case "REQUEST_SERVER_CONNECTION":
                                     _handshake_topic_creation(kafka, kafka_msg)
-                                case _:
-                                    raise RuntimeError(
-                                        f'Uknown system message from client side in {msg_topic}: "{system_message}"'
-                                    )
-
-                    elif payload_type == "system_message":
-                        # System messages from client side handler
-                        if system_message:
-                            match system_message:
                                 # Handshake in dedicated topic handler
                                 case "HANDSHAKE_GLOBAL_TOPIC":
                                     _check_and_acknowledge_client_topic(
@@ -90,8 +82,15 @@ async def consume_and_handle():
                                     )
                                 case _:
                                     raise RuntimeError(
-                                        f'Uknown system message from client side in topic {msg_topic}: "{system_message}"'
+                                        f'Uknown system message from client side in {msg_topic}: "{content}"'
                                     )
+                        case _:
+                            logger.warning(
+                                'Unknown payload type in topic "%s": "%s". Content: "%s"',
+                                msg_topic,
+                                payload_type,
+                                content
+                            )
 
     except Exception:
         logger.exception("Error in main loop of server.")
@@ -146,7 +145,7 @@ def _check_and_acknowledge_client_topic(
     username = msg["metadata"]["username"]
 
     # Na razie taka beznadziejna walidacja, do zastąpienia czymś sensownym
-    kafka.send_data_to_user(msg_topic, username=username, system_message="ACK")
+    kafka.send_data_to_user(msg_topic, username=username, content="ACK")
 
 
 # if __name__ == "__main__":

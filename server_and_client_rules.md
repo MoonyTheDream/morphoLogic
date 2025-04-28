@@ -5,7 +5,7 @@ Type: *JSON*
 client in *serverHandshakeTopic* -> "system_message": "REQUEST_SERVER_CONNECTION"
 server in *clientHandshakeTopic* -> {"client_topic_handoff": "<dedicated_topic>"}
 client in *serverGeneralTopic* -> "system_message": "HANDSHAKE_GLOBAL_TOPIC"
-server in <dedicated_topic> -> "system_message": "ACK"
+server in <dedicated_topic> -> "server_message": "ACK"
 
 In case of not receiving "ACK" message after a timeout Godot will send an error message back to *serverHandshakeTopic*
 
@@ -27,7 +27,6 @@ In case of not receiving "ACK" message after a timeout Godot will send an error 
 }
   <!-- "client_input": "<string sent by an user>",
   "system_message": "optional system message like 'HANSHAKE'" // created only by microserver -->
-}
 ## Server -> Client
 {
   "metadata": {
@@ -36,15 +35,17 @@ In case of not receiving "ACK" message after a timeout Godot will send an error 
     "server_version": "<client_version>",
     "timestamp": "<timestamp>"
   },
-  "system_message": "optional system message like 'connected to server'",
-  "obejcts": {
-    "id_of_object_01": {
-      "value_01": "value",
-      "value_02": 5
-    },
-    "id_od_object_02" :{
-      "value_01": "some_value",
-      "value_02": 0
+  "payload": {
+    "type": "<system_message|direct_message|objects>"
+    "content": { 
+      "id_of_object_01": {
+        "value_01": "value",
+        "value_02": 5
+      },
+      "id_od_object_02" :{
+        "value_01": "some_value",
+        "value_02": 0
+      }
     }
   }
 }

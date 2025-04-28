@@ -17,8 +17,9 @@ func parse_message(data: Dictionary) -> void:
 	if data and data['metadata'].get("to_user", "") == ClientData.username:
 
 		# Handling System Messages
-		var system_message = data['payload']['type'] == "system_message"
+		# var system_message = data['payload']['type'] == "system_message"
 		# var system_message = data.get("system_message", "")
+		# var payload = data['payload']
 		var message_type = data['payload']['type']
 		var message_content = data['payload']['content']
 		# if system_message:
@@ -35,7 +36,7 @@ func parse_message(data: Dictionary) -> void:
 						draw_message.emit(tr("[color=tomato]UKNOWN SYSTEM MESSAGE! REPORT ISSUE TO DEVS.[/color]\n"))
 			# Handshake
 			"client_topic_handoff":
-				var new_topic = data['client_topic_handoff']
+				# var new_topic = message_content
 				TCPDialog.send_tcp_message("microserver_subscribe_to", message_content)
 				TCPDialog.send_tcp_message("produce_to_topic", ClientData.server_general_topic)
 				TCPDialog.send_tcp_message("system_message", "HANDSHAKE_GLOBAL_TOPIC")
@@ -47,7 +48,7 @@ func parse_message(data: Dictionary) -> void:
 func _wait_for_ack():
 	TCPDialog.new_data_arrived.disconnect(parse_message)
 	var server_answer = await TCPDialog.new_data_arrived
-	if server_answer['payload']['type'] == "system_message" and server_answer['payload']['content'] == "ACK":
+	if server_answer['payload']['type'] == "server_message" and server_answer['payload']['content'] == "ACK":
 		TCPDialog.new_data_arrived.connect(parse_message)
 		var success_msg = tr("[color=green_yellow]Succsessfuly Established Server Connection.[/color]\n")
 		draw_message.emit(success_msg)

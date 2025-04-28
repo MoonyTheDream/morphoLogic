@@ -250,7 +250,12 @@ class TCPServer:
         """
         Used when a microserver has a system message to client like 'Connected to Server'
         """
-        message = {"system_message": message}
+        message = {
+            "payload": {
+                "type": "system_message",
+                "content": message,
+            },
+        }
         wrapped_data = self._add_metadata(message)
         wrapped_data = json.dumps(wrapped_data)
         await self.send_message(wrapped_data)
@@ -427,8 +432,11 @@ async def main():
             client_id = None
             try:
                 data_json = json.loads(client_info)
-                if data_json["system_message"] == "REQUEST_SERVER_CONNECTION":
-                    client_id = data_json["metadata"].get("username", None).strip()
+                message_type = data_json["payload"]["type"]
+                message_content = data_json["payload"]["content"]
+                if message_type == "system_message":
+                    if message_content == "REQUEST_SERVER_CONNECTION":
+                        client_id = data_json["metadata"].get("username", None).strip()
             except json.JSONDecodeError:
                 logger.exception(
                     "Invalid JSON received from TCP client. Shutting down."
@@ -499,28 +507,45 @@ async def _tcp_to_kafka_handler(
                     continue
 
                 logger.debug("Received TCP message: %s", msg)
-                system_message = msg.get("system_message", "")
+                # system_message = msg.get("system_message", "")
+                message_type = msg["payload"]["type"]
+                message_content = msg["payload"]["content"]
+                match message_type:
 
-                match system_message:
+                    case "microserver_subscribe_to":
+                        # subscribe_to = msg["microserver_subscribe_to"]
+                        consumer.subscribe([message_content])
+                        logger.debug('Subscribed to:"%s"', message_content)
+                    # ---------------------------------------------------------------------------- #
 
-                    case "CLEANUP":
-                        logger.info("Received CLEANUP message from Godot. Exiting.")
-                        await force_terminate_task_group()
-
-                    case "MICROSERVER_SUBSCRIBE":
-                        subscribe_to = msg["microserver_subscribe_to"]
-                        consumer.subscribe([subscribe_to])
-                        logger.debug('Subscribed to:"%s"', subscribe_to)
-
-                    case "MICROSERVER_PRODUCE_TO":
-                        produce_topic = msg["produce_topic"]
+                    case "produce_topic":
+                        produce_topic = message_content
                         logger.debug(
                             'Changed topic to produce to, to: "%s"', produce_topic
                         )
+                    # ---------------------------------------------------------------------------- #
 
+                    case "system_message":
+
+                        match message_content:
+
+                            case "CLEANUP":
+                                logger.info(
+                                    "Received CLEANUP message from Godot. Exiting."
+                                )
+                                await force_terminate_task_group()
+
+                            case _:
+                                # Produce the message to the Kafka topic with username as a key
+                                produce_msg_to_kafka(
+                                    produce_topic, client_id, producer, msg
+                                )
+                                
                     case _:
-                        # Produce the message to the Kafka topic with username as a key
-                        produce_msg_to_kafka(produce_topic, client_id, producer, msg)
+                            # Produce the message to the Kafka topic with username as a key
+                            produce_msg_to_kafka(
+                                produce_topic, client_id, producer, msg
+                            )
 
             producer.poll(0)
 
