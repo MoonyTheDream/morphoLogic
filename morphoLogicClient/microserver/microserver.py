@@ -252,8 +252,7 @@ class TCPServer:
         """
         message = {
             "payload": {
-                "type": "system_message",
-                "content": message,
+                "system_message": message,
             },
         }
         wrapped_data = self._add_metadata(message)
@@ -432,11 +431,10 @@ async def main():
             client_id = None
             try:
                 data_json = json.loads(client_info)
-                message_type = data_json["payload"]["type"]
-                message_content = data_json["payload"]["content"]
-                if message_type == "system_message":
-                    if message_content == "REQUEST_SERVER_CONNECTION":
-                        client_id = data_json["metadata"].get("username", None).strip()
+                system_message = data_json["payload"].get("system_message", "")
+                # message_content = data_json["payload"].get("content", "")
+                if system_message == "REQUEST_SERVER_CONNECTION":
+                    client_id = data_json["metadata"].get("username", None).strip()
             except json.JSONDecodeError:
                 logger.exception(
                     "Invalid JSON received from TCP client. Shutting down."
@@ -507,45 +505,48 @@ async def _tcp_to_kafka_handler(
                     continue
 
                 logger.debug("Received TCP message: %s", msg)
-                # system_message = msg.get("system_message", "")
-                message_type = msg["payload"]["type"]
-                message_content = msg["payload"]["content"]
-                match message_type:
+                system_message = msg["payload"].get("system_message", "")
+                # server_message = msg["payload"].get("server_message", "")
+                message_content = msg["payload"].get("content", "")
+                if system_message:
+                    match system_message:
 
-                    case "microserver_subscribe_to":
-                        # subscribe_to = msg["microserver_subscribe_to"]
-                        consumer.subscribe([message_content])
-                        logger.debug('Subscribed to:"%s"', message_content)
-                    # ---------------------------------------------------------------------------- #
+                        case "microserver_subscribe_to":
+                            # subscribe_to = msg["microserver_subscribe_to"]
+                            consumer.subscribe([message_content])
+                            logger.debug('Subscribed to:"%s"', message_content)
+                        # ---------------------------------------------------------------------------- #
 
-                    case "produce_topic":
-                        produce_topic = message_content
-                        logger.debug(
-                            'Changed topic to produce to, to: "%s"', produce_topic
-                        )
-                    # ---------------------------------------------------------------------------- #
+                        case "produce_to_topic":
+                            produce_topic = message_content
+                            logger.debug(
+                                'Changed topic to produce to, to: "%s"', produce_topic
+                            )
+                        # ---------------------------------------------------------------------------- #
 
-                    case "system_message":
-
-                        match message_content:
-
-                            case "CLEANUP":
-                                logger.info(
-                                    "Received CLEANUP message from Godot. Exiting."
-                                )
-                                await force_terminate_task_group()
-
-                            case _:
-                                # Produce the message to the Kafka topic with username as a key
-                                produce_msg_to_kafka(
-                                    produce_topic, client_id, producer, msg
-                                )
-                                
-                    case _:
+                        case "CLEANUP":
+                            logger.info(
+                                "Received CLEANUP message from Godot. Exiting."
+                            )
+                            await force_terminate_task_group()
+                            
+                        case _:
                             # Produce the message to the Kafka topic with username as a key
                             produce_msg_to_kafka(
                                 produce_topic, client_id, producer, msg
                             )
+                            
+                if msg["payload"].get("user_input", ""):
+                    produce_msg_to_kafka(
+                                produce_topic, client_id, producer, msg
+                            )
+            
+            # # W sumei trzeba się będzie upewnić, czy już i tak nie jest postanowione wysyłanie i dopero wtedy wysyłać
+            # if server_message != "":
+            #     # Produce the message to the Kafka topic with username as a key
+            #     produce_msg_to_kafka(
+            #         produce_topic, client_id, producer, msg
+            #     )     
 
             producer.poll(0)
 

@@ -94,13 +94,13 @@ func wait_for_port_from_pipe(m_stdio, timeout_sec: float = 10.0) -> int:
 	return -1
 
 func initialize_server_connection():
-	send_tcp_message("system_message", "REQUEST_SERVER_CONNECTION")
+	send_tcp_message("", "REQUEST_SERVER_CONNECTION")
 	tcp_t = Thread.new()
 	tcp_t.start(continously_receive_messages)
 
 func _exit_tree():
 	# Make sure Python processed is killed (to death) when exiting godot
-	send_tcp_message("system_message", "CLEANUP")
+	send_tcp_message("", "CLEANUP")
 	print("Python microserver has been kindly asked to kill itself.")
 
 	# Stop the thread properly
@@ -115,7 +115,7 @@ func continously_receive_messages() -> void:
 			var available_bytes = TCPClient.get_available_bytes()
 			if available_bytes > 0:
 				var received_data = TCPClient.get_utf8_string(available_bytes)
-				var dict_data : Dictionary = JSON.parse_string(received_data)
+				var dict_data: Dictionary = JSON.parse_string(received_data)
 				call_deferred("emit_received_data", dict_data)
 		else:
 			break
@@ -124,7 +124,7 @@ func continously_receive_messages() -> void:
 func emit_received_data(data):
 	new_data_arrived.emit(data)
 
-func send_tcp_message(type: String, content: String) -> void:
+func send_tcp_message(user_input: String = "", system_message: String = "", message_content: String = "") -> void:
 	var data_to_send: Dictionary
 	data_to_send['metadata'] = {
 			"source": "client",
@@ -134,10 +134,11 @@ func send_tcp_message(type: String, content: String) -> void:
 			"session_token": "NOT_IMPLEMENTED_YET"
 		}
 	data_to_send['payload'] = {
-		"type": type,
-		"content": content
+		"user_input": user_input,
+		"system_message": system_message,
+		"content": message_content,
 	}
-	var wrapped_message = JSON.stringify(data_to_send) +"\n"
+	var wrapped_message = JSON.stringify(data_to_send) + "\n"
 	
 
 	TCPClient.poll()

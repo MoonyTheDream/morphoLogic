@@ -64,8 +64,9 @@ async def handle_message(msg, kafka: KafkaConnection, tg: asyncio.TaskGroup):
     # Other needed data from kafka message
     kafka_msg = _decode_msg(msg)
     # payload = kafka_msg["payload"]
-    payload_type = kafka_msg["payload"]["type"]
-    content = kafka_msg["payload"]["content"]
+    system_message = kafka_msg["payload"].get("system_message", "")
+    user_input = kafka_msg["payload"].get("user_input", "")
+    message_content = kafka_msg["payload"].get("message_content", "")
     
     # system_message = kafka_msg.get("system_message", "")
     
@@ -74,34 +75,50 @@ async def handle_message(msg, kafka: KafkaConnection, tg: asyncio.TaskGroup):
     # The above WILL CHANGE. TOPIC PER USERNAME SHOULD BE TRACKING SOMEWHERE
 
     # Handling handhske messages from clients
-    match payload_type:
+    match system_message:
         
-        case "system_message":
-            match content:
-        # if msg_topic == _SERVER_HANDSHAKE_TOPIC:
-        #     # Handshake requests
-                case "REQUEST_SERVER_CONNECTION":
-                    _handshake_topic_creation(kafka, kafka_msg)
-                # Handshake in dedicated topic handler
-                case "HANDSHAKE_GLOBAL_TOPIC":
-                    _check_and_acknowledge_client_topic(
-                        kafka, sending_user, kafka_msg
-                    )
-                case _:
-                    raise RuntimeError(
-                        f'Uknown system message from client side in {msg_topic}: "{content}"'
-                    )
-                    
-        case "client_input":
-            pass
-        
-        case _:
-            logger.warning(
-                'Unknown payload type in topic "%s": "%s". Content: "%s"',
-                msg_topic,
-                payload_type,
-                content
+        # Handshake requests
+        case "REQUEST_SERVER_CONNECTION":
+            _handshake_topic_creation(kafka, kafka_msg)
+        # Handshake in dedicated topic handler
+        case "HANDSHAKE_GLOBAL_TOPIC":
+            _check_and_acknowledge_client_topic(
+                kafka, sending_user, kafka_msg
             )
+        case "":
+            pass
+        case _:
+            raise RuntimeError(
+                f'Uknown system message from client side in {msg_topic}: "{system_message}"'
+            )
+    if user_input:
+        if user_input == "odeslij":
+            tg.create_task(testowy_odeslij(kafka, sending_user))
+        logger.debug(
+            'User "%s" sent message: "%s" to topic "%s"',
+            sending_user,
+            user_input,
+            msg_topic,
+        )
+        
+        # case _:
+        #     logger.warning(
+        #         'Unknown payload type in topic "%s": "%s". Content: "%s"',
+        #         msg_topic,
+        #         payload_type,
+        #         content
+        #     )
+
+async def testowy_odeslij(kafka: KafkaConnection, username: str):
+    """
+    Testowy handler do wysyłania wiadomości do użytkownika
+    """
+    logger.debug('Sending test message to "%s"', username)
+    kafka.send_data_to_user(
+        topic=username,
+        username=username,
+        direct_message="MASZ! Nażryj się, machoniu.\n",
+    )
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Decode Msg ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 def _decode_msg(msg) -> dict:
@@ -127,8 +144,8 @@ def _handshake_topic_creation(kafka: KafkaConnection, client_handshake_msg: dict
         kafka.send_data_to_user(
             _CLIENT_HANDSHAKE_TOPIC,
             username,
-            content=(dedicated_topic),
-            payload_type="client_topic_handoff",
+            server_message="client_topic_handoff",
+            content=dedicated_topic,
         )
 
 
@@ -152,7 +169,7 @@ def _check_and_acknowledge_client_topic(
     username = msg["metadata"]["username"]
 
     # Na razie taka beznadziejna walidacja, do zastąpienia czymś sensownym
-    kafka.send_data_to_user(msg_topic, username=username, content="ACK")
+    kafka.send_data_to_user(msg_topic, username=username, server_message="ACK")
 
 
 # if __name__ == "__main__":

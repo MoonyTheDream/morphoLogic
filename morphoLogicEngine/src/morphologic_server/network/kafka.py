@@ -190,15 +190,19 @@ class KafkaConnection:
         self,
         topic: str,
         username: str,
-        content: str,
-        payload_type: str = "server_message",
+        server_message: str = "",
+        content: str = "",
+        direct_message: str = "",
     ):
         """Wrapper for sending message. Add more preferences here later if needed"""
         # if data is None:
         payload_data: dict = {
             "payload": {
-                "type": payload_type,
+                "server_message": server_message,
                 "content": content,
+                "direct_message": direct_message,
+                # "type": payload_type,
+                # "content": content,
             }
         }
         # payload_data['payload']['content'] = content

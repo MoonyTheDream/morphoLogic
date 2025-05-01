@@ -12,7 +12,7 @@ In case of not receiving "ACK" message after a timeout Godot will send an error 
 
 
 ## Client -> Server
-{
+<!-- {
   "metadata": {
     "source": "client",
     "username": "<username>",
@@ -24,11 +24,26 @@ In case of not receiving "ACK" message after a timeout Godot will send an error 
     "type": "<client_input|system_message>",
     "content": "<the actual payload>"
   }
+} -->
+
+{
+  "metadata": {
+    "source": "client",
+    "username": "<username>",
+    "client_version": "<client_version>",
+    "timestamp": "<timestamp>",
+    "client_ip": "<client.ip>"
+  },
+  "payload": {
+    "user_input": "<the_message>",
+    "system_message": "<the_message>",
+    "content": "<optional_content_for_the_message>"
+  }
 }
   <!-- "client_input": "<string sent by an user>",
   "system_message": "optional system message like 'HANSHAKE'" // created only by microserver -->
 ## Server -> Client
-{
+<!-- {
   "metadata": {
     "source": "<server/microserver>",
     "to_user": "<name_of_the_target_user>",
@@ -38,6 +53,29 @@ In case of not receiving "ACK" message after a timeout Godot will send an error 
   "payload": {
     "type": "<system_message|direct_message|objects>"
     "content": { 
+      "id_of_object_01": {
+        "value_01": "value",
+        "value_02": 5
+      },
+      "id_od_object_02" :{
+        "value_01": "some_value",
+        "value_02": 0
+      }
+    }
+  }
+} -->
+{
+  "metadata": {
+    "source": "<server/microserver>",
+    "to_user": "<name_of_the_target_user>",
+    "server_version": "<client_version>",
+    "timestamp": "<timestamp>"
+  },
+  "payload": {
+    "server_message": "<the_message>",
+    "direct_message": "<the message wo show on client directly>",
+    "content": "<optional_content_for_the_message>"
+    "objects": { 
       "id_of_object_01": {
         "value_01": "value",
         "value_02": 5
