@@ -26,17 +26,16 @@ async def awake(tg: asyncio.TaskGroup):
     logger.info("Server version: %s", _SETTINGS.SERVER_VERSION)
     logger.info("Waking up laws of nature.")
 
-    tg.create_task(consume_and_handle())
+    tg.create_task(consume_and_handover(tg))
 
 
 # ------------------------------------------------------------------------------------------------ #
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Consume And Handle ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-async def consume_and_handle():
+async def consume_and_handover(tg: asyncio.TaskGroup):
     """
-    A handler that consumes message from globalTopic and decides to which function
-    it needs to be handled.
+    A handler that consumes message from globalTopic and handing them over to handler.
     """
     try:
 
@@ -52,49 +51,57 @@ async def consume_and_handle():
                     if msg.error():
                         logger.warning("Error consuming message: %s", msg.error().str())
                         return
-
-                    # We want to know to which topic the message was sent
-                    msg_topic = msg.topic()
-                    # Other needed data from kafka message
-                    kafka_msg = _decode_msg(msg)
-                    payload = kafka_msg["payload"]
-                    payload_type = payload["type"]
-                    content = payload["content"]
                     
-                    # system_message = kafka_msg.get("system_message", "")
-                    
-                    # this is also topic name
-                    sending_user = kafka_msg["metadata"]["username"]
-                    # The above WILL CHANGE. TOPIC PER USERNAME SHOULD BE TRACKING SOMEWHERE
-
-                    # Handling handhske messages from clients
-                    match payload_type:
-                        case "system_message":
-                            match content:
-                        # if msg_topic == _SERVER_HANDSHAKE_TOPIC:
-                        #     # Handshake requests
-                                case "REQUEST_SERVER_CONNECTION":
-                                    _handshake_topic_creation(kafka, kafka_msg)
-                                # Handshake in dedicated topic handler
-                                case "HANDSHAKE_GLOBAL_TOPIC":
-                                    _check_and_acknowledge_client_topic(
-                                        kafka, sending_user, kafka_msg
-                                    )
-                                case _:
-                                    raise RuntimeError(
-                                        f'Uknown system message from client side in {msg_topic}: "{content}"'
-                                    )
-                        case _:
-                            logger.warning(
-                                'Unknown payload type in topic "%s": "%s". Content: "%s"',
-                                msg_topic,
-                                payload_type,
-                                content
-                            )
+                    tg.create_task(handle_message(msg, kafka, tg))
 
     except Exception:
         logger.exception("Error in main loop of server.")
 
+async def handle_message(msg, kafka: KafkaConnection, tg: asyncio.TaskGroup):
+    """An actual handler of the message."""
+    # We want to know to which topic the message was sent
+    msg_topic = msg.topic()
+    # Other needed data from kafka message
+    kafka_msg = _decode_msg(msg)
+    # payload = kafka_msg["payload"]
+    payload_type = kafka_msg["payload"]["type"]
+    content = kafka_msg["payload"]["content"]
+    
+    # system_message = kafka_msg.get("system_message", "")
+    
+    # this is also topic name
+    sending_user = kafka_msg["metadata"]["username"]
+    # The above WILL CHANGE. TOPIC PER USERNAME SHOULD BE TRACKING SOMEWHERE
+
+    # Handling handhske messages from clients
+    match payload_type:
+        
+        case "system_message":
+            match content:
+        # if msg_topic == _SERVER_HANDSHAKE_TOPIC:
+        #     # Handshake requests
+                case "REQUEST_SERVER_CONNECTION":
+                    _handshake_topic_creation(kafka, kafka_msg)
+                # Handshake in dedicated topic handler
+                case "HANDSHAKE_GLOBAL_TOPIC":
+                    _check_and_acknowledge_client_topic(
+                        kafka, sending_user, kafka_msg
+                    )
+                case _:
+                    raise RuntimeError(
+                        f'Uknown system message from client side in {msg_topic}: "{content}"'
+                    )
+                    
+        case "client_input":
+            pass
+        
+        case _:
+            logger.warning(
+                'Unknown payload type in topic "%s": "%s". Content: "%s"',
+                msg_topic,
+                payload_type,
+                content
+            )
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Decode Msg ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 def _decode_msg(msg) -> dict:
