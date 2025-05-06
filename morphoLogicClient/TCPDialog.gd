@@ -4,17 +4,13 @@ extends Node
 var TCPClient = StreamPeerTCP.new()
 const SERVER_IP = "127.0.0.1"
 const TEMP_FILE_PATH = "res://temp_port.txt"
-# var assigned_port = -1
-# var microserver_process = -1
 signal new_data_arrived(data)
 var tcp_t
-# var root
 
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
 	pass
-	# root = get_tree().root
 
 func run_python_microserver() -> bool:
 	# Executing Python script
@@ -53,22 +49,6 @@ func _initialize_tcp_connection(m_stdio) -> bool:
 		return true
 	print("An error occured: %s" % connection_result)
 	return false
-
-# func wait_for_port_from_pipe(m_stdio) -> int:
-# 	var available_bytes
-# 	var port = -1
-# 	while true:
-# 		available_bytes = 0
-# 		while available_bytes == 0:
-# 			available_bytes = m_stdio.get_length()
-# 		# 	port = m_stdio.get_as_text(true)
-# 		port = m_stdio.get_as_text()	
-# 		if "PORT_FOR_GODOT" in port:
-# 			port = port.split(" ")
-# 			assigned_port = port[1].to_int()
-# 			break
-# 	print("STDIO got port: %s" % port)
-# 	return true
 
 func wait_for_port_from_pipe(m_stdio, timeout_sec: float = 10.0) -> int:
 	var start_time = Time.get_ticks_msec()

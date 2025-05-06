@@ -4,6 +4,7 @@ import asyncio
 import json
 
 from morphologic_server import logger, settings as _SETTINGS
+from morphologic_server.utils.search import get_objects_in_proximity
 from .network.kafka import (
     KafkaConnection,
     CLIENT_HANDSHAKE_TOPIC as _CLIENT_HANDSHAKE_TOPIC,
@@ -85,6 +86,7 @@ async def handle_message(msg, kafka: KafkaConnection, tg: asyncio.TaskGroup):
             _check_and_acknowledge_client_topic(
                 kafka, sending_user, kafka_msg
             )
+            await _send_initial_objects_data(kafka, sending_user)
         case "":
             pass
         case _:
@@ -108,6 +110,13 @@ async def handle_message(msg, kafka: KafkaConnection, tg: asyncio.TaskGroup):
         #         payload_type,
         #         content
         #     )
+        
+async def _send_initial_objects_data(kafka: KafkaConnection, username: str):
+    from morphologic_server.archetypes.base import search, Character
+    # BARDZO WIP
+    user = await search("MoonyTheDream", Character)
+    
+    objects = await get_objects_in_proximity(user)
 
 async def testowy_odeslij(kafka: KafkaConnection, username: str):
     """
@@ -144,7 +153,7 @@ def _handshake_topic_creation(kafka: KafkaConnection, client_handshake_msg: dict
         kafka.send_data_to_user(
             _CLIENT_HANDSHAKE_TOPIC,
             username,
-            server_message="client_topic_handoff",
+            server_message="CLIENT_TOPIC_HANDOFF",
             content=dedicated_topic,
         )
 
@@ -170,6 +179,8 @@ def _check_and_acknowledge_client_topic(
 
     # Na razie taka beznadziejna walidacja, do zastąpienia czymś sensownym
     kafka.send_data_to_user(msg_topic, username=username, server_message="ACK")
+    
+    
 
 
 # if __name__ == "__main__":

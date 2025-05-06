@@ -511,13 +511,13 @@ async def _tcp_to_kafka_handler(
                 if system_message:
                     match system_message:
 
-                        case "microserver_subscribe_to":
-                            # subscribe_to = msg["microserver_subscribe_to"]
+                        case "MICROSERVER_SUBSCRIBE_TO":
+                            # subscribe_to = msg["MICROSERVER_SUBSCRIBE_TO"]
                             consumer.subscribe([message_content])
                             logger.debug('Subscribed to:"%s"', message_content)
                         # ---------------------------------------------------------------------------- #
 
-                        case "produce_to_topic":
+                        case "PRODUCE_TO_TOPIC":
                             produce_topic = message_content
                             logger.debug(
                                 'Changed topic to produce to, to: "%s"', produce_topic

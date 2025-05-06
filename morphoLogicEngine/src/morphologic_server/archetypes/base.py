@@ -1,4 +1,5 @@
 """API for saving and querrying data from DB"""
+import json
 
 from abc import ABC  # , abstractmethod
 from typing import Optional, Type, Tuple, Union
@@ -1152,6 +1153,27 @@ class GameObject(Archetypes):
                 e,
             )
             return None
+        
+    def __str__(self):
+        jsonify = {
+            f"object_{self.id}": {
+                "id": self.id,
+                "name": self.name,
+                "description": self.description,
+                "object_type": self.object_type.value,
+                "location": {
+                    "x": self.location.x,
+                    "y": self.location.y,
+                    "z": self.location.z,
+                },
+                "attributes": self.attributes,
+                "container_id": self.container_id,
+                "puppeted_by_id": self.puppeted_by_id,
+            }
+        }
+        # logger.debug(jsonify)
+        jsonify = json.dumps(jsonify)
+        return jsonify
 
 
 #  .d8888b.  888                                        888

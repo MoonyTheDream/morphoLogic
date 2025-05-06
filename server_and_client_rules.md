@@ -3,7 +3,7 @@ Type: *JSON*
 
 ## HANDSHAKE (type:content of payload)
 client in *serverHandshakeTopic* -> "system_message": "REQUEST_SERVER_CONNECTION"
-server in *clientHandshakeTopic* -> {"client_topic_handoff": "<dedicated_topic>"}
+server in *clientHandshakeTopic* -> {"CLIENT_TOPIC_HANDOFF": "<dedicated_topic>"}
 client in *serverGeneralTopic* -> "system_message": "HANDSHAKE_GLOBAL_TOPIC"
 server in <dedicated_topic> -> "server_message": "ACK"
 
@@ -98,7 +98,7 @@ ERROR = [color=tomato]
 
 Subscribing to new topic by client
 "system_message": "MICROSERVER_SUBSCRIBE"
-"microserver_subscribe_to": "<topic>"
+"MICROSERVER_SUBSCRIBE_TO": "<topic>"
 
 Setting topic to produce to:
 "system_message": "MICROSERVER_PRODUCE_TO"
