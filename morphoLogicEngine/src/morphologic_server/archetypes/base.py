@@ -1,7 +1,9 @@
 """API for saving and querrying data from DB"""
+
 import json
 
 from abc import ABC  # , abstractmethod
+from enum import Enum
 from typing import Optional, Type, Tuple, Union
 
 from sqlalchemy import select
@@ -411,6 +413,41 @@ class Archetypes(ABC):
     def db_obj(self):
         """Return the database object."""
         return self._db_obj
+
+    @property
+    def as_dict(self):
+
+        result = {}
+
+        for attr_name in dir(self):
+            # Skip private/protected and callables. "as_dict" must be skipped to avoid recursion.
+            if attr_name.startswith("_") or attr_name in {
+                "as_dict",
+                "container",
+                "stored",
+                "db_obj",
+            }:
+                continue
+
+            attr = getattr(self.__class__, attr_name, None)
+
+            # Only process properties
+            if isinstance(attr, property):
+                try:
+                    value = getattr(self, attr_name)
+
+                    # For spatial Point object
+                    if isinstance(value, (Character, GameObject, CharacterSoul, Account)):
+                        continue
+                    elif attr_name == "location" and hasattr(value, "x"):
+                        result[attr_name] = {"x": value.x, "y": value.y, "z": value.z}
+                    elif isinstance(value, Enum):
+                        result[attr_name] = value.value
+                    else:
+                        result[attr_name] = value
+                except Exception as e:
+                    logger.warning("Could not get %s: %s", attr_name, e)
+        return result
 
     # ******************************************************************************************** #
     #                                            METHODS                                           #
@@ -1153,27 +1190,6 @@ class GameObject(Archetypes):
                 e,
             )
             return None
-        
-    def __str__(self):
-        jsonify = {
-            f"object_{self.id}": {
-                "id": self.id,
-                "name": self.name,
-                "description": self.description,
-                "object_type": self.object_type.value,
-                "location": {
-                    "x": self.location.x,
-                    "y": self.location.y,
-                    "z": self.location.z,
-                },
-                "attributes": self.attributes,
-                "container_id": self.container_id,
-                "puppeted_by_id": self.puppeted_by_id,
-            }
-        }
-        # logger.debug(jsonify)
-        jsonify = json.dumps(jsonify)
-        return jsonify
 
 
 #  .d8888b.  888                                        888

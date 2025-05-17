@@ -15,7 +15,8 @@ from morphologic_server.db.models import (
 )
 from morphologic_server.archetypes.base import (
     Archetypes,
-    GameObject
+    GameObject,
+    Character
 )
 
 STANDARD_VISIBILITY_RADIUS = 10.0  # IN METERES
@@ -44,12 +45,18 @@ async def get_objects_in_proximity(
         result1 = await session.execute(stmt1)
         result2 = await session.execute(stmt2)
         
-        objs1 = result1.scalars().all()
-        objs2 = result2.scalars().all()
+        game_objects = result1.scalars().all()
+        characters = result2.scalars().all()
         
-        objs = objs1 + objs2
-        objs = [obj.name for obj in objs]
-        logger.debug(str(GameObject(objs1[0])))
-        logger.debug(str(objs))
-        
+    game_objects = [GameObject(obj) for obj in game_objects]
+    characters = [Character(obj) for obj in characters]
+    stringified_game_objects = [d.as_dict for d in game_objects if d.as_dict.get("object_type") != "character"]
+    stringified_characters = [d.as_dict for d in characters]
+    logger.debug("Objects in proximity: %s", stringified_game_objects)
+    logger.debug("Characters in proximity: %s", stringified_characters)
+    result = {
+        "game_objects": stringified_game_objects,
+        "characters": stringified_characters,
+    }
+    return result
         # return archetype(obj) if obj else None

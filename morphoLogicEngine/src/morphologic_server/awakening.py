@@ -117,6 +117,12 @@ async def _send_initial_objects_data(kafka: KafkaConnection, username: str):
     user = await search("MoonyTheDream", Character)
     
     objects = await get_objects_in_proximity(user)
+    kafka.send_data_to_user(
+        topic=username,
+        username=username,
+        objects=objects,
+        
+    )
 
 async def testowy_odeslij(kafka: KafkaConnection, username: str):
     """

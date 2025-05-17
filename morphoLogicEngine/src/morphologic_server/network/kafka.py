@@ -193,6 +193,7 @@ class KafkaConnection:
         server_message: str = "",
         content: str = "",
         direct_message: str = "",
+        objects: dict = None,
     ):
         """Wrapper for sending message. Add more preferences here later if needed"""
         # if data is None:
@@ -201,6 +202,7 @@ class KafkaConnection:
                 "server_message": server_message,
                 "content": content,
                 "direct_message": direct_message,
+                "objects": objects,
                 # "type": payload_type,
                 # "content": content,
             }
