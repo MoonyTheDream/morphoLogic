@@ -1,11 +1,16 @@
-[gd_scene load_steps=8 format=3 uid="uid://b4h3t4jgnduk6"]
+[gd_scene load_steps=10 format=3 uid="uid://b4h3t4jgnduk6"]
 
 [ext_resource type="Script" uid="uid://dhpif8130p6s" path="res://scenes/rich_text_label.gd" id="1_c838k"]
 [ext_resource type="FontFile" uid="uid://b2qnutwcbw7pr" path="res://fonts/quaaykop-font/Quaaykop-DYE1R.ttf" id="1_saump"]
 [ext_resource type="Script" uid="uid://basqkxjcadfu4" path="res://scenes/line_edit.gd" id="2_bj4i0"]
+[ext_resource type="Script" uid="uid://6xrdayxjfwlm" path="res://scenes/secondary_text_field.gd" id="4_e38b3"]
 [ext_resource type="Texture2D" uid="uid://dn5of4l8x8vqp" path="res://images/blurred_painting.png" id="4_re2a1"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1ogr5"]
+content_margin_left = 24.0
+content_margin_top = 24.0
+content_margin_right = 24.0
+content_margin_bottom = 24.0
 bg_color = Color(0, 0, 0, 0.321569)
 border_width_left = 3
 border_width_top = 3
@@ -25,12 +30,31 @@ bg_color = Color(0, 0, 0, 0.0980392)
 expand_margin_left = 8.0
 expand_margin_right = 8.0
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_sdrrl"]
+content_margin_left = 24.0
+content_margin_top = 24.0
+content_margin_right = 24.0
+content_margin_bottom = 24.0
+bg_color = Color(0, 0, 0, 0.101961)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.657, 0.9, 0.8676, 0.737255)
+border_blend = true
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
 [sub_resource type="Theme" id="Theme_68rva"]
 default_font = ExtResource("1_saump")
 default_font_size = 34
 LineEdit/colors/selection_color = Color(0.347388, 0.515218, 0.414999, 1)
 LineEdit/styles/focus = SubResource("StyleBoxFlat_1ogr5")
 LineEdit/styles/normal = SubResource("StyleBoxFlat_gbnq0")
+RichTextLabel/styles/focus = SubResource("StyleBoxFlat_sdrrl")
+RichTextLabel/styles/normal = SubResource("StyleBoxFlat_sdrrl")
 
 [node name="BasicView" type="Node"]
 
@@ -56,15 +80,37 @@ texture = ExtResource("4_re2a1")
 [node name="MainTextField" type="RichTextLabel" parent="MainTextControls"]
 unique_name_in_owner = true
 layout_mode = 0
-offset_left = 23.0
+offset_left = 10.0
 offset_top = 21.0
-offset_right = 1893.0
-offset_bottom = 909.0
+offset_right = 1272.0
+offset_bottom = 940.0
 focus_mode = 2
 bbcode_enabled = true
 scroll_following = true
 selection_enabled = true
 script = ExtResource("1_c838k")
+
+[node name="SecondaryTextField" type="RichTextLabel" parent="MainTextControls"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 1282.0
+offset_top = 21.0
+offset_right = 1899.0
+offset_bottom = 940.0
+focus_mode = 2
+bbcode_enabled = true
+scroll_following = true
+selection_enabled = true
+script = ExtResource("4_e38b3")
+
+[node name="InfoPopup" type="Window" parent="MainTextControls/SecondaryTextField"]
+initial_position = 4
+size = Vector2i(355, 285)
+visible = false
+
+[node name="InfoLabel" type="Label" parent="MainTextControls/SecondaryTextField/InfoPopup"]
+offset_right = 352.0
+offset_bottom = 279.0
 
 [node name="InputField" type="LineEdit" parent="MainTextControls"]
 unique_name_in_owner = true

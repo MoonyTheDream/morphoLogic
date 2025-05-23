@@ -95,8 +95,16 @@ func continously_receive_messages() -> void:
 			var available_bytes = TCPClient.get_available_bytes()
 			if available_bytes > 0:
 				var received_data = TCPClient.get_utf8_string(available_bytes)
-				var dict_data: Dictionary = JSON.parse_string(received_data)
-				call_deferred("emit_received_data", dict_data)
+				var received_messages = received_data.split("|k-sep|")
+				var dict_data_list = []
+				for message in received_messages:
+					if message != "":
+						dict_data_list.append(JSON.parse_string(message))
+				for message in dict_data_list:
+					call_deferred("emit_received_data", message)
+
+				# var dict_data: Array[Dictionary] = JSON.parse_string(received_messages)
+				# call_deferred("emit_received_data", dict_data)
 		else:
 			break
 		OS.delay_msec(10)

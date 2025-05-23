@@ -221,6 +221,8 @@ class TCPServer:
             logger.error("No active TCP connection to send data.")
             return False
         try:
+            data += "|k-sep|"  # Add a seperator character to the message
+            
             self.writer.write(data.encode("utf-8"))
             await self.writer.drain()
             logger.debug('Sent via TCP: "%s"', data)
@@ -597,7 +599,6 @@ def produce_msg_to_kafka(
     """
     try:
         message_to_send = json.dumps(message, ensure_ascii=False).encode("utf-8")
-
         producer.produce(
             produce_topic,
             key=client_id,

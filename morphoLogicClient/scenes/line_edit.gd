@@ -39,6 +39,11 @@ func _append(message: String) -> void:
 
 func _send_to_tcp(content: String) -> void:
 	_inputHandler(content)
+
+	# if content == "odeslij":
+	# 	for i in range(100):
+	# 		TCPDialog.send_tcp_message("odeslij")
+
 	TCPDialog.send_tcp_message(content)
 	
 func _up():

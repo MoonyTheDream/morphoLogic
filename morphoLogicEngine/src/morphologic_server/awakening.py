@@ -86,7 +86,7 @@ async def handle_message(msg, kafka: KafkaConnection, tg: asyncio.TaskGroup):
             _check_and_acknowledge_client_topic(
                 kafka, sending_user, kafka_msg
             )
-            await _send_initial_objects_data(kafka, sending_user)
+            await send_initial_objects_data(kafka, sending_user)
         case "":
             pass
         case _:
@@ -111,10 +111,11 @@ async def handle_message(msg, kafka: KafkaConnection, tg: asyncio.TaskGroup):
         #         content
         #     )
         
-async def _send_initial_objects_data(kafka: KafkaConnection, username: str):
+async def send_initial_objects_data(kafka: KafkaConnection, username: str):
     from morphologic_server.archetypes.base import search, Character
     # BARDZO WIP
     user = await search("MoonyTheDream", Character)
+    # user = await search("AnotherCharacter", Character)
     
     objects = await get_objects_in_proximity(user)
     kafka.send_data_to_user(
@@ -134,6 +135,7 @@ async def testowy_odeslij(kafka: KafkaConnection, username: str):
         username=username,
         direct_message="MASZ! Nażryj się, machoniu.\n",
     )
+    await send_initial_objects_data(kafka, username)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Decode Msg ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 def _decode_msg(msg) -> dict:

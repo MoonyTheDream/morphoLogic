@@ -3,6 +3,7 @@ extends Node
 var TextOutput
 
 signal draw_message(msg)
+signal update_objects(objects)
 
 func _ready() -> void:
 	TCPDialog.new_data_arrived.connect(parse_message)
@@ -12,6 +13,7 @@ func parse_message(data: Dictionary) -> void:
 		var server_message = data['payload'].get("server_message", "")
 		var system_message = data['payload'].get("system_message", "")
 		var direct_message = data['payload'].get("direct_message", "")
+		var objects = data['payload'].get("objects", "")
 		match system_message:
 			"CONNECTED_TO_SERVER":
 				draw_message.emit(tr("[color=yellow_green]Succsessfully connected to server.[/color]\n"))
@@ -40,6 +42,11 @@ func parse_message(data: Dictionary) -> void:
 		# 	draw_message.emit(tr("[color=tomato]UKNOWN MESSAGE TYPE! REPORT ISSUE TO DEVS.[/color]\n"))
 		if direct_message:
 			draw_message.emit(direct_message)
+
+		if objects:
+			# update_objects.emit(objects["game_objects"])
+			update_objects.emit(objects)
+		
 
 func _wait_for_ack():
 	TCPDialog.new_data_arrived.disconnect(parse_message)
