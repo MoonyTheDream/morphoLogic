@@ -169,6 +169,10 @@ class AreaDB(BaseDB):
 
     polygon: Mapped[str] = mapped_column(Geometry(geometry_type="POLYGON", srid=3857))
     name: Mapped[str] = mapped_column(String(STANDARD_LENGTH))
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    # Prioryty 0 is a ground level default are for description. Priority above 0 takes 
+    # over the lower priority. For now 1 is max.
+    priority: Mapped[int] = mapped_column(Integer, default=0)
 
 
 #  .d8888b.                                   .d88888b.  888       d8b                   888

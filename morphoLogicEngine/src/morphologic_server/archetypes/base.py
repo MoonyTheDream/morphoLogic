@@ -1042,6 +1042,28 @@ class Area(Archetypes):
             )
         self._db_obj.name = value
 
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Description ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    @property
+    def description(self):
+        """Return description"""
+        return self._db_obj.description
+
+    @description.setter
+    def description(self, value: str):
+        """Set description"""
+        self._db_obj.description = value
+        
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Priority ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    @property
+    def priority(self):
+        """Return priority"""
+        return self._db_obj.description
+    
+    @description.setter
+    def description(self, value:int):
+        """Set priority"""
+        self._db_obj.priority = value
+
 
 #  .d8888b.                                   .d88888b.  888       d8b                   888
 # d88P  Y88b                                 d88P" "Y88b 888       Y8P                   888
