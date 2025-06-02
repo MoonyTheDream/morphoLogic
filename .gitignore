@@ -154,3 +154,6 @@ cython_debug/
 
 /godot_kafka_extension
 /kafka_2.13-3.9.0
+
+# Logs
+*.log.*

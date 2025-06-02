@@ -11,7 +11,7 @@ from sqlalchemy import select
 # from sqlalchemy.orm import selectinload
 from geoalchemy2 import shape
 
-from geoalchemy2.functions import ST_DWithin, ST_Force2D
+from geoalchemy2.functions import ST_DWithin, ST_Force2D, ST_Intersects
 from geoalchemy2.shape import from_shape  # , to_shape
 from shapely.geometry import Point, Polygon
 
@@ -29,6 +29,7 @@ from morphologic_server.db.models import (
     CharacterDB,
     STANDARD_LENGTH as _DB_STANDARD_LENGTH,
 )
+from morphologic_server.utils import search as search_utils
 
 DEFAULT_SPAWN_LOCATION = from_shape(Point(0, 0, 0), srid=3857)
 
@@ -195,6 +196,15 @@ async def search_by_xy(x: float, y: float, archetype: Type["Archetypes"]):
         return archetype(obj) if obj else None
 
 
+# def get_area_containing_point(session, x: float, y: float):
+#     point = Point(x, y)
+#     # point3d = Point(float(x), float(y), float(z))
+#     point_geom = shape.from_shape(point, srid=3857)
+#     stmt = select(AreaDB).where(ST_Intersects(AreaDB.polygon, point_geom))
+#     result = session.execute(stmt).scalars().all()
+#     return result
+
+
 # ************************************************************************************************ #
 #                                             CREATING                                             #
 # ************************************************************************************************ #
@@ -329,7 +339,7 @@ async def create_or_edit_terrain(
 
 
 async def create_area(
-    polygon: list[Tuple[float, float]], name: str
+    polygon: list[Tuple[float, float]], name: str, description: str, priority: int = 0
 ) -> Optional["Area"]:
     """Creates an area in the database.
 
@@ -338,7 +348,12 @@ async def create_area(
     """
     async with DBAsyncSession() as session:
         polygon = Polygon(polygon)
-        area = AreaDB(polygon=shape.from_shape(polygon, srid=3857), name=name)
+        area = AreaDB(
+            polygon=shape.from_shape(polygon, srid=3857),
+            name=name,
+            description=description,
+            priority=priority,
+        )
         session.add(area)
         await session.commit()
         await session.refresh(area)
@@ -437,7 +452,9 @@ class Archetypes(ABC):
                     value = getattr(self, attr_name)
 
                     # For spatial Point object
-                    if isinstance(value, (Character, GameObject, CharacterSoul, Account)):
+                    if isinstance(
+                        value, (Character, GameObject, CharacterSoul, Account)
+                    ):
                         continue
                     elif attr_name == "location" and hasattr(value, "x"):
                         result[attr_name] = {"x": value.x, "y": value.y, "z": value.z}
@@ -819,7 +836,11 @@ class CharacterSoul(Archetypes):
         return await create_or_edit_terrain(x=x, y=y, z=z, terrain_type=terrain_type)
 
     async def create_area(
-        self, polygon: list[Tuple[float, float]], name: str
+        self,
+        polygon: list[Tuple[float, float]],
+        name: str,
+        description: str,
+        priority: int = 0,
     ) -> Optional["Area"]:
         """Creates an area in the database.
 
@@ -829,8 +850,7 @@ class CharacterSoul(Archetypes):
         self.check_permissions()
 
         return await create_area(
-            polygon=polygon,
-            name=name,
+            polygon=polygon, name=name, description=description, priority=priority
         )
 
     async def create_game_object(
@@ -1052,15 +1072,15 @@ class Area(Archetypes):
     def description(self, value: str):
         """Set description"""
         self._db_obj.description = value
-        
+
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Priority ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     @property
     def priority(self):
         """Return priority"""
         return self._db_obj.description
-    
+
     @description.setter
-    def description(self, value:int):
+    def description(self, value: int):
         """Set priority"""
         self._db_obj.priority = value
 
@@ -1246,6 +1266,43 @@ class Character(GameObject):
         else:
             return None
 
+    # ******************************************************************************************** #
+    #                                            METHODS                                           #
+    # ******************************************************************************************** #
+    async def get_areas_im_in(self):
+        # point = Point(x, y)
+        # point3d = Point(float(x), float(y), float(z))
+        # point_geom = shape.from_shape(point, srid=3857)
+        async with DBAsyncSession() as session:
+            stmt = select(AreaDB).where(
+                ST_Intersects(AreaDB.polygon, ST_Force2D(self._db_obj.location))
+            )
+            results = await session.execute(stmt)
+            results = results.scalars().all()
+        return [Area(areadb) for areadb in results]
+
+    async def get_area_im_in(self):
+        areas = await self.get_areas_im_in()
+        areas.sort(key=lambda obj: obj.priority, reverse=True)
+        if len(areas) > 1 and areas[0].priority == areas[1].priority:
+            logger.warning(
+                "More than one area of the same place in location %s",
+                self._db_obj.location,
+            )
+        # sorted_list = sorted(my_list, key=lambda obj: obj.priority)
+        return areas[0] if areas else None
+
+    async def get_surrounding_description(self):
+        """Get description of the area this character is in."""
+        area = await self.get_area_im_in()
+        objects = await search_utils.get_objects_in_proximity(self)
+        game_objects = objects.get("game_objects", [])
+        characters = objects.get("characters", [])
+        characters_str = "\n".join([f"{char.name} ({char.id})" for char in characters])
+        game_objects_str = "\n".join([f"{obj.name} ({obj.id})" for obj in game_objects])
+
+        test_text = f'Character {self.name} is in area "{area.name}" \n Characters around:\n {characters_str} \n\n Objects around:\n {game_objects_str}'
+        return test_text
 
 # ------------------------------------------------------------------------------------------------ #
 # Tymczasowo, żeby móc w shell'u korzystać z self

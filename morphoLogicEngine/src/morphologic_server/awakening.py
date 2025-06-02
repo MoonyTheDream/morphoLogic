@@ -95,7 +95,7 @@ async def handle_message(msg, kafka: KafkaConnection, tg: asyncio.TaskGroup):
             )
     if user_input:
         if user_input == "odeslij":
-            tg.create_task(testowy_odeslij(kafka, sending_user))
+            tg.create_task(testowy_odeslij(kafka, sending_user, tg))
         logger.debug(
             'User "%s" sent message: "%s" to topic "%s"',
             sending_user,
@@ -117,15 +117,16 @@ async def send_initial_objects_data(kafka: KafkaConnection, username: str):
     user = await search("MoonyTheDream", Character)
     # user = await search("AnotherCharacter", Character)
     
-    objects = await get_objects_in_proximity(user)
+    objects = await user.get_surrounding_description()
     kafka.send_data_to_user(
         topic=username,
         username=username,
-        objects=objects,
+        server_message="SURROUNDINGS_DATA",
+        content=objects
         
     )
 
-async def testowy_odeslij(kafka: KafkaConnection, username: str):
+async def testowy_odeslij(kafka: KafkaConnection, username: str, tg):
     """
     Testowy handler do wysyłania wiadomości do użytkownika
     """
@@ -135,7 +136,8 @@ async def testowy_odeslij(kafka: KafkaConnection, username: str):
         username=username,
         direct_message="MASZ! Nażryj się, machoniu.\n",
     )
-    await send_initial_objects_data(kafka, username)
+    for i in range(100):
+        tg.create_task(send_initial_objects_data(kafka, username))
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Decode Msg ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 def _decode_msg(msg) -> dict:

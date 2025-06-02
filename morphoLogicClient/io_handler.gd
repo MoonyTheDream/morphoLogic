@@ -25,15 +25,18 @@ func parse_message(data: Dictionary) -> void:
 				pass
 			_:
 				draw_message.emit(tr('[color=tomato]UKNOWN SYSTEM MESSAGE:[/color]"%s"! [color=tomato]REPORT ISSUE TO DEVS.[/color]\n' % system_message))
+		var message_content = data['payload'].get("content", "")
 		match server_message:
 			# Handshake
 			"CLIENT_TOPIC_HANDOFF":
-				var message_content = data['payload']["content"]
 				# var new_topic = message_content
 				TCPDialog.send_tcp_message("", "MICROSERVER_SUBSCRIBE_TO", message_content)
 				TCPDialog.send_tcp_message("", "PRODUCE_TO_TOPIC", ClientData.server_general_topic)
 				TCPDialog.send_tcp_message("", "HANDSHAKE_GLOBAL_TOPIC")
 				_wait_for_ack()
+			"SURROUNDINGS_DATA":
+				update_objects.emit(message_content)
+
 			"":
 				pass
 			_:
@@ -44,8 +47,9 @@ func parse_message(data: Dictionary) -> void:
 			draw_message.emit(direct_message)
 
 		if objects:
+			pass
 			# update_objects.emit(objects["game_objects"])
-			update_objects.emit(objects)
+			# update_objects.emit(message_content)
 		
 
 func _wait_for_ack():
