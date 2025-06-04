@@ -95,7 +95,7 @@ func continously_receive_messages() -> void:
 			var available_bytes = TCPClient.get_available_bytes()
 			if available_bytes > 0:
 				var received_data = TCPClient.get_utf8_string(available_bytes)
-				var received_messages = received_data.split("|k-sep|")
+				var received_messages = received_data.split("|k-sep|") # mircoserver.py adds this separator to each message
 				var dict_data_list = []
 				for message in received_messages:
 					if message != "":

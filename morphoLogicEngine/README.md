@@ -24,4 +24,4 @@ pip install -e .
 # PostgreSQL with PostGIS
 ## Docker
 
-`docker run --name morphoLogic_postgres -e POSTGRES_PASSWORD=krF15e@x48Zz2 -p 5432:5432 -d postgis/postgis`
+``docker run --name morphoLogic_postgres -e POSTGRES_PASSWORD=trollpassword -p 5432:5432 -d postgis/postgis

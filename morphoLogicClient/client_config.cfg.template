@@ -1,0 +1,9 @@
+[microserver]
+kafka_server = "localhost:9092"
+clientHandshakeTopic = "clientHandshakeTopic"
+serverHandshakeTopic = "serverHandshakeTopic"
+
+[kafka]
+generalTopic = "serverGeneralTopic"
+log_level_debug = true
+debugpy = false

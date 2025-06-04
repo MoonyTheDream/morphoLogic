@@ -1,6 +1,7 @@
 """A Microserver working as bridge between Kafka and Godot Client"""
 
 import asyncio
+import configparser
 import json
 import logging
 import os
@@ -21,13 +22,13 @@ MICROSERVER_VERSION = "0.2.0"
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Settings ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 SETTINGS_FILE = (
-    os.path.join("morphoLogicClient", "settings.json")
+    os.path.join("morphoLogicClient", "client_config.cfg")
     if not RUN_BY_GODOT
-    else "settings.json"
+    else "client_config.cfg"
 )
 
 
-def load_settings(path=SETTINGS_FILE):
+def load_settings(path=SETTINGS_FILE) -> configparser.ConfigParser:
     """
     Loads global settings from JSON file.
     Raises FileNotFoundError if file is missing.
@@ -35,29 +36,46 @@ def load_settings(path=SETTINGS_FILE):
     if not os.path.exists(path):
         raise FileNotFoundError(f'Settings file "{path}" not found.')
 
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    config = configparser.ConfigParser()
+    config.read(SETTINGS_FILE)
 
+    # with open(path, "r", encoding="utf-8") as f:
+    #     return json.load(f)
+
+    return config
+
+def get_setting(conf: configparser.ConfigParser, section: str, option: str, fallback=None):
+    buffer = conf.get(section, option, fallback=fallback)
+    if type(buffer) == str and buffer.startswith('"') and buffer.endswith('"'):
+        buffer = buffer[1:len(buffer) - 1]  # Remove quotes if present
+    return buffer
 
 _SETTINGS = load_settings()
 # Allow environment variable overrides for Kafka bootstrap server and general topic
 BOOTSTRAP_SERVER = os.getenv(
-    "KAFKA_BOOTSTRAP_SERVER", _SETTINGS.get("kafka_server", "localhost:9092")
+    "KAFKA_BOOTSTRAP_SERVER",
+    get_setting(_SETTINGS, "microserver", "kafka_server", fallback="localhost:9092"),
 )
 GENERAL_TOPIC = os.getenv(
-    "KAFKA_GENERAL_TOPIC", _SETTINGS.get("generalTopic", "serverGeneralTopic")
+    "KAFKA_GENERAL_TOPIC",
+    get_setting(_SETTINGS, "general", "generalTopic", fallback="serverGeneralTopic"),
 )
 CLIENT_HANDSHAKE_TOPIC = os.getenv(
-    "KAFKA_HANDSHAKE_TOPIC", _SETTINGS.get("handshakeTopic", "clientHandshakeTopic")
+    "KAFKA_HANDSHAKE_TOPIC",
+    get_setting(
+        _SETTINGS, "microserver", "clientHandshakeTopic", fallback="clientHandshakeTopic"
+    ),
 )
 SERVER_HANDSHAKE_TOPIC = os.getenv(
     "KAFKA_HANDSHAKE_TOPIC",
-    _SETTINGS.get("serverHandshakeTopic", "serverHandshakeTopic"),
+    get_setting(
+        _SETTINGS, "microserver", "serverHandshakeTopic", fallback="serverHandshakeTopic"
+    ),
 )
 
 # Get a log level from settings.json
 # Change to true in settings.json for .debug visible
-DEBUG_MODE = _SETTINGS.get("log_level_debug", False)
+DEBUG_MODE = _SETTINGS.getboolean("general", "log_level_debug", fallback=False)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Logger Setup ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 logger = logging.getLogger("mL microserver")
@@ -221,8 +239,10 @@ class TCPServer:
             logger.error("No active TCP connection to send data.")
             return False
         try:
-            data += "|k-sep|"  # Add a seperator character to the message
-            
+            # Add a seperator character to the message as in other case
+            # Godot client will not be able to read it properly when multiple messages  
+            data += "|k-sep|"  
+
             self.writer.write(data.encode("utf-8"))
             await self.writer.drain()
             logger.debug('Sent via TCP: "%s"', data)
@@ -410,7 +430,7 @@ async def main():
     loop = asyncio.get_running_loop()
     loop.set_debug(DEBUG_MODE)
 
-    if _SETTINGS.get("debugpy", False):
+    if _SETTINGS.getboolean("general", "debugpy", fallback=False):
         import debugpy
 
         logger.info("Debugger listened at  5678 localhost")
@@ -527,28 +547,24 @@ async def _tcp_to_kafka_handler(
                         # ---------------------------------------------------------------------------- #
 
                         case "CLEANUP":
-                            logger.info(
-                                "Received CLEANUP message from Godot. Exiting."
-                            )
+                            logger.info("Received CLEANUP message from Godot. Exiting.")
                             await force_terminate_task_group()
-                            
+
                         case _:
                             # Produce the message to the Kafka topic with username as a key
                             produce_msg_to_kafka(
                                 produce_topic, client_id, producer, msg
                             )
-                            
+
                 if msg["payload"].get("user_input", ""):
-                    produce_msg_to_kafka(
-                                produce_topic, client_id, producer, msg
-                            )
-            
+                    produce_msg_to_kafka(produce_topic, client_id, producer, msg)
+
             # # W sumei trzeba się będzie upewnić, czy już i tak nie jest postanowione wysyłanie i dopero wtedy wysyłać
             # if server_message != "":
             #     # Produce the message to the Kafka topic with username as a key
             #     produce_msg_to_kafka(
             #         produce_topic, client_id, producer, msg
-            #     )     
+            #     )
 
             producer.poll(0)
 

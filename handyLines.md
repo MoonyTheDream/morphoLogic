@@ -10,10 +10,10 @@
 ## kafka_2.13-3.9.0
 docker pull apache/kafka:latest
 docker run -p 9092:9092 apache/kafka:latest
-bin/kafka-topics.sh --create --topic serverGeneralTopic --bootstrap-server localhost:9092
+bin/kafka-topics.sh --create --topic serverGeneralTopic --bootstrap-server <localhost/kafka_server_address>:9092
   --config retention.ms=60000 // for hansdhake topics
     key = None
-bin/kafka-topics.sh --create --topic addresedToClients --bootstrap-server localhost:9092
+bin/kafka-topics.sh --create --topic addresedToClients --bootstrap-server <localhost/kafka_server_address>:9092
     key = <userName>
 
 bin/kafka-console-producer.sh --topic Moony --bootstrap-server localhost:9092 --timeout 0

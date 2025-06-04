@@ -1,12 +1,11 @@
 """Config module loading settings from JSON file."""
+import os
 
-# import os
-# import json
-
-# from enum import Enum, StrEnum
 from dataclasses import dataclass
-# from pathlib import Path
+from pathlib import Path
 
+from dotenv import load_dotenv
+load_dotenv()  # Load .env into environment variables
 
 @dataclass
 class SettingsDataclass:
@@ -19,20 +18,21 @@ class SettingsDataclass:
     GENERAL_TOPIC: str = "serverGeneralTopic"
     CLIENT_HANDSHAKE_TOPIC: str = "clientHandshakeTopic"
     SERVER_HANDSHAKE_TOPIC: str = "serverHandshakeTopic"
-    LOCAL_DEVELOPING: bool = False
+    
+    # # Checking for sercret settings file
+    # if Path.cwd() / "secret_settings.py":
+    #     try:
+    #         from morphologic_server.secret_settings import secret_settings
+    #     except ImportError:
+    #         print("\nSecret settings file not found or not properly configured.\n")
+    #         secret_settings = {}
+    # LOCAL_DEVELOPING: bool = False
 
-    KAFKA_SERVER: str
-    DB_ADDRESS: str
+    # KAFKA_SERVER: str
+    # DB_ADDRESS: str
 
-    # def __init__(self):
-    if LOCAL_DEVELOPING:
-        KAFKA_SERVER = "localhost:9092"
-        DB_ADDRESS = "morphoLogicServer:morphoLogicTEST@localhost:5432/morphoLogicDB"
-    else:
-        KAFKA_SERVER = "localhost:9092"
-        DB_ADDRESS = (
-            "morphoLogicServer:morphoLogicTEST@109.241.128.160:5436/morphoLogicDB"
-        )
+    KAFKA_SERVER: str = os.getenv("KAFKA_SERVER") if os.getenv("KAFKA_SERVER") else "localhost:9092"
+    DB_ADDRESS: str = os.getenv("DB_ADDRESS")
 
 
 settings = SettingsDataclass()
