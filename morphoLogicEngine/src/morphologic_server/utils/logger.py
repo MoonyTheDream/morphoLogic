@@ -31,6 +31,12 @@ def setup_logger():
     staged_logger = logging.getLogger("morphoLogic Server")
 
     debug_mode = _SETTINGS.LOG_LEVEL_DEBUG
+    
+    # Make sure the file directory exists
+    log_dir = Path(__file__).resolve().parents[3] / "logs"
+    if not log_dir.exists():
+        log_dir.mkdir(parents=True, exist_ok=True)
+    
     log_file = Path(__file__).resolve().parents[3] / "logs/server_logs.log"
     log_handler = RotatingFileHandler(
         log_file,

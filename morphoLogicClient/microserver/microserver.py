@@ -95,6 +95,11 @@ def setup_logger():
         if not RUN_BY_GODOT
         else "microserver/microserver.log"
     )
+    # Check if the log directory exists, create it if not
+    log_dir = os.path.dirname(log_file)
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir, exist_ok=True)
+        
     log_handler = RotatingFileHandler(
         log_file,
         maxBytes=4 * 1024 * 1024,

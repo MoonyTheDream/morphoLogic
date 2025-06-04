@@ -17,9 +17,12 @@ morphoLogicEngine/
 └── README.md           # This documentation
 
 # Building morphoLogicEngine CLI
-pip install --upgrade hatch
+In main morphoLogicEngine folder:
+
+`pip install --upgrade hatch
 hatch build
-pip install -e .
+pip install -e .`
+
 
 # PostgreSQL with PostGIS
 ## Docker
