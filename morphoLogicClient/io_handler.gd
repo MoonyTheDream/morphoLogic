@@ -6,7 +6,7 @@ signal draw_message(msg)
 signal update_objects(objects)
 
 func _ready() -> void:
-	TCPDialog.new_data_arrived.connect(parse_message)
+	Kafka.new_data_arrived.connect(parse_message)
 
 func parse_message(data: Dictionary) -> void:
 	if data and data['metadata'].get("to_user", "") == ClientData.username:
@@ -30,9 +30,11 @@ func parse_message(data: Dictionary) -> void:
 			# Handshake
 			"CLIENT_TOPIC_HANDOFF":
 				# var new_topic = message_content
-				TCPDialog.send_tcp_message("", "MICROSERVER_SUBSCRIBE_TO", message_content)
-				TCPDialog.send_tcp_message("", "PRODUCE_TO_TOPIC", ClientData.server_general_topic)
-				TCPDialog.send_tcp_message("", "HANDSHAKE_GLOBAL_TOPIC")
+				# TCPDialog.send_tcp_message("", "MICROSERVER_SUBSCRIBE_TO", message_content)
+				Kafka.set_consumer_topic(message_content)
+				# TCPDialog.send_tcp_message("", "PRODUCE_TO_TOPIC", ClientData.server_general_topic)
+				Kafka.set_producer_topic(ClientData.server_general_topic)
+				Kafka.send_message("", "HANDSHAKE_GLOBAL_TOPIC")
 				_wait_for_ack()
 			"SURROUNDINGS_DATA":
 				update_objects.emit(message_content)
@@ -53,10 +55,10 @@ func parse_message(data: Dictionary) -> void:
 		
 
 func _wait_for_ack():
-	TCPDialog.new_data_arrived.disconnect(parse_message)
-	var server_answer = await TCPDialog.new_data_arrived
+	Kafka.new_data_arrived.disconnect(parse_message)
+	var server_answer = await Kafka.new_data_arrived
 	if server_answer['payload'].get('server_message', '') == "ACK":
-		TCPDialog.new_data_arrived.connect(parse_message)
+		Kafka.new_data_arrived.connect(parse_message)
 		var success_msg = tr("[color=green_yellow]Succsessfuly Established Server Connection.[/color]\n")
 		draw_message.emit(success_msg)
 	else:

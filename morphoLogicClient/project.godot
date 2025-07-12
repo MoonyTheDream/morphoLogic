@@ -20,7 +20,7 @@ config/icon="uid://d2rakuvfhfult"
 [autoload]
 
 ClientData="*res://ClientData.gd"
-TCPDialog="*res://TCPDialog.gd"
+Kafka="*res://Kafka.gd"
 InputHandler="*res://io_handler.gd"
 
 [debug]

@@ -15,7 +15,7 @@ func _ready() -> void:
 	# Username is needed in each message to Kafka
 	ClientData.username = username
 	# A method that will send the first message to Kafka with handshake
-	TCPDialog.initialize_server_connection()
+	Kafka.initialize_server_connection()
 
 	self.text_submitted.disconnect(_inputHandler)
 	self.text_submitted.connect(_send_to_tcp)
@@ -44,8 +44,8 @@ func _send_to_tcp(content: String) -> void:
 	# 	for i in range(100):
 	# 		TCPDialog.send_tcp_message("odeslij")
 
-	TCPDialog.send_tcp_message(content)
-	
+	Kafka.send_message(content)
+
 func _up():
 	_if_at_zero(true)
 	self.cursor = (self.cursor - 1) % self.inputList.size()
