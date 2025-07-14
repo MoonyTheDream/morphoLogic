@@ -1,9 +1,10 @@
 extends Node
 
-var TextOutput
+# var TextOutput
 
 signal draw_message(msg)
 signal update_objects(objects)
+var message_processed := true
 
 func _ready() -> void:
 	Kafka.new_data_arrived.connect(parse_message)
@@ -31,7 +32,10 @@ func parse_message(data: Dictionary) -> void:
 			"CLIENT_TOPIC_HANDOFF":
 				# var new_topic = message_content
 				# TCPDialog.send_tcp_message("", "MICROSERVER_SUBSCRIBE_TO", message_content)
-				Kafka.set_consumer_topic(message_content)
+				Kafka.change_consumer_topic(message_content)
+				if not Kafka.is_ready():
+					await Kafka.consumer.consumer_ready # Wait for Kafka consumer to be ready
+
 				# TCPDialog.send_tcp_message("", "PRODUCE_TO_TOPIC", ClientData.server_general_topic)
 				Kafka.set_producer_topic(ClientData.server_general_topic)
 				Kafka.send_message("", "HANDSHAKE_GLOBAL_TOPIC")
@@ -52,14 +56,17 @@ func parse_message(data: Dictionary) -> void:
 			pass
 			# update_objects.emit(objects["game_objects"])
 			# update_objects.emit(message_content)
+	message_processed = true
 		
 
-func _wait_for_ack():
+func _wait_for_ack() -> void:
 	Kafka.new_data_arrived.disconnect(parse_message)
 	var server_answer = await Kafka.new_data_arrived
 	if server_answer['payload'].get('server_message', '') == "ACK":
-		Kafka.new_data_arrived.connect(parse_message)
 		var success_msg = tr("[color=green_yellow]Succsessfuly Established Server Connection.[/color]\n")
 		draw_message.emit(success_msg)
 	else:
 		draw_message.emit("KURDE ERROR, BO NIE BYŁO 'ACK', ALE NIE MAM NIC POZA TYM PRINTEM")
+	message_processed = true
+	Kafka.new_data_arrived.connect(parse_message)
+

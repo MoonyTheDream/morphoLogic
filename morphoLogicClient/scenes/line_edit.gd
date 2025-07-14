@@ -9,8 +9,11 @@ func _ready() -> void:
 	grab_focus()
 	inputList.append("") # occupying the 0 position, so any other will take subsequent place
 	self.text_submitted.connect(_inputHandler) # later it will be part of _send_to_tcp
-	await get_tree().create_timer(0.30).timeout # Better UX and time for other services to start
+	# await get_tree().create_timer(0.30).timeout # Better UX and time for other services to start
 	
+	if not Kafka.is_ready():
+		await Kafka.consumer.consumer_ready # Wait for Kafka consumer to be ready
+
 	var username = await self.request_username()
 	# Username is needed in each message to Kafka
 	ClientData.username = username
