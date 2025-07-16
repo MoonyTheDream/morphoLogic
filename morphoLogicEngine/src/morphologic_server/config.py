@@ -2,7 +2,7 @@
 import os
 
 from dataclasses import dataclass
-from pathlib import Path
+# from pathlib import Path
 
 from dotenv import load_dotenv
 load_dotenv()  # Load .env into environment variables
@@ -15,7 +15,8 @@ class SettingsDataclass:
 
     SERVER_VERSION: str = "0.1.0"
     LOG_LEVEL_DEBUG: bool = True
-    GENERAL_TOPIC: str = "serverGeneralTopic"
+    SERVER_GENERAL_TOPIC: str = "serverGeneralTopic"
+    CLIENTS_GENERAL_TOPIC: str = "clientsGeneralTopic"
     CLIENT_HANDSHAKE_TOPIC: str = "clientHandshakeTopic"
     SERVER_HANDSHAKE_TOPIC: str = "serverHandshakeTopic"
     
@@ -54,7 +55,7 @@ settings = SettingsDataclass()
 #     SERVER_VERSION: str
 #     LOG_LEVEL_DEBUG: bool
 #     KAFKA_SERVER: str
-#     GENERAL_TOPIC: str
+#     SERVER_GENERAL_TOPIC: str
 #     CLIENT_HANDSHAKE_TOPIC: str
 #     SERVER_HANDSHAKE_TOPIC: str
 #     DB_ADDRESS: str
@@ -78,7 +79,7 @@ settings = SettingsDataclass()
 #         self.SERVER_VERSION = _settings_json.get("server_version", "ERROR")
 #         self.LOG_LEVEL_DEBUG = _settings_json.get("log_level_debug", False)
 #         self.KAFKA_SERVER = _settings_json.get("kafka_server", 'localhost:9092')
-#         self.GENERAL_TOPIC = _settings_json.get("generalTopic", "serverGeneralTopic")
+#         self.SERVER_GENERAL_TOPIC = _settings_json.get("generalTopic", "serverGeneralTopic")
 #         self.CLIENT_HANDSHAKE_TOPIC = _settings_json.get("clientHandshakeTopic", "clientHandshakeTopic")
 #         self.SERVER_HANDSHAKE_TOPIC = _settings_json.get("serverHandshakeTopic", "serverHandshakeTopic")
 #         self.DB_ADDRESS = _settings_json.get("db_address", "localhost:5432")

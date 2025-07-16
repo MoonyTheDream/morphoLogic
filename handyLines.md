@@ -1,6 +1,7 @@
 # TOPICS
 ## Communication server -> client
 - A given topic per client
+-> clientsGeneralTopic
 -> clientHandshakeTopic
 ## Communication client -> server
 -> serverGeneralTopic 

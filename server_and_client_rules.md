@@ -9,6 +9,15 @@ server in <dedicated_topic> -> "server_message": "ACK"
 
 In case of not receiving "ACK" message after a timeout Godot will send an error message back to *serverHandshakeTopic*
 
+### Revamped HANDSHAKE
+-> [CLIENT][serverGeneralTopic]"system_message":"YO_ANYBODY_HOME?" // at launch, to verify connection
+-> [SERVER][clientsGeneralTopic]"system_message":"UP_AND_RUNNING"
+-> [CLIENT][serverGeneralTopic]"username":<username>; "system_message":"ITS'A_ME_MARIO" // after user log in. Username attached to each message from now on
+-> [SERVER][clientsGeneralTopic]"sytem_message":"SHH_LET'S_TALK_IN_PRIVATE"; "client_topic_handoff": <dedicated_client's_topic>
+-> [CLIENT][serverGeneralTopic]"system_message":"WALLS_HAVE_EARS_GOT_IT" // after succsessful subscribing to new topic
+-> [SERVER][<dedicated_client's_topic>]"system_message":"CAN_YOU_HEAR_ME?"
+-> [CLIENT][serverGeneralTopic]"system_message":"LOUD_AND_CLEAR"
+-> [SERVER][<dedicated_client's_topic>]"system_message":"PERFECT_LET_US_TALK_BUSINESS_THEN"
 
 
 ## Client -> Server

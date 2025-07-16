@@ -4,7 +4,7 @@ signal new_data_arrived(data)
 
 @onready var producer = KafkaProducer.new()
 @onready var consumer := KafkaConsumer.new()
-var _is_kafka_ready := false
+# var _is_kafka_ready := false
 
 
 func _ready() -> void:
@@ -14,18 +14,18 @@ func _ready() -> void:
     consumer.set_topic(ClientData.client_handshake_topic)
     print("Starting Kafka Consumer on topic: '%s'" % ClientData.client_handshake_topic)
     consumer.start()
-    await consumer.consumer_ready
-    _is_kafka_ready = true
+    # await consumer.consumer_ready
+    # _is_kafka_ready = true
 
     producer.set_bootstrap_servers(ClientData.bootstrap_server)
     producer.set_topic(ClientData.server_handshake_topic)
 
-func is_ready() -> bool:
-    return _is_kafka_ready
+# func is_ready() -> bool:
+#     return _is_kafka_ready
 
 func _process(_delta: float) -> void:
     # if consumer.has_message():
-    if _is_kafka_ready and InputHandler.message_processed == true:
+    if Kafka.consumer.is_running() and InputHandler.message_processed == true:
         var message = consumer.get_message()
         if message:
             print("Received message: %s" % message)
@@ -57,8 +57,8 @@ func _process(_delta: float) -> void:
             # call_deferred("emit_received_data", dict_data)
 
 func send_message(user_input: String = "", system_message: String = "", message_content: String = "") -> void:
-    if not _is_kafka_ready:
-        await consumer.consumer_ready
+    # if not _is_kafka_ready:
+        # await consumer.consumer_ready
 
     var data_to_send: Dictionary
     data_to_send['metadata'] = {
@@ -84,13 +84,15 @@ func set_producer_topic(topic: String) -> void:
     producer.set_topic(topic)
 
 func change_consumer_topic(topic: String) -> void:
-    _is_kafka_ready = false
+    # _is_kafka_ready = false
     # consumer.stop()
     # consumer.set_topic(topic)
     # consumer.start()
     # await consumer.consumer_ready
     consumer.change_topic(topic)
-    _is_kafka_ready = true
+    await consumer.consumer_ready # Wait for Kafka consumer to be ready
+
+    # _is_kafka_ready = true
 
 func initialize_server_connection() -> void:
     # This method can be used to send an initial handshake message

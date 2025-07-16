@@ -19,8 +19,11 @@ from ..utils.time_helpers import get_gmt_time
 BOOTSTRAP_SERVER = os.getenv(
     "KAFKA_BOOTSTRAP_SERVER", _SETTINGS.KAFKA_SERVER
 )
-GENERAL_TOPIC = os.getenv(
-    "KAFKA_GENERAL_TOPIC", _SETTINGS.GENERAL_TOPIC
+SERVER_GENERAL_TOPIC = os.getenv(
+    "KAFKA_SERVER_GENERAL_TOPIC", _SETTINGS.SERVER_GENERAL_TOPIC
+)
+CLIENTS_GENERAL_TOPIC = os.getenv(
+    "KAFKA_CLIENTS_GENERAL_TOPIC", _SETTINGS.CLIENTS_GENERAL_TOPIC
 )
 CLIENT_HANDSHAKE_TOPIC = os.getenv(
     "KAFKA_HANDSHAKE_TOPIC", _SETTINGS.CLIENT_HANDSHAKE_TOPIC
@@ -54,7 +57,7 @@ class KafkaConnection:
         self.producer: Producer = None
         self.consumer: Consumer = None
         self.bootstrap_server = bootstrap_server
-        # self.general_topic = GENERAL_TOPIC
+        # self.general_topic = SERVER_GENERAL_TOPIC
 
     def _establish_kafka_connection(
         self, admin: AdminClient, max_retries=4, wait_time=1
@@ -101,7 +104,7 @@ class KafkaConnection:
             }
             self.consumer = Consumer(consumer_conf)
 
-            self.subscribe_to_topics([GENERAL_TOPIC, SERVER_HANDSHAKE_TOPIC])
+            self.subscribe_to_topics([SERVER_GENERAL_TOPIC, SERVER_HANDSHAKE_TOPIC])
 
             # kafka_resources = {
             #     "admin": admin,
@@ -219,6 +222,20 @@ class KafkaConnection:
         # consumer get's it's own partition when there's more that one consumers
         # and there might be more than one producer and consumer when multiple users will try to join
         logger.debug('Produced message to %s: "%s"', topic, wrapped_data)
+
+    def health_confirmation(self):
+        """Just a quick 'UP_AND_RUNNING' message to Kafka"""
+        payload_data = {
+            "payload": {
+                "server_message": "UP_AND_RUNNING",
+                "content": "",
+                "direct_message": "",
+                "objects": None,
+            }
+        }
+        wrapped_data = self._add_metadata(payload_data, "")
+        wrapped_data = json.dumps(payload_data, ensure_ascii=False).encode("utf-8")
+        self.producer.produce(CLIENTS_GENERAL_TOPIC, value=wrapped_data)
 
     def _add_metadata(self, data: dict, username: str) -> dict:
         """

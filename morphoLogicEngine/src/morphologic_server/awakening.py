@@ -66,8 +66,15 @@ async def handle_message(msg, kafka: KafkaConnection, tg: asyncio.TaskGroup):
     kafka_msg = _decode_msg(msg)
     # payload = kafka_msg["payload"]
     system_message = kafka_msg["payload"].get("system_message", "")
+    
+    # Don't freak out, just answer and carry on
+    if system_message == "YO_ANYBODY_HOME?":
+        kafka.health_confirmation()
+        return
+        
+        
     user_input = kafka_msg["payload"].get("user_input", "")
-    message_content = kafka_msg["payload"].get("message_content", "")
+    # message_content = kafka_msg["payload"].get("message_content", "")
     
     # system_message = kafka_msg.get("system_message", "")
     

@@ -32,9 +32,7 @@ func parse_message(data: Dictionary) -> void:
 			"CLIENT_TOPIC_HANDOFF":
 				# var new_topic = message_content
 				# TCPDialog.send_tcp_message("", "MICROSERVER_SUBSCRIBE_TO", message_content)
-				Kafka.change_consumer_topic(message_content)
-				if not Kafka.is_ready():
-					await Kafka.consumer.consumer_ready # Wait for Kafka consumer to be ready
+				await Kafka.change_consumer_topic(message_content)
 
 				# TCPDialog.send_tcp_message("", "PRODUCE_TO_TOPIC", ClientData.server_general_topic)
 				Kafka.set_producer_topic(ClientData.server_general_topic)

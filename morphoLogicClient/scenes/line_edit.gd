@@ -11,7 +11,7 @@ func _ready() -> void:
 	self.text_submitted.connect(_inputHandler) # later it will be part of _send_to_tcp
 	# await get_tree().create_timer(0.30).timeout # Better UX and time for other services to start
 	
-	if not Kafka.is_ready():
+	if not Kafka.consumer.is_running():
 		await Kafka.consumer.consumer_ready # Wait for Kafka consumer to be ready
 
 	var username = await self.request_username()
