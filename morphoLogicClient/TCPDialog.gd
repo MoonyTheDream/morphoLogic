@@ -74,7 +74,7 @@ func _ready() -> void:
 # 	return -1
 
 # func initialize_server_connection():
-# 	send_tcp_message("", "REQUEST_SERVER_CONNECTION")
+# 	send_tcp_message("", "ITS'A_ME_MARIO")
 # 	tcp_t = Thread.new()
 # 	tcp_t.start(continously_receive_messages)
 

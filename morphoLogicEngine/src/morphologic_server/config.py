@@ -12,12 +12,10 @@ class SettingsDataclass:
     """
     Class that represents settings for the morphologic server.
     """
-
     SERVER_VERSION: str = "0.1.0"
     LOG_LEVEL_DEBUG: bool = True
     SERVER_GENERAL_TOPIC: str = "serverGeneralTopic"
     CLIENTS_GENERAL_TOPIC: str = "clientsGeneralTopic"
-    CLIENT_HANDSHAKE_TOPIC: str = "clientHandshakeTopic"
     SERVER_HANDSHAKE_TOPIC: str = "serverHandshakeTopic"
     
     # # Checking for sercret settings file
@@ -56,7 +54,7 @@ settings = SettingsDataclass()
 #     LOG_LEVEL_DEBUG: bool
 #     KAFKA_SERVER: str
 #     SERVER_GENERAL_TOPIC: str
-#     CLIENT_HANDSHAKE_TOPIC: str
+#     CLIENTS_GENERAL_TOPIC: str
 #     SERVER_HANDSHAKE_TOPIC: str
 #     DB_ADDRESS: str
 
@@ -80,6 +78,6 @@ settings = SettingsDataclass()
 #         self.LOG_LEVEL_DEBUG = _settings_json.get("log_level_debug", False)
 #         self.KAFKA_SERVER = _settings_json.get("kafka_server", 'localhost:9092')
 #         self.SERVER_GENERAL_TOPIC = _settings_json.get("generalTopic", "serverGeneralTopic")
-#         self.CLIENT_HANDSHAKE_TOPIC = _settings_json.get("clientHandshakeTopic", "clientHandshakeTopic")
+#         self.CLIENTS_GENERAL_TOPIC = _settings_json.get("clientHandshakeTopic", "clientHandshakeTopic")
 #         self.SERVER_HANDSHAKE_TOPIC = _settings_json.get("serverHandshakeTopic", "serverHandshakeTopic")
 #         self.DB_ADDRESS = _settings_json.get("db_address", "localhost:5432")

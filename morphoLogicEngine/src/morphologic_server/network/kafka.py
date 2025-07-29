@@ -25,8 +25,8 @@ SERVER_GENERAL_TOPIC = os.getenv(
 CLIENTS_GENERAL_TOPIC = os.getenv(
     "KAFKA_CLIENTS_GENERAL_TOPIC", _SETTINGS.CLIENTS_GENERAL_TOPIC
 )
-CLIENT_HANDSHAKE_TOPIC = os.getenv(
-    "KAFKA_HANDSHAKE_TOPIC", _SETTINGS.CLIENT_HANDSHAKE_TOPIC
+CLIENTS_GENERAL_TOPIC = os.getenv(
+    "KAFKA_HANDSHAKE_TOPIC", _SETTINGS.CLIENTS_GENERAL_TOPIC
 )
 SERVER_HANDSHAKE_TOPIC = os.getenv(
     "KAFKA_HANDSHAKE_TOPIC", _SETTINGS.SERVER_HANDSHAKE_TOPIC
@@ -221,9 +221,9 @@ class KafkaConnection:
         # adding key might result in some consumers not consuming their message as each
         # consumer get's it's own partition when there's more that one consumers
         # and there might be more than one producer and consumer when multiple users will try to join
-        logger.debug('Produced message to %s: "%s"', topic, wrapped_data)
+        logger.debug('Produced message to %s: "%s"', topic, payload_data)
 
-    def health_confirmation(self):
+    def health_status(self):
         """Just a quick 'UP_AND_RUNNING' message to Kafka"""
         payload_data = {
             "payload": {
@@ -236,6 +236,8 @@ class KafkaConnection:
         wrapped_data = self._add_metadata(payload_data, "")
         wrapped_data = json.dumps(payload_data, ensure_ascii=False).encode("utf-8")
         self.producer.produce(CLIENTS_GENERAL_TOPIC, value=wrapped_data)
+        logger.debug('Produced message to %s: "%s"', CLIENTS_GENERAL_TOPIC, payload_data)
+        
 
     def _add_metadata(self, data: dict, username: str) -> dict:
         """

@@ -8,20 +8,19 @@ signal new_data_arrived(data)
 
 
 func _ready() -> void:
-    
     # Prepare both Kafka Producer and Consumer
     consumer.set_bootstrap_servers(ClientData.bootstrap_server)
-    consumer.set_topic(ClientData.client_handshake_topic)
-    print("Starting Kafka Consumer on topic: '%s'" % ClientData.client_handshake_topic)
+    consumer.set_topic(ClientData.clients_general_topic)
+    print("Starting Kafka Consumer on topic: '%s'" % ClientData.clients_general_topic)
     consumer.start()
     # await consumer.consumer_ready
-    # _is_kafka_ready = true
 
     producer.set_bootstrap_servers(ClientData.bootstrap_server)
-    producer.set_topic(ClientData.server_handshake_topic)
+    producer.set_topic(ClientData.server_general_topic)
 
-# func is_ready() -> bool:
-#     return _is_kafka_ready
+func _is_it_for_me_really(data: Dictionary) -> bool:
+    # Check if the message is for this client
+    return data['metadata'].get("to_user", "") == ClientData.username or data['payload'].get("server_message", "") == "UP_AND_RUNNING"
 
 func _process(_delta: float) -> void:
     # if consumer.has_message():
@@ -29,25 +28,11 @@ func _process(_delta: float) -> void:
         var message = consumer.get_message()
         if message:
             print("Received message: %s" % message)
-            # var data = JSON.parse(message.get_value().get_string_from_utf8())
-            # if data:
-            #     data['metadata']['to_user'] = ClientData.username  # Ensure the message is directed
-            #     new_data_arrived.emit(data)
-            # else:
-            #     print("Failed to parse message: %s" % message.get_value().get_string_from_utf8())
-            # var received_data = TCPClient.get_utf8_string(available_bytes)
-            # var received_messages = received_data.split("|k-sep|") # mircoserver.py adds this separator to each message
-            # var dict_data_list = []
-            # for message in received_messages:
-            #     if message != "":
-            #         dict_data_list.append(JSON.parse_string(message))
-            # for message in dict_data_list:
-            #     call_deferred("emit_received_data", message)
 
             if message != "":
                 var data = JSON.parse_string(message)
-                if data:
-                    data['metadata']['to_user'] = ClientData.username  # Ensure the message is directed
+                if data and _is_it_for_me_really(data):
+                    # data['metadata']['to_user'] = ClientData.username # Ensure the message is directed
                     InputHandler.message_processed = false
                     new_data_arrived.emit(data)
                 else:
@@ -56,10 +41,10 @@ func _process(_delta: float) -> void:
             # var dict_data: Array[Dictionary] = JSON.parse_string(received_messages)
             # call_deferred("emit_received_data", dict_data)
 
+
 func send_message(user_input: String = "", system_message: String = "", message_content: String = "") -> void:
     # if not _is_kafka_ready:
         # await consumer.consumer_ready
-
     var data_to_send: Dictionary
     data_to_send['metadata'] = {
 			"source": "client",
@@ -96,4 +81,4 @@ func change_consumer_topic(topic: String) -> void:
 
 func initialize_server_connection() -> void:
     # This method can be used to send an initial handshake message
-    self.send_message("", "REQUEST_SERVER_CONNECTION")
+    self.send_message("", "ITS'A_ME_MARIO")
