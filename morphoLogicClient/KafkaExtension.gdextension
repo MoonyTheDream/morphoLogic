@@ -7,8 +7,9 @@ reloadable = true
 [libraries]
 
 linux.debug.x86_64 = "res://bin/libKafkaExtension.linux.template_debug.x86_64.so"
-
-
 linux.release.x86_64 = "res://bin/libKafkaExtension.linux.template_debug.x86_64.so"
+
+windows.debug.x86_64 = "res://bin/KafkaExtension.windows.template_debug.x86_64.dll"
+windows.release.x86_64 = "res://bin/KafkaExtension.windows.template_debug.x86_64.dll"
 
 
