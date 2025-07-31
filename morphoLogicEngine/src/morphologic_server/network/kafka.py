@@ -32,7 +32,6 @@ SERVER_HANDSHAKE_TOPIC = os.getenv(
     "KAFKA_HANDSHAKE_TOPIC", _SETTINGS.SERVER_HANDSHAKE_TOPIC
 )
 
-
 # 888    d8P            .d888 888
 # 888   d8P            d88P"  888
 # 888  d8P             888    888
@@ -60,7 +59,7 @@ class KafkaConnection:
         # self.general_topic = SERVER_GENERAL_TOPIC
 
     def _establish_kafka_connection(
-        self, admin: AdminClient, max_retries=4, wait_time=1
+        self, max_retries=4, wait_time=1
     ):
         """
         Verifies the connection to Kafka by requesting cluster metadata.
@@ -68,7 +67,7 @@ class KafkaConnection:
         """
         for attemt in range(max_retries):
             try:
-                cluster_metadata = admin.list_topics(timeout=5)
+                cluster_metadata = self.admin.list_topics(timeout=5)
                 if cluster_metadata.brokers:
                     logger.debug("Kafka connection verified.")
                     return
@@ -91,14 +90,14 @@ class KafkaConnection:
         try:
             admin_conf = {"bootstrap.servers": BOOTSTRAP_SERVER}
             self.admin = AdminClient(admin_conf)
-            self._establish_kafka_connection(self.admin)
+            self._establish_kafka_connection()
 
             producer_conf = {"bootstrap.servers": BOOTSTRAP_SERVER, "acks": "all"}
             self.producer = Producer(producer_conf)
 
             consumer_conf = {
                 "bootstrap.servers": BOOTSTRAP_SERVER,
-                "group.id": "morphoLogicServerGroup",
+                "group.id": "morphoLogicServerGroup", # Make dynamic later
                 "auto.offset.reset": "earliest",
                 "enable.partition.eof": False,  # we'll be hitting end of partition quite often
             }
@@ -106,11 +105,6 @@ class KafkaConnection:
 
             self.subscribe_to_topics([SERVER_GENERAL_TOPIC, SERVER_HANDSHAKE_TOPIC])
 
-            # kafka_resources = {
-            #     "admin": admin,
-            #     "producer": producer,
-            #     "consumer": consumer,
-            # }
             return self
 
         except KafkaException:
@@ -206,15 +200,8 @@ class KafkaConnection:
                 "content": content,
                 "direct_message": direct_message,
                 "objects": objects,
-                # "type": payload_type,
-                # "content": content,
             }
         }
-        # payload_data['payload']['content'] = content
-        # payload_data['payload']['type'] = payload_type
-        # data.update(
-        #     {"dicrect_message": direct_message, "system_message": system_message}
-        # )
         wrapped_data = self._add_metadata(payload_data, username)
         wrapped_data = json.dumps(payload_data, ensure_ascii=False).encode("utf-8")
         self.producer.produce(topic, value=wrapped_data)  # no key, as:
