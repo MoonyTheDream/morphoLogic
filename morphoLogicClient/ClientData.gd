@@ -3,8 +3,10 @@ extends Node
 const CONFIG_PATH = "res://client_config.cfg"
 
 var server_general_topic := ""
+var clients_general_topic := ""
 var version := "0.1.0"
 var username = null
+var bootstrap_server := ""
 
 func load_settings(path: String = CONFIG_PATH) -> ConfigFile:
 	var config = ConfigFile.new()
@@ -16,4 +18,6 @@ func load_settings(path: String = CONFIG_PATH) -> ConfigFile:
 
 func _ready():
 	var config := load_settings()
-	server_general_topic = config.get_value("kafka", "generalTopic", "serverGeneralTopic")
+	server_general_topic = config.get_value("kafka", "serverGeneralTopic", "serverGeneralTopic")
+	clients_general_topic = config.get_value("kafka", "clientsGeneralTopic", "clientsGeneralTopic")
+	bootstrap_server = config.get_value("kafka", "bootstrapServer", "localhost:9092")

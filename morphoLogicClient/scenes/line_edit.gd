@@ -9,13 +9,16 @@ func _ready() -> void:
 	grab_focus()
 	inputList.append("") # occupying the 0 position, so any other will take subsequent place
 	self.text_submitted.connect(_inputHandler) # later it will be part of _send_to_tcp
-	await get_tree().create_timer(0.30).timeout # Better UX and time for other services to start
+	# await get_tree().create_timer(0.30).timeout # Better UX and time for other services to start
 	
+	if not Kafka.consumer.is_running():
+		await Kafka.consumer.consumer_ready # Wait for Kafka consumer to be ready
+
 	var username = await self.request_username()
 	# Username is needed in each message to Kafka
 	ClientData.username = username
 	# A method that will send the first message to Kafka with handshake
-	TCPDialog.initialize_server_connection()
+	Kafka.initialize_server_connection()
 
 	self.text_submitted.disconnect(_inputHandler)
 	self.text_submitted.connect(_send_to_tcp)
@@ -44,8 +47,8 @@ func _send_to_tcp(content: String) -> void:
 	# 	for i in range(100):
 	# 		TCPDialog.send_tcp_message("odeslij")
 
-	TCPDialog.send_tcp_message(content)
-	
+	Kafka.send_message(content)
+
 func _up():
 	_if_at_zero(true)
 	self.cursor = (self.cursor - 1) % self.inputList.size()

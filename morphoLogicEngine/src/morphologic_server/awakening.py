@@ -7,8 +7,7 @@ from morphologic_server import logger, settings as _SETTINGS
 from morphologic_server.utils.search import get_objects_in_proximity
 from .network.kafka import (
     KafkaConnection,
-    CLIENT_HANDSHAKE_TOPIC as _CLIENT_HANDSHAKE_TOPIC,
-    SERVER_HANDSHAKE_TOPIC as _SERVER_HANDSHAKE_TOPIC,
+    CLIENTS_GENERAL_TOPIC as _CLIENTS_GENERAL_TOPIC,
 )
 
 __all__ = ["awake"]
@@ -31,6 +30,9 @@ async def awake(tg: asyncio.TaskGroup):
 
 
 # ------------------------------------------------------------------------------------------------ #
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Periodically Health Status ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+# async def automated_periodical_health_status(tg: asyncio.TaskGroup):
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Consume And Handle ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
@@ -66,8 +68,15 @@ async def handle_message(msg, kafka: KafkaConnection, tg: asyncio.TaskGroup):
     kafka_msg = _decode_msg(msg)
     # payload = kafka_msg["payload"]
     system_message = kafka_msg["payload"].get("system_message", "")
+    
+    # # Don't freak out, just answer and carry on
+    # if system_message == "YO_ANYBODY_HOME?":
+    #     kafka.health_status()
+    #     return
+        
+        
     user_input = kafka_msg["payload"].get("user_input", "")
-    message_content = kafka_msg["payload"].get("message_content", "")
+    # message_content = kafka_msg["payload"].get("message_content", "")
     
     # system_message = kafka_msg.get("system_message", "")
     
@@ -79,13 +88,14 @@ async def handle_message(msg, kafka: KafkaConnection, tg: asyncio.TaskGroup):
     match system_message:
         
         # Handshake requests
-        case "REQUEST_SERVER_CONNECTION":
+        case "ITS'A_ME_MARIO":
             _handshake_topic_creation(kafka, kafka_msg)
         # Handshake in dedicated topic handler
-        case "HANDSHAKE_GLOBAL_TOPIC":
+        case "WALLS_HAVE_EARS_GOT_IT":
             _check_and_acknowledge_client_topic(
                 kafka, sending_user, kafka_msg
             )
+        case "LOUD_AND_CLEAR":
             await send_initial_objects_data(kafka, sending_user)
         case "":
             pass
@@ -161,9 +171,9 @@ def _handshake_topic_creation(kafka: KafkaConnection, client_handshake_msg: dict
 
         # kafka.update_subscription([dedicated_topic])
         kafka.send_data_to_user(
-            _CLIENT_HANDSHAKE_TOPIC,
+            _CLIENTS_GENERAL_TOPIC,
             username,
-            server_message="CLIENT_TOPIC_HANDOFF",
+            server_message="SHH_LET'S_TALK_IN_PRIVATE",
             content=dedicated_topic,
         )
 
@@ -182,13 +192,13 @@ def _check_and_acknowledge_client_topic(
     8888P   Y8888   888   888
     888P     Y888 8888888 888
     
-    After client's HANDSHAKE_GLOBAL_TOPIC check if the topic is subscribed and
+    After client's WALLS_HAVE_EARS_GOT_IT check if the topic is subscribed and
     then send there an "ACK" system message
     """
     username = msg["metadata"]["username"]
 
     # Na razie taka beznadziejna walidacja, do zastąpienia czymś sensownym
-    kafka.send_data_to_user(msg_topic, username=username, server_message="ACK")
+    kafka.send_data_to_user(msg_topic, username=username, server_message="CAN_YOU_HEAR_ME?")
     
     
 
