@@ -8,6 +8,7 @@ import debugpy
 from ptpython.repl import embed
 from morphologic_server import (
     logger,
+    Context,
     TerminateTaskGroup,
     force_terminate_task_group,
     check_if_logging_to_console,
@@ -16,7 +17,6 @@ from morphologic_server import (
 )
 from .awakening import awake
 from .utils.async_cmd import AsyncCmd
-
 
 # ------------------------------------------------------------------------------------------------ #
 
@@ -135,8 +135,10 @@ async def start_server(args):
         remove_console_handler()
     try:
         async with asyncio.TaskGroup() as tg:
-            tg.create_task(awake(tg))
-            tg.create_task(MorphoLogicCmd().cmdloop())
+            context = Context()
+            context.tg = tg
+            context.tg.create_task(awake(context))
+            context.tg.create_task(MorphoLogicCmd().cmdloop())
     except* TerminateTaskGroup:
         logger.info("Terminating tasks.")
     except* asyncio.exceptions.CancelledError:

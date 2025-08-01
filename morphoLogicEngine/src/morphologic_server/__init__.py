@@ -27,18 +27,25 @@
 
 # ------------------------------------------------------------------------------------------------ #
 
-from .utils.asyncio_helpers import TerminateTaskGroup, force_terminate_task_group
 from .config import settings
-from .utils.logger import logger, remove_console_handler, add_console_handler, check_if_logging_to_console
+from .services.context import Context
+from .utils.asyncio_helpers import TerminateTaskGroup, force_terminate_task_group
+from .utils.logger import (
+    logger,
+    remove_console_handler,
+    add_console_handler,
+    check_if_logging_to_console,
+)
 
 __all__ = [
     "logger",
+    "Context",
     "settings",
     "TerminateTaskGroup",
     "force_terminate_task_group",
     "remove_console_handler",
     "add_console_handler",
-    "check_if_logging_to_console"
+    "check_if_logging_to_console",
 ]
 
 # if __name__ == "__main__":
