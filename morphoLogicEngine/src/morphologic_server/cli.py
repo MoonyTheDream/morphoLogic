@@ -15,7 +15,7 @@ from morphologic_server import (
     remove_console_handler,
     add_console_handler,
 )
-from .awakening import awake
+from .awakening import AwakenedHeart
 from .utils.async_cmd import AsyncCmd
 
 # ------------------------------------------------------------------------------------------------ #
@@ -23,8 +23,8 @@ from .utils.async_cmd import AsyncCmd
 
 async def run_python_shell():
     """Coroutine to run the python shell."""
-    from morphologic_server.db.models import TerrainType
-    from morphologic_server.archetypes import base as archetypes
+    # from morphologic_server.db.models import TerrainType
+    from morphologic_server.archetypes import base as archetypes 
 
     banner = "morphoLogic async shell Type `await ...` freely — Ctrl-D to exit."
     print(banner)
@@ -135,9 +135,11 @@ async def start_server(args):
         remove_console_handler()
     try:
         async with asyncio.TaskGroup() as tg:
-            context = Context()
-            context.tg = tg
-            context.tg.create_task(awake(context))
+            context = Context(tg)
+            awakening = AwakenedHeart(context)
+            # Start the server
+            await awakening.awake()
+            # context.tg.create_task(awake(context))
             context.tg.create_task(MorphoLogicCmd().cmdloop())
     except* TerminateTaskGroup:
         logger.info("Terminating tasks.")

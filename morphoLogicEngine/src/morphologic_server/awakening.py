@@ -3,7 +3,13 @@
 import asyncio
 import json
 
-from morphologic_server import logger, Context, settings as _SETTINGS
+from morphologic_server import (
+    logger,
+    Context,
+    settings as _SETTINGS,
+    force_terminate_task_group,
+)
+
 # from morphologic_server.utils.search import get_objects_in_proximity
 from morphologic_server.services.message_handler import MessageHandler
 from .network.kafka import (
@@ -27,6 +33,7 @@ class AwakenedHeart:
     """
     The Hearth of the Morpho.
     """
+
     context: Context
     tg: asyncio.TaskGroup
 
@@ -54,6 +61,10 @@ class AwakenedHeart:
             while not self.context.stop_server:
                 # Handle ticks and other tasks
                 await asyncio.sleep(1)
+
+        # Stop all tasks gracefully
+        logger.info("Stopping the server.")
+        self.tg.create_task(force_terminate_task_group())
 
     def stop_server(self):
         """Stop the server."""
