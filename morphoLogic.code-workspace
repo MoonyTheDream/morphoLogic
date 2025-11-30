@@ -5,8 +5,12 @@
 		}
 	],
 	"settings": {
-		"godotTools.editorPath.godot4": "/home/moony/snap/steam/common/.local/share/Steam/steamapps/common/Godot Engine/godot.x11.opt.tools.64",
+		// "godotTools.editorPath.godot4": "/home/moony/snap/steam/common/.local/share/Steam/steamapps/common/Godot Engine/godot.x11.opt.tools.64",
 		// "godotTools.editorPath.godot4": "d:\\SteamLibrary\\steamapps\\common\\Godot Engine\\godot.windows.opt.tools.64.exe",
+		
+		// Morpho PC Linux
+		"godotTools.editorPath.godot4": "/home/moony/.local/share/Steam/steamapps/common/Godot Engine/godot.x11.opt.tools.64"
+		
 		"github.copilot.enable": {
 			"*": true,
 			"plaintext": false,
@@ -14,7 +18,6 @@
 			"scminput": false
 		}
 		// "godotTools.editorPath.godot4": "/home/moony/godot/Godot_v4.3-stable_linux.arm64"
-		// "godotTools.editorPath.godot4": "/home/moony/.local/share/Steam/steamapps/common/Godot Engine/godot.x11.opt.tools.64"
 	},
 	"launch": {
 		"version": "0.2.0",
