@@ -4,7 +4,6 @@ import asyncio
 
 from dataclasses import dataclass
 
-from ..network.kafka import KafkaConnection
 
 @dataclass
 class Context:
@@ -12,4 +11,4 @@ class Context:
 
     tg: asyncio.TaskGroup
     stop_server: bool = False
-    kafka: KafkaConnection
+    kafka: "KafkaConnection" = None  # Placeholder for Kafka connection type

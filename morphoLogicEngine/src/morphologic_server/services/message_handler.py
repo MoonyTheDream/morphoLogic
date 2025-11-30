@@ -77,6 +77,6 @@ class MessageHandler:
         Handles messages to the proper processor.
         """
         if msg.system_msg:
-            SystemMessageProcessor()
+            self.context.tg.create_task(SystemMessageProcessor(msg, self.context))
         
-            
+
