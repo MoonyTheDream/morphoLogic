@@ -6,9 +6,9 @@ import json
 from morphologic_server import (
     logger,
     Context,
-    settings as _SETTINGS,
     force_terminate_task_group,
 )
+from .config import ServerSettings
 
 # from morphologic_server.utils.search import get_objects_in_proximity
 from morphologic_server.services.message_handler import MessageHandler
@@ -28,6 +28,17 @@ from .network.kafka import (
 #  d8888888888 Y88b 888 d88P 888  888 888 "88b Y8b.
 # d88P     888  "Y8888888P"  "Y888888 888  888  "Y8888
 
+
+class MorphoLogicHeart:
+    """
+    The Heart of the Morpho.
+    The application server and entry point. All dependencies injected and no globals.
+    """
+    
+    def __init__ (self, settings: ServerSettings):
+        self.settings = settings
+
+    
 
 class AwakenedHeart:
     """

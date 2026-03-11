@@ -27,7 +27,6 @@
 
 # ------------------------------------------------------------------------------------------------ #
 
-from .config import settings
 from .services.context import Context
 from .utils.asyncio_helpers import TerminateTaskGroup, force_terminate_task_group
 from .utils.logger import (

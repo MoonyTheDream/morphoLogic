@@ -68,7 +68,7 @@ class MorphoLogicCmd(AsyncCmd):
     stop = None
     intro = """
 Welcome. You are apparently one of the chosen ones as only few can enter this realm.
-Say help or just raise your eyebrows - ? - to learn more.
+Say help or just raise your eyebrows — ? — to learn more.
 """
     prompt = "(morphoLogicServer) "
 
