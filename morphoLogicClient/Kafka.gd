@@ -79,6 +79,6 @@ func change_consumer_topic(topic: String) -> void:
 
 	# _is_kafka_ready = true
 
-func initialize_server_connection() -> void:
-	# This method can be used to send an initial handshake message
-	self.send_message("", "ITS'A_ME_MARIO")
+func initialize_server_connection(password: String = "") -> void:
+	# Send handshake with password in the content field
+	self.send_message("", "ITS'A_ME_MARIO", password)

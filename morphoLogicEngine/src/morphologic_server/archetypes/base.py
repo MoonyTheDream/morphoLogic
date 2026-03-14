@@ -402,6 +402,20 @@ async def create_game_object(
         return GameObject(game_object)
 
 
+async def authenticate(username: str, password: str) -> Optional["Character"]:
+    """Return the bound Character if username + password are valid, else None.
+
+    Lookup chain: Account.name → account.character_souls[0] → soul.bound_character.
+    """
+    account = await find_account(username)
+    if account is None or not account.check_password(password):
+        return None
+    souls = account.character_souls
+    if not souls:
+        return None
+    return souls[0].bound_character
+
+
 # ------------------------------------------------------------------------------------------------ #
 #        d8888                 888               888
 #       d88888                 888               888
@@ -641,6 +655,21 @@ class Account(Archetypes):
                 e,
             )
             return []
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Password ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    def set_password(self, plain: str) -> None:
+        """Hash and store a password for this account."""
+        import bcrypt
+        self._db_obj.password_hash = bcrypt.hashpw(
+            plain.encode(), bcrypt.gensalt()
+        ).decode()
+
+    def check_password(self, plain: str) -> bool:
+        """Return True if plain matches the stored hash."""
+        import bcrypt
+        if not self._db_obj.password_hash:
+            return False
+        return bcrypt.checkpw(plain.encode(), self._db_obj.password_hash.encode())
 
 
 #  .d8888b.  888                                        888
@@ -1077,10 +1106,10 @@ class Area(Archetypes):
     @property
     def priority(self):
         """Return priority"""
-        return self._db_obj.description
+        return self._db_obj.priority
 
-    @description.setter
-    def description(self, value: int):
+    @priority.setter
+    def priority(self, value: int):
         """Set priority"""
         self._db_obj.priority = value
 

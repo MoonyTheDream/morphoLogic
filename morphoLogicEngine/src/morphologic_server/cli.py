@@ -8,14 +8,14 @@ import debugpy
 from ptpython.repl import embed
 from morphologic_server import (
     logger,
-    Context,
     TerminateTaskGroup,
     force_terminate_task_group,
     check_if_logging_to_console,
     remove_console_handler,
     add_console_handler,
 )
-from .awakening import AwakenedHeart
+from .app import Server
+from .config import ServerSettings
 from .utils.async_cmd import AsyncCmd
 
 # ------------------------------------------------------------------------------------------------ #
@@ -134,13 +134,11 @@ async def start_server(args):
         print("Awakening of the World.")
         remove_console_handler()
     try:
+        server = Server(ServerSettings())
         async with asyncio.TaskGroup() as tg:
-            context = Context(tg)
-            awakening = AwakenedHeart(context)
-            # Start the server
-            await awakening.awake()
-            # context.tg.create_task(awake(context))
-            context.tg.create_task(MorphoLogicCmd().cmdloop())
+            # Both tasks run concurrently — neither blocks the other.
+            tg.create_task(server.run(tg))
+            tg.create_task(MorphoLogicCmd().cmdloop())
     except* TerminateTaskGroup:
         logger.info("Terminating tasks.")
     except* asyncio.exceptions.CancelledError:
@@ -160,6 +158,12 @@ async def just_shell(args):
     Run just the python shell.
     """
     await run_python_shell()
+
+
+async def run_seed(args):
+    """Populate the database with test objects and areas."""
+    from morphologic_server.scripts.seed import seed
+    await seed()
 
 
 # ------------------------------------------------------------------------------------------------ #
@@ -196,11 +200,19 @@ def main():
     )
     shell.set_defaults(func=just_shell)
 
+    seed_cmd = subparsers.add_parser(
+        "seed", help="Populate the database with test objects and areas"
+    )
+    seed_cmd.set_defaults(func=run_seed)
+
     args = parser.parse_args()
 
     # If no arguments provided, display help
     if hasattr(args, "func"):
-        asyncio.run(args.func(args))
+        try:
+            asyncio.run(args.func(args))
+        except KeyboardInterrupt:
+            pass
     else:
         parser.print_help()
 

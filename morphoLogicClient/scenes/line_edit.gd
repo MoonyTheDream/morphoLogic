@@ -17,8 +17,9 @@ func _ready() -> void:
 	var username = await self.request_username()
 	# Username is needed in each message to Kafka
 	ClientData.username = username
+	var password = await self.request_password()
 	# A method that will send the first message to Kafka with handshake
-	Kafka.initialize_server_connection()
+	Kafka.initialize_server_connection(password)
 
 	self.text_submitted.disconnect(_inputHandler)
 	self.text_submitted.connect(_send_to_tcp)
@@ -107,6 +108,21 @@ func request_username() -> String:
 				continue
 			txt_f.draw_new_message(tr("Welcome, [color=medium_turquoise]{username}[/color]! Let me see if you are on the invite guest.\n").format({username = answer}))
 			return answer
+	return ""
+
+func request_password() -> String:
+	var answer = ""
+	var txt_f = get_node("%MainTextField")
+	var entry_message = tr("Please provide your [color=medium_turquoise]password[/color].\n")
+	entry_message = "[pulse freq=0.5 color=#ffffff60 ease=2.0]" + entry_message + "[/pulse]"
+	txt_f.draw_new_message(entry_message)
+
+	while true:
+		answer = await self.text_submitted
+		if answer == "":
+			txt_f.draw_new_message(entry_message)
+			continue
+		return answer
 	return ""
 
 func is_valid_username(username_text: String) -> bool:

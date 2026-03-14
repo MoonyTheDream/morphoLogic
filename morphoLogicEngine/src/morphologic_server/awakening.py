@@ -59,7 +59,6 @@ class AwakenedHeart:
         and introduces a loop to handle ticks and other tasks.
         """
         print("The morphoLogic laws of physics bound itself into existence!")
-        logger.info("Server version: %s", _SETTINGS.SERVER_VERSION)
         logger.info("Waking up laws of nature.")
 
         with KafkaConnection() as kafka:

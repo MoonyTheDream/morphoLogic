@@ -49,7 +49,7 @@ class AccountDB(BaseDB):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(STANDARD_LENGTH))
     email: Mapped[str] = mapped_column(String(STANDARD_LENGTH))
-    # password_hash: Mapped[str] = mapped_column(String(255))
+    password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # Permissions: 0 - admin, 1 - builder, 2 - player
     permission_level: Mapped[int] = mapped_column(Integer, default=2)
