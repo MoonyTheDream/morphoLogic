@@ -35,46 +35,94 @@ sudo certbot certonly --webroot -w /var/www/certbot-webroot -d <yourdomain>
 # certbot's systemd timer handles renewal automatically
 ```
 
-### c) Add post-renewal hook to reload Kafka
-Kafka runs as a Docker container named `morphoLogic_kafka`, so the hook restarts it:
+### c) Copy certs to a Kafka-accessible directory
+The Let's Encrypt `privkey.pem` is `600` (root-only). The Bitnami container runs as user `1001` and cannot read it directly from `/etc/letsencrypt/live/`. Copy the certs to a dedicated directory:
+
+```bash
+sudo mkdir -p /etc/kafka-certs
+sudo cp /etc/letsencrypt/live/<yourdomain>/fullchain.pem /etc/kafka-certs/
+sudo cp /etc/letsencrypt/live/<yourdomain>/privkey.pem /etc/kafka-certs/
+sudo chown -R 1001:1001 /etc/kafka-certs
+sudo chmod 644 /etc/kafka-certs/fullchain.pem
+sudo chmod 640 /etc/kafka-certs/privkey.pem
+```
+
+### d) Add post-renewal hook to reload Kafka
+The hook must also refresh the copies in `/etc/kafka-certs/`:
 ```bash
 sudo tee /etc/letsencrypt/renewal-hooks/post/reload-kafka.sh > /dev/null << 'EOF'
 #!/bin/bash
+cp /etc/letsencrypt/live/<yourdomain>/fullchain.pem /etc/kafka-certs/
+cp /etc/letsencrypt/live/<yourdomain>/privkey.pem /etc/kafka-certs/
+chown 1001:1001 /etc/kafka-certs/fullchain.pem /etc/kafka-certs/privkey.pem
+chmod 640 /etc/kafka-certs/privkey.pem
 docker restart morphoLogic_kafka
 EOF
 sudo chmod +x /etc/letsencrypt/renewal-hooks/post/reload-kafka.sh
 ```
 
-### d) Configure Kafka SSL
-Kafka is a **bitnami/kafka Docker container** (`morphoLogic_kafka`). Bitnami's image is configured via environment variables, not by editing `server.properties` directly.
+### e) Configure Kafka SSL — docker-compose.yml
+Kafka is a **bitnami/kafka Docker container** (`morphoLogic_kafka`).
 
-**Mount the certs into the container** (add to your `docker run` command or `docker-compose.yml`):
+Bitnami has two layers of TLS config that must both be set:
+- `KAFKA_TLS_TYPE=PEM` — tells Bitnami's entrypoint script to expect PEM (not JKS). Without this, the script errors out looking for `.jks` files regardless of `KAFKA_CFG_SSL_*` vars.
+- `KAFKA_TLS_CLIENT_AUTH=none` — Bitnami-level equivalent of `KAFKA_CFG_SSL_CLIENT_AUTH`.
+- Bitnami expects certs at **fixed filenames** inside `/bitnami/kafka/config/certs/` — the `KAFKA_CFG_SSL_KEYSTORE_*` path vars are ignored when `KAFKA_TLS_TYPE=PEM`.
+- The CONTROLLER listener must be on its own port (9094) — it cannot share port 9093 with the SSL listener.
+
+**Full `docker-compose.yml`:**
 ```yaml
+version: '1'
+
+services:
+  kafka:
+    image: bitnami/kafka:latest
+    container_name: morphoLogic_kafka
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      - KAFKA_CFG_NODE_ID=0
+      - KAFKA_CFG_PROCESS_ROLES=broker,controller
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka:9094
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://localhost:9092,SSL://0.0.0.0:9093,CONTROLLER://kafka:9094
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092,SSL://<yourdomain>:9093
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,SSL:SSL,CONTROLLER:PLAINTEXT
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      - KAFKA_TLS_TYPE=PEM
+      - KAFKA_TLS_CLIENT_AUTH=none
+      - KAFKA_KRAFT_CLUSTER_ID=<base64-uuid from: docker run --rm bitnami/kafka kafka-storage.sh random-uuid>
+    volumes:
+      - kafka_data:/bitnami/kafka
+      - /etc/kafka-certs/fullchain.pem:/bitnami/kafka/config/certs/kafka.keystore.pem:ro
+      - /etc/kafka-certs/privkey.pem:/bitnami/kafka/config/certs/kafka.keystore.key:ro
+      - /etc/kafka-certs/fullchain.pem:/bitnami/kafka/config/certs/kafka.truststore.pem:ro
+    restart: unless-stopped
+    networks:
+      - kafka_net
+
 volumes:
-  - /etc/letsencrypt/live/<yourdomain>:/etc/kafka/certs:ro
+  kafka_data:
+
+networks:
+  kafka_net:
+    driver: bridge
 ```
 
-**Set these env vars on the container:**
-```
-KAFKA_CFG_LISTENERS=PLAINTEXT://localhost:9092,SSL://0.0.0.0:9093
-KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092,SSL://<yourdomain>:9093
-KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,SSL:SSL
-KAFKA_CFG_SSL_KEYSTORE_TYPE=PEM
-KAFKA_CFG_SSL_KEYSTORE_CERTIFICATE_CHAIN=/etc/kafka/certs/fullchain.pem
-KAFKA_CFG_SSL_KEYSTORE_KEY=/etc/kafka/certs/privkey.pem
-KAFKA_CFG_SSL_CLIENT_AUTH=none
-```
+Note: port 9094 (CONTROLLER) is internal — no `ports:` mapping needed.
 
-Recreate the container to apply changes:
-```bash
-docker compose up -d kafka   # or however you manage the container
-# Verify TLS works:
-openssl s_client -connect <yourdomain>:9093 -brief
-```
-
-### e) Open firewall port
+### f) Open firewall port and forward on router
 ```bash
 sudo ufw allow 9093/tcp
+```
+Also forward port 9093 TCP on your router to the Pi's local IP.
+
+Bring up and verify:
+```bash
+docker compose up -d kafka
+openssl s_client -connect <yourdomain>:9093 -brief
+# Expected: CONNECTION ESTABLISHED, Verification: OK
 ```
 
 ---

@@ -10,6 +10,15 @@ signal new_data_arrived(data)
 func _ready() -> void:
 	# Prepare both Kafka Producer and Consumer
 	consumer.set_bootstrap_servers(ClientData.bootstrap_server)
+	if ClientData.security_protocol != "":
+		consumer.set_security_protocol(ClientData.security_protocol)
+		producer.set_security_protocol(ClientData.security_protocol)
+		if ClientData.ssl_ca_location != "":
+			var abs_path := ProjectSettings.globalize_path(ClientData.ssl_ca_location)
+			consumer.set_ssl_ca_location(abs_path)
+			producer.set_ssl_ca_location(abs_path)
+
+
 	consumer.set_topic(ClientData.clients_general_topic)
 	print("Starting Kafka Consumer on topic: '%s'" % ClientData.clients_general_topic)
 	consumer.start()

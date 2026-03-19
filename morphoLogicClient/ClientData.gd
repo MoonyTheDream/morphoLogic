@@ -7,6 +7,8 @@ var clients_general_topic := ""
 var version := "0.1.0"
 var username = null
 var bootstrap_server := ""
+var security_protocol: String = ""
+var ssl_ca_location: String = ""
 
 func load_settings(path: String = CONFIG_PATH) -> ConfigFile:
 	var config = ConfigFile.new()
@@ -21,3 +23,5 @@ func _ready():
 	server_general_topic = config.get_value("kafka", "serverGeneralTopic", "serverGeneralTopic")
 	clients_general_topic = config.get_value("kafka", "clientsGeneralTopic", "clientsGeneralTopic")
 	bootstrap_server = config.get_value("kafka", "bootstrapServer", "localhost:9092")
+	security_protocol = config.get_value("kafka", "securityProtocol", "")
+	ssl_ca_location   = config.get_value("kafka", "sslCaLocation", "")

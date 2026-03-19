@@ -25,6 +25,8 @@ class ServerSettings(BaseSettings):
     SERVER_VERSION: str = Field(default="0.1.0", description="Server version")
     LOG_LEVEL_DEBUG: bool = Field(default=False, description="Enable debug logging")
     ENVIRONMENT: str = Field(default="development", description="Environment (development, staging, production)")
+    KAFKA_SECURITY_PROTOCOL: str = "" # set to "ssl" to enable TSL
+    KAFKA_SSL_CA_LOCATIONS: str = ""
     
     # Kafka configuration
     KAFKA_SERVER: str = Field(
