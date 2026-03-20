@@ -3,7 +3,6 @@ extends Node
 # var microserver_process_id = null # storing process ID of microserver for cleanup
 var TCPClient = StreamPeerTCP.new()
 const SERVER_IP = "127.0.0.1"
-const TEMP_FILE_PATH = "res://temp_port.txt"
 signal new_data_arrived(data)
 var tcp_t
 
