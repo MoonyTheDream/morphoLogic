@@ -9,7 +9,8 @@ signal new_data_arrived(data)
 
 func _ready() -> void:
 	# Prepare both Kafka Producer and Consumer
-	consumer.set_bootstrap_servers(ClientData.bootstrap_server)
+
+	# Setting up correct security protocol for both Producer and Consumer
 	if ClientData.security_protocol != "":
 		consumer.set_security_protocol(ClientData.security_protocol)
 		producer.set_security_protocol(ClientData.security_protocol)
@@ -18,14 +19,20 @@ func _ready() -> void:
 			consumer.set_ssl_ca_location(abs_path)
 			producer.set_ssl_ca_location(abs_path)
 
-
+	# Setting up the consumer
+	consumer.set_bootstrap_servers(ClientData.bootstrap_server)
 	consumer.set_topic(ClientData.clients_general_topic)
-	print("Starting Kafka Consumer on topic: '%s'" % ClientData.clients_general_topic)
+	consumer.consumer_ready.connect(_on_consumer_ready)
+	consumer.consumer_error.connect(_on_error)
 	consumer.start()
-	# await consumer.consumer_ready
+	# consumer.set_group_id("")
 
+	# Setting up the producer
 	producer.set_bootstrap_servers(ClientData.bootstrap_server)
 	producer.set_topic(ClientData.server_general_topic)
+	producer.producer_ready.connect(_on_producer_ready)
+	producer.producer_error.connect(_on_error)
+	producer.connect_to_broker()
 
 func _is_it_for_me_really(data: Dictionary) -> bool:
 	# Check if the message is for this client
@@ -52,8 +59,6 @@ func _process(_delta: float) -> void:
 
 
 func send_message(user_input: String = "", system_message: String = "", message_content: String = "") -> void:
-	# if not _is_kafka_ready:
-		# await consumer.consumer_ready
 	var data_to_send: Dictionary
 	data_to_send['metadata'] = {
 			"source": "client",
@@ -91,3 +96,17 @@ func change_consumer_topic(topic: String) -> void:
 func initialize_server_connection(password: String = "") -> void:
 	# Send handshake with password in the content field
 	self.send_message("", "ITS'A_ME_MARIO", password)
+
+
+func _on_producer_ready():
+	print("Started Kafka Producer.")
+
+
+func _on_consumer_ready():
+	# print("Consumer subscribed")
+	print("Started Kafka Consumer on topic: '%s'" % ClientData.clients_general_topic)
+	# print("Starting Kafka Consumer on topic: '%s'" % topic)
+
+
+func _on_error(msg: String):
+	printerr("Kafka error: ", msg)
