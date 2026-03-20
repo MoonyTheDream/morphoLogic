@@ -4,6 +4,7 @@
 import argparse
 import asyncio
 import debugpy
+import sys
 
 from ptpython.repl import embed
 from morphologic_server import (
@@ -98,6 +99,10 @@ Say help or just raise your eyebrows — ? — to learn more.
         if log_to_console:
             add_console_handler()
             print("Logging attached again.")
+
+        if sys.stdin.closed:
+            return True  # quit() in shell closed stdin — exit cmdloop
+
         self.do_help(arg)
 
     def do_detach(self, _):
