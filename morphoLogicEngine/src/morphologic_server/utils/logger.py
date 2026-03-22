@@ -91,3 +91,47 @@ class MorphoLogger:
         console_handler.setFormatter(formatter)
         self.logger.addHandler(console_handler)
         # return staged_logger
+
+
+# ---------------------------------------------------------------------------
+# Module-level logger and helper functions used by __init__.py and the rest
+# of the codebase via:  from morphologic_server import logger, ...
+# ---------------------------------------------------------------------------
+
+logger = logging.getLogger("morphoLogic Server")
+
+_log_dir = Path(__file__).resolve().parents[3] / "logs"
+_log_dir.mkdir(parents=True, exist_ok=True)
+_file_handler = RotatingFileHandler(
+    _log_dir / "server_logs.log", maxBytes=4 * 1024 * 1024, backupCount=4
+)
+_file_handler.setFormatter(formatter)
+logger.setLevel(logging.DEBUG)
+logger.addHandler(_file_handler)
+
+_console_handler = logging.StreamHandler(sys.stdout)
+_console_handler.setFormatter(formatter)
+logger.addHandler(_console_handler)
+
+
+def check_if_logging_to_console() -> bool:
+    """Return True if a stdout StreamHandler is attached to the module logger."""
+    return any(
+        isinstance(h, logging.StreamHandler) and getattr(h, "stream", None) is sys.stdout
+        for h in logger.handlers
+    )
+
+
+def remove_console_handler() -> None:
+    """Remove the stdout StreamHandler from the module logger."""
+    for h in list(logger.handlers):
+        if isinstance(h, logging.StreamHandler) and getattr(h, "stream", None) is sys.stdout:
+            logger.removeHandler(h)
+            break
+
+
+def add_console_handler() -> None:
+    """Add a stdout StreamHandler to the module logger."""
+    h = logging.StreamHandler(sys.stdout)
+    h.setFormatter(formatter)
+    logger.addHandler(h)

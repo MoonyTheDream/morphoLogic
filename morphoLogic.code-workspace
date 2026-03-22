@@ -9,11 +9,17 @@
 		// Laptox
 		"godotTools.editorPath.godot4": "/home/moony/snap/steam/common/.local/share/Steam/steamapps/common/Godot Engine/godot.x11.opt.tools.64",
 		
+		// PC Windows
 		// "godotTools.editorPath.godot4": "d:\\SteamLibrary\\steamapps\\common\\Godot Engine\\godot.windows.opt.tools.64.exe",
+		// "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+
 		
 		// Morpho PC Linux
 		// "godotTools.editorPath.godot4": "/home/moony/.local/share/Steam/steamapps/common/Godot Engine/godot.x11.opt.tools.64"
 		
+		// "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+
+
 		"github.copilot.enable": {
 			"*": true,
 			"plaintext": false,

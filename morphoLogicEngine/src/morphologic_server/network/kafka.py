@@ -25,9 +25,6 @@ SERVER_GENERAL_TOPIC = os.getenv(
 CLIENTS_GENERAL_TOPIC = os.getenv(
     "KAFKA_CLIENTS_GENERAL_TOPIC", _SETTINGS.CLIENTS_GENERAL_TOPIC
 )
-CLIENTS_GENERAL_TOPIC = os.getenv(
-    "KAFKA_HANDSHAKE_TOPIC", _SETTINGS.CLIENTS_GENERAL_TOPIC
-)
 SERVER_HANDSHAKE_TOPIC = os.getenv(
     "KAFKA_HANDSHAKE_TOPIC", _SETTINGS.SERVER_HANDSHAKE_TOPIC
 )
@@ -88,18 +85,19 @@ class KafkaConnection:
         Handles the creation of Kafka Admin Client, Producer, and Consmer
         """
         try:
-            admin_conf = {"bootstrap.servers": BOOTSTRAP_SERVER}
+            admin_conf = {"bootstrap.servers": BOOTSTRAP_SERVER, **self._ssl_conf()}
             self.admin = AdminClient(admin_conf)
             self._establish_kafka_connection()
 
-            producer_conf = {"bootstrap.servers": BOOTSTRAP_SERVER, "acks": "all"}
+            producer_conf = {"bootstrap.servers": BOOTSTRAP_SERVER, "acks": "all", **self._ssl_conf()}
             self.producer = Producer(producer_conf)
 
             consumer_conf = {
                 "bootstrap.servers": BOOTSTRAP_SERVER,
-                "group.id": "morphoLogicServerGroup", # Make dynamic later
+                "group.id": _SETTINGS.KAFKA_GROUP_ID,
                 "auto.offset.reset": "earliest",
                 "enable.partition.eof": False,  # we'll be hitting end of partition quite often
+                **self._ssl_conf(),
             }
             self.consumer = Consumer(consumer_conf)
 
@@ -123,6 +121,14 @@ class KafkaConnection:
         if self.producer:
             self.producer.flush(3)  # ensure all queued messages are delivered
             logger.info("Flushed Kafka producer.")
+            
+    def _ssl_conf(self) -> dict:
+        if not _SETTINGS.KAFKA_SECURITY_PROTOCOL:
+            return {}
+        c = {"security.protocol": _SETTINGS.KAFKA_SECURITY_PROTOCOL}
+        if _SETTINGS.KAFKA_SSL_CA_LOCATIONS:
+            c["ssl.ca.location"] = _SETTINGS.KAFKA_SSL_CA_LOCATIONS
+        return c
 
     def create_new_topics(self, topics: list[str]) -> list[str]:
         """

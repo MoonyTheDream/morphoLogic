@@ -8,12 +8,16 @@
 
 config_version=5
 
+[animation]
+
+compatibility/default_parent_skeleton_in_mesh_instance_3d=true
+
 [application]
 
 config/name="morphoLogicClient"
 config/version="0.1.0"
 run/main_scene="res://scenes/prototype.tscn"
-config/features=PackedStringArray("4.5", "GL Compatibility")
+config/features=PackedStringArray("4.6", "GL Compatibility")
 boot_splash/bg_color=Color(0.460273, 0.624563, 0.647919, 1)
 config/icon="uid://d2rakuvfhfult"
 

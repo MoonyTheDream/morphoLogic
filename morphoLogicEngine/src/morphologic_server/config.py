@@ -1,11 +1,14 @@
 """Config module loading settings from environment variables with validation."""
+from pathlib import Path
 from typing import Optional
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
 
-load_dotenv()  # Load .env into environment variables
+# Load .env from the same directory as this file, regardless of CWD
+_env_file = Path(__file__).parent / ".env"
+load_dotenv(_env_file)
 
 
 class ServerSettings(BaseSettings):
@@ -22,6 +25,8 @@ class ServerSettings(BaseSettings):
     SERVER_VERSION: str = Field(default="0.1.0", description="Server version")
     LOG_LEVEL_DEBUG: bool = Field(default=False, description="Enable debug logging")
     ENVIRONMENT: str = Field(default="development", description="Environment (development, staging, production)")
+    KAFKA_SECURITY_PROTOCOL: str = "" # set to "ssl" to enable TSL
+    KAFKA_SSL_CA_LOCATIONS: str = ""
     
     # Kafka configuration
     KAFKA_SERVER: str = Field(
@@ -51,7 +56,10 @@ class ServerSettings(BaseSettings):
         description="PostgreSQL connection URL"
     )
     
-    model_config = {"env_file": ".env", "case_sensitive": False}
+    model_config = {
+        "env_file": str(Path(__file__).parent / ".env"),
+        "case_sensitive": False,
+    }
     
     @field_validator("KAFKA_SERVER")
     @classmethod
