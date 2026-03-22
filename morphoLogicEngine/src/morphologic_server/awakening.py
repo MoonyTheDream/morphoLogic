@@ -3,14 +3,21 @@
 import asyncio
 import json
 
-from morphologic_server import logger, settings as _SETTINGS
-from morphologic_server.utils.search import get_objects_in_proximity
+from morphologic_server import (
+    logger,
+    Context,
+    force_terminate_task_group,
+)
+from .config import ServerSettings
+
+# from morphologic_server.utils.search import get_objects_in_proximity
+from morphologic_server.services.message_handler import MessageHandler
 from .network.kafka import (
     KafkaConnection,
     CLIENTS_GENERAL_TOPIC as _CLIENTS_GENERAL_TOPIC,
 )
 
-__all__ = ["awake"]
+# __all__ = ["awake"]
 
 #        d8888                        888
 #       d88888                        888
@@ -20,45 +27,100 @@ __all__ = ["awake"]
 #   d88P   888 888  888  888 .d888888 888888K  88888888
 #  d8888888888 Y88b 888 d88P 888  888 888 "88b Y8b.
 # d88P     888  "Y8888888P"  "Y888888 888  888  "Y8888
-async def awake(tg: asyncio.TaskGroup):
-    "Entry point of the server."
-    print("The morphoLogic laws of physics bound itself into existence!")
-    logger.info("Server version: %s", _SETTINGS.SERVER_VERSION)
-    logger.info("Waking up laws of nature.")
-
-    tg.create_task(consume_and_handover(tg))
 
 
-# ------------------------------------------------------------------------------------------------ #
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Periodically Health Status ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-# async def automated_periodical_health_status(tg: asyncio.TaskGroup):
-
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Consume And Handle ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-async def consume_and_handover(tg: asyncio.TaskGroup):
+class MorphoLogicHeart:
     """
-    A handler that consumes message from globalTopic and handing them over to handler.
+    The Heart of the Morpho.
+    The application server and entry point. All dependencies injected and no globals.
     """
-    try:
+    
+    def __init__ (self, settings: ServerSettings):
+        self.settings = settings
+
+    
+
+class AwakenedHeart:
+    """
+    The Hearth of the Morpho.
+    """
+
+    context: Context
+    tg: asyncio.TaskGroup
+
+    def __init__(self, context: Context):
+        self.context = context
+        self.tg = context.tg
+
+    async def awake(self):
+        """
+        The main entry point of the server.
+        Initializes Kafka connection, starts consuming messages,
+        and introduces a loop to handle ticks and other tasks.
+        """
+        print("The morphoLogic laws of physics bound itself into existence!")
+        logger.info("Waking up laws of nature.")
 
         with KafkaConnection() as kafka:
-            while True:
-                msg = await asyncio.to_thread(
-                    lambda: kafka.consumer.consume(num_messages=1, timeout=1)
-                )
-                if msg:
-                    if isinstance(msg, list):
-                        msg = msg[0]
+            self.context.kafka = kafka
 
-                    if msg.error():
-                        logger.warning("Error consuming message: %s", msg.error().str())
-                        return
-                    
-                    tg.create_task(handle_message(msg, kafka, tg))
+            message_handler = MessageHandler(self.context)
+            # Start consuming messages from Kafka
+            self.tg.create_task(message_handler.start())
 
-    except Exception:
-        logger.exception("Error in main loop of server.")
+            while not self.context.stop_server:
+                # Handle ticks and other tasks
+                await asyncio.sleep(1)
+
+        # Stop all tasks gracefully
+        logger.info("Stopping the server.")
+        self.tg.create_task(force_terminate_task_group())
+
+    def stop_server(self):
+        """Stop the server."""
+        self.context.stop_server = True
+
+
+# async def awake(tg: asyncio.TaskGroup):
+#     "Entry point of the server."
+#     print("The morphoLogic laws of physics bound itself into existence!")
+#     logger.info("Server version: %s", _SETTINGS.SERVER_VERSION)
+#     logger.info("Waking up laws of nature.")
+
+#     tg.create_task(consume_and_handover(tg))
+
+
+# # ------------------------------------------------------------------------------------------------ #
+
+# # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Periodically Health Status ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+# # async def automated_periodical_health_status(tg: asyncio.TaskGroup):
+
+
+# # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Consume And Handle ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+# async def consume_and_handover(tg: asyncio.TaskGroup):
+#     """
+#     A handler that consumes message from globalTopic and handing them over to handler.
+#     """
+#     try:
+
+#         with KafkaConnection() as kafka:
+#             while True:
+#                 msg = await asyncio.to_thread(
+#                     lambda: kafka.consumer.consume(num_messages=1, timeout=1)
+#                 )
+#                 if msg:
+#                     if isinstance(msg, list):
+#                         msg = msg[0]
+
+#                     if msg.error():
+#                         logger.warning("Error consuming message: %s", msg.error().str())
+#                         return
+
+#                     tg.create_task(handle_message(msg, kafka, tg))
+
+#     except Exception:
+#         logger.exception("Error in main loop of server.")
+
 
 async def handle_message(msg, kafka: KafkaConnection, tg: asyncio.TaskGroup):
     """An actual handler of the message."""
@@ -68,33 +130,30 @@ async def handle_message(msg, kafka: KafkaConnection, tg: asyncio.TaskGroup):
     kafka_msg = _decode_msg(msg)
     # payload = kafka_msg["payload"]
     system_message = kafka_msg["payload"].get("system_message", "")
-    
+
     # # Don't freak out, just answer and carry on
     # if system_message == "YO_ANYBODY_HOME?":
     #     kafka.health_status()
     #     return
-        
-        
+
     user_input = kafka_msg["payload"].get("user_input", "")
     # message_content = kafka_msg["payload"].get("message_content", "")
-    
+
     # system_message = kafka_msg.get("system_message", "")
-    
+
     # this is also topic name
     sending_user = kafka_msg["metadata"]["username"]
     # The above WILL CHANGE. TOPIC PER USERNAME SHOULD BE TRACKING SOMEWHERE
 
     # Handling handhske messages from clients
     match system_message:
-        
+
         # Handshake requests
         case "ITS'A_ME_MARIO":
             _handshake_topic_creation(kafka, kafka_msg)
         # Handshake in dedicated topic handler
         case "WALLS_HAVE_EARS_GOT_IT":
-            _check_and_acknowledge_client_topic(
-                kafka, sending_user, kafka_msg
-            )
+            _check_and_acknowledge_client_topic(kafka, sending_user, kafka_msg)
         case "LOUD_AND_CLEAR":
             await send_initial_objects_data(kafka, sending_user)
         case "":
@@ -112,7 +171,7 @@ async def handle_message(msg, kafka: KafkaConnection, tg: asyncio.TaskGroup):
             user_input,
             msg_topic,
         )
-        
+
         # case _:
         #     logger.warning(
         #         'Unknown payload type in topic "%s": "%s". Content: "%s"',
@@ -120,21 +179,23 @@ async def handle_message(msg, kafka: KafkaConnection, tg: asyncio.TaskGroup):
         #         payload_type,
         #         content
         #     )
-        
+
+
 async def send_initial_objects_data(kafka: KafkaConnection, username: str):
     from morphologic_server.archetypes.base import search, Character
+
     # BARDZO WIP
     user = await search("MoonyTheDream", Character)
     # user = await search("AnotherCharacter", Character)
-    
+
     objects = await user.get_surrounding_description()
     kafka.send_data_to_user(
         topic=username,
         username=username,
         server_message="SURROUNDINGS_DATA",
-        content=objects
-        
+        content=objects,
     )
+
 
 async def testowy_odeslij(kafka: KafkaConnection, username: str, tg):
     """
@@ -148,6 +209,7 @@ async def testowy_odeslij(kafka: KafkaConnection, username: str, tg):
     )
     for i in range(100):
         tg.create_task(send_initial_objects_data(kafka, username))
+
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Decode Msg ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 def _decode_msg(msg) -> dict:
@@ -191,16 +253,16 @@ def _check_and_acknowledge_client_topic(
     88888P Y88888   888   888
     8888P   Y8888   888   888
     888P     Y888 8888888 888
-    
+
     After client's WALLS_HAVE_EARS_GOT_IT check if the topic is subscribed and
     then send there an "ACK" system message
     """
     username = msg["metadata"]["username"]
 
     # Na razie taka beznadziejna walidacja, do zastąpienia czymś sensownym
-    kafka.send_data_to_user(msg_topic, username=username, server_message="CAN_YOU_HEAR_ME?")
-    
-    
+    kafka.send_data_to_user(
+        msg_topic, username=username, server_message="CAN_YOU_HEAR_ME?"
+    )
 
 
 # if __name__ == "__main__":

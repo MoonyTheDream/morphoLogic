@@ -152,7 +152,7 @@ class AsyncCmd:
                         if self.use_rawinput:
                             try:
                                 line = await asyncio.to_thread(self.stdin.readline)
-                            except EOFError:
+                            except (EOFError, ValueError):
                                 line = "EOF"
                         else:
                             self.stdout.write(self.prompt)

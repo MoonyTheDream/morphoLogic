@@ -1,5 +1,3 @@
-from typing import Type
-
 from sqlalchemy import select
 
 from geoalchemy2.shape import from_shape
@@ -13,18 +11,14 @@ from morphologic_server.db.models import (
     GameObjectDB,
     CharacterDB,
 )
-from morphologic_server.archetypes.base import (
-    Archetypes,
-    GameObject,
-    Character
-)
 
 STANDARD_VISIBILITY_RADIUS = 10.0  # IN METERES
 
 
-async def get_objects_in_proximity(
-    focal_point: Type["Archetypes"], radius: float = STANDARD_VISIBILITY_RADIUS
-):
+async def get_objects_in_proximity(focal_point, radius: float = STANDARD_VISIBILITY_RADIUS):
+    # Lazy import to break the circular dependency with archetypes/base.py
+    from morphologic_server.archetypes.base import GameObject, Character
+
     point_z = from_shape(Point(focal_point.location.x, focal_point.location.y, focal_point.location.z), srid=3857)
 
     async with DBAsyncSession() as session:
@@ -44,7 +38,7 @@ async def get_objects_in_proximity(
                 )
             )
         )
-        
+
         stmt2 = (
             select(CharacterDB)
             .where(
@@ -63,10 +57,10 @@ async def get_objects_in_proximity(
         )
         result1 = await session.execute(stmt1)
         result2 = await session.execute(stmt2)
-        
+
         game_objects = result1.scalars().all()
         characters = result2.scalars().all()
-        
+
     game_objects = [GameObject(obj) for obj in game_objects if obj.object_type != "character"]
     characters = [Character(obj) for obj in characters]
     

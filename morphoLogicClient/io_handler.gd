@@ -4,6 +4,7 @@ extends Node
 
 signal draw_message(msg)
 signal update_objects(objects)
+signal update_minimap(objects: Dictionary)
 var message_processed := true
 
 func _ready() -> void:
@@ -31,7 +32,7 @@ func parse_message(data: Dictionary) -> void:
 		var server_message = data['payload'].get("server_message", "")
 		# var system_message = data['payload'].get("system_message", "")
 		var direct_message = data['payload'].get("direct_message", "")
-		var objects = data['payload'].get("objects", "")
+		var objects = data['payload'].get("objects", null)
 		var message_content = data['payload'].get("content", "")
 		match server_message:
 			# Handshake
@@ -60,10 +61,8 @@ func parse_message(data: Dictionary) -> void:
 		if direct_message:
 			draw_message.emit(direct_message)
 
-		if objects:
-			pass
-			# update_objects.emit(objects["game_objects"])
-			# update_objects.emit(message_content)
+		if objects and typeof(objects) == TYPE_DICTIONARY:
+			update_minimap.emit(objects)
 	message_processed = true
 		
 

@@ -4,6 +4,7 @@
 import argparse
 import asyncio
 import debugpy
+import sys
 
 from ptpython.repl import embed
 from morphologic_server import (
@@ -14,17 +15,17 @@ from morphologic_server import (
     remove_console_handler,
     add_console_handler,
 )
-from .awakening import awake
+from .app import Server
+from .config import ServerSettings
 from .utils.async_cmd import AsyncCmd
-
 
 # ------------------------------------------------------------------------------------------------ #
 
 
 async def run_python_shell():
     """Coroutine to run the python shell."""
-    from morphologic_server.db.models import TerrainType
-    from morphologic_server.archetypes import base as archetypes
+    # from morphologic_server.db.models import TerrainType
+    from morphologic_server.archetypes import base as archetypes 
 
     banner = "morphoLogic async shell Type `await ...` freely — Ctrl-D to exit."
     print(banner)
@@ -68,7 +69,7 @@ class MorphoLogicCmd(AsyncCmd):
     stop = None
     intro = """
 Welcome. You are apparently one of the chosen ones as only few can enter this realm.
-Say help or just raise your eyebrows - ? - to learn more.
+Say help or just raise your eyebrows — ? — to learn more.
 """
     prompt = "(morphoLogicServer) "
 
@@ -98,6 +99,10 @@ Say help or just raise your eyebrows - ? - to learn more.
         if log_to_console:
             add_console_handler()
             print("Logging attached again.")
+
+        if sys.stdin.closed:
+            return True  # quit() in shell closed stdin — exit cmdloop
+
         self.do_help(arg)
 
     def do_detach(self, _):
@@ -134,8 +139,10 @@ async def start_server(args):
         print("Awakening of the World.")
         remove_console_handler()
     try:
+        server = Server(ServerSettings())
         async with asyncio.TaskGroup() as tg:
-            tg.create_task(awake(tg))
+            # Both tasks run concurrently — neither blocks the other.
+            tg.create_task(server.run(tg))
             tg.create_task(MorphoLogicCmd().cmdloop())
     except* TerminateTaskGroup:
         logger.info("Terminating tasks.")
@@ -156,6 +163,12 @@ async def just_shell(args):
     Run just the python shell.
     """
     await run_python_shell()
+
+
+async def run_seed(args):
+    """Populate the database with test objects and areas."""
+    from morphologic_server.scripts.seed import seed
+    await seed()
 
 
 # ------------------------------------------------------------------------------------------------ #
@@ -192,11 +205,19 @@ def main():
     )
     shell.set_defaults(func=just_shell)
 
+    seed_cmd = subparsers.add_parser(
+        "seed", help="Populate the database with test objects and areas"
+    )
+    seed_cmd.set_defaults(func=run_seed)
+
     args = parser.parse_args()
 
     # If no arguments provided, display help
     if hasattr(args, "func"):
-        asyncio.run(args.func(args))
+        try:
+            asyncio.run(args.func(args))
+        except KeyboardInterrupt:
+            pass
     else:
         parser.print_help()
 

@@ -11,6 +11,4 @@ The CLI has some basic functions. When the morphoLogic Server is run by "morphol
 - `detach` - detaches (turns off) the CLI, the server keeps running
 
 # morphoLogicClient
-Built on Godot
-## microserver
-The microserver (python script) is automaticly run by a Godot Client. It's main purpose is to comunicate Client with Kafka (two-way communication)      
+Built on Godot 
