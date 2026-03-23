@@ -1,14 +1,23 @@
-# TOPICS
-## Communication server -> client
-- A given topic per client
--> clientsGeneralTopic
--> clientHandshakeTopic
-## Communication client -> server
--> serverGeneralTopic 
--> serverHandshakeTopic
+# Handy Lines
 
-# Docker Kafka Client Commands
-## kafka_2.13-3.9.0
+## TOPICS
+
+### Communication server -> client
+
+- A given topic per client
+  - `clientsGeneralTopic`
+  - `clientHandshakeTopic`
+
+### Communication client -> server
+
+- `serverGeneralTopic`
+- `serverHandshakeTopic`
+
+## Docker Kafka Client Commands
+
+### kafka_2.13-3.9.0
+
+```cli
 docker pull apache/kafka:latest
 docker run -p 9092:9092 apache/kafka:latest
 bin/kafka-topics.sh --create --topic serverGeneralTopic --bootstrap-server <localhost/kafka_server_address>:9092
@@ -16,23 +25,35 @@ bin/kafka-topics.sh --create --topic serverGeneralTopic --bootstrap-server <loca
     key = None
 bin/kafka-topics.sh --create --topic addresedToClients --bootstrap-server <localhost/kafka_server_address>:9092
     key = <userName>
+```
 
+```cli
 bin/kafka-console-producer.sh --topic Moony --bootstrap-server localhost:9092 --timeout 0
+```
+
+```cli
 bin/kafka-console-consumer.sh --topic serverGeneralTopic --from-beginning --bootstrap-server localhost:9092
+```
 
-# pip
+## pip
 <!-- Just the latest -->
-confluent-kafka 
+`confluent-kafka`
 
-# Docker Itself
-# Add Docker's official GPG key:
+## Docker Itself
+
+## Add Docker's official GPG key
+
+```cli
 sudo apt-get update
 sudo apt-get install ca-certificates curl
 sudo install -m 0755 -d /etc/apt/keyrings
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo curl -fsSL <https://download.docker.com/linux/ubuntu/gpg> -o /etc/apt/keyrings/docker.asc
 sudo chmod a+r /etc/apt/keyrings/docker.asc
+```
 
-# Add the repository to Apt sources:
+## Add the repository to Apt sources
+
+```cli
 echo \
   "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
   $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | \
@@ -41,7 +62,6 @@ sudo apt-get update
 
 sudo groupadd docker
 sudo usermod -aG docker $USER
+```
 
-*restart* for *vscode* to also be able to see docker
-
-
+**Restart** for *vscode* to also be able to see docker.

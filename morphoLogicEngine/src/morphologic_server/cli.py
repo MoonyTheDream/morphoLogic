@@ -1,10 +1,11 @@
 """Module responsible for the command line interface of the server."""
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Imports ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+import sys
+
 import argparse
 import asyncio
 import debugpy
-import sys
 
 from ptpython.repl import embed
 from morphologic_server import (
@@ -25,7 +26,7 @@ from .utils.async_cmd import AsyncCmd
 async def run_python_shell():
     """Coroutine to run the python shell."""
     # from morphologic_server.db.models import TerrainType
-    from morphologic_server.archetypes import base as archetypes 
+    from morphologic_server.archetypes import base as archetypes
 
     banner = "morphoLogic async shell Type `await ...` freely — Ctrl-D to exit."
     print(banner)
@@ -168,6 +169,7 @@ async def just_shell(args):
 async def run_seed(args):
     """Populate the database with test objects and areas."""
     from morphologic_server.scripts.seed import seed
+
     await seed()
 
 

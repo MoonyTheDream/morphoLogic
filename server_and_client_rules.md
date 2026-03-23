@@ -1,19 +1,55 @@
 # Communication between Server and Clinet
-Type: *JSON*
+
+Type: **JSON**
 
 ## Revamped HANDSHAKE
 <!-- -> [CLIENT][serverGeneralTopic]"system_message":"YO_ANYBODY_HOME?" // at launch, to verify connection
 -> [SERVER][clientsGeneralTopic]"system_message":"UP_AND_RUNNING" 
 Może jednak niepotrzebne, próba loginu tym jest -->
--> [CLIENT][serverGeneralTopic]"username":<username>; "system_message":"ITS'A_ME_MARIO" // after user log in. Username attached to each message from now on
--> [SERVER][clientsGeneralTopic]"sytem_message":"SHH_LET'S_TALK_IN_PRIVATE"; "SHH_LET'S_TALK_IN_PRIVATE": <dedicated_client's_topic>
--> [CLIENT][serverGeneralTopic]"system_message":"WALLS_HAVE_EARS_GOT_IT" // after succsessful subscribing to new topic
--> [SERVER][<dedicated_client's_topic>]"system_message":"CAN_YOU_HEAR_ME?"
--> [CLIENT][serverGeneralTopic]"system_message":"LOUD_AND_CLEAR"
+**1. CLIENT → `serverGeneralTopic`**
+
+```json
+{ "username": "<username>", "system_message": "ITS'A_ME_MARIO" }
+```
+
+> After login. Username is attached to every subsequent message.
+
+**2. SERVER → `clientsGeneralTopic`**
+
+```json
+{ "system_message": "SHH_LET'S_TALK_IN_PRIVATE", "SHH_LET'S_TALK_IN_PRIVATE": "<dedicated_topic>" }
+```
+
+> Server assigns the client a private topic.
+
+**3. CLIENT → `serverGeneralTopic`**
+
+```json
+{ "system_message": "WALLS_HAVE_EARS_GOT_IT" }
+```
+
+> Client confirms it has subscribed to the private topic.
+
+**4. SERVER → `<dedicated_client_topic>`**
+
+```json
+{ "system_message": "CAN_YOU_HEAR_ME?" }
+```
+
+> Server tests the private channel.
+
+**5. CLIENT → `serverGeneralTopic`**
+
+```json
+{ "system_message": "LOUD_AND_CLEAR" }
+```
+
+> Handshake complete.
 <!-- -> [SERVER][<dedicated_client's_topic>]"system_message":"PERFECT_LET_US_TALK_BUSINESS_THEN" -->
 
-
 ## Client -> Server
+
+```json
 {
   "metadata": {
     "source": "client",
@@ -28,7 +64,11 @@ Może jednak niepotrzebne, próba loginu tym jest -->
     "content": "<optional_content_for_the_message>"
   }
 }
+```
+
 ## Server -> Client
+
+```json
 {
   "metadata": {
     "source": "<server/microserver>",
@@ -40,7 +80,7 @@ Może jednak niepotrzebne, próba loginu tym jest -->
     "server_message": "<the_message>",
     "direct_message": "<the message wo show on client directly>",
     "content": "<optional_content_for_the_message>"
-    "objects": { 
+    "objects": {
       "id_of_object_01": {
         "value_01": "value",
         "value_02": 5
@@ -52,7 +92,10 @@ Może jednak niepotrzebne, próba loginu tym jest -->
     }
   }
 }
+```
+
 ## Colors
+
 NAMES = [color=medium_turquoise]
 INFO (positive) = [color=yellow_green]
 WARNING = [color=gold]

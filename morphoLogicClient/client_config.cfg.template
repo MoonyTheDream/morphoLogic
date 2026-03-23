@@ -3,8 +3,10 @@ serverGeneralTopic = "serverGeneralTopic"
 clientsGeneralTopic = "clientsGeneralTopic"
 log_level_debug = true
 debugpy = false
-bootstrapServer = "localhost:9092"
+bootstrapServer = "<mlkafka.address>:9092"
+securityProtocol = "ssl"
 serverHandshakeTopic = "serverHandshakeTopic"
 clientHandshakeTopic = "clientHandshakeTopic"
+sslCaLocation = "res://cacert.pem"
 
 
