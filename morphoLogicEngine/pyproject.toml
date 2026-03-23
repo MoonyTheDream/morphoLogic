@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Game server for morphoLogic"
 authors = [{name = "Moony The Dream", email = "moonchasered@gmail.com"}]
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
     "confluent-kafka",
     "debugpy",
