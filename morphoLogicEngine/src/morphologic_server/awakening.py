@@ -1,14 +1,18 @@
-"""The main module starting the server and all needed services."""
+"""
+The main module starting the server and all needed services.
+Aplication bootstrap.
+"""
 
 import asyncio
 import json
+import logging
 
 from morphologic_server import (
     logger,
     Context,
     force_terminate_task_group,
 )
-from .config import ServerSettings
+from morphologic_server.config import ServerSettings
 
 # from morphologic_server.utils.search import get_objects_in_proximity
 from morphologic_server.services.message_handler import MessageHandler
@@ -33,10 +37,22 @@ class MorphoLogicHeart:
     """
     The Heart of the Morpho.
     The application server and entry point. All dependencies injected and no globals.
+    
+    Usage (from cli.py):
+        settings = ServerSettings()
+        server = Server(settings)
+        async with asyncio.TaskGroup() as tg:
+            tg.create_task(server.run(tg))
+            tg.create_task(MorphoLogicCmd().cmdloop())
     """
     
     def __init__ (self, settings: ServerSettings):
         self.settings = settings
+        self._stop = False
+        
+        # Adjust the module loger level as in the settings
+        level = logging.DEBUG if settings.is_debug() else logging.INFO
+        logging.getLogger("morphoLogic Server").setLevel(level)
 
     
 

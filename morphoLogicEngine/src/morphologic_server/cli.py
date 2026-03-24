@@ -76,14 +76,14 @@ Say help or just raise your eyebrows — ? — to learn more.
 
     async def do_stop(self, _):
         """Stop the server."""
-        print("Stars are fading... All the Heaven's batteries are turning off.")
+        print("Stars are fading — the Heaven's batteries are weakening.")
         await force_terminate_task_group()
         return True  # Exits the cmd loop
 
     def do_debug(self, _):
         """Listen on debugpy."""
         debugpy.listen(("localhost", 5678))
-        debugpy.wait_for_client()
+        debugpy.wait_for_client()   
         print("Debugger attached")
 
     async def do_shell(self, arg):

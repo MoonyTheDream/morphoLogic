@@ -20,6 +20,7 @@ dependencies = [
     "shapely>=2.1.0",
     "ptpython>=3.0.29",
     "pytest>=8.3.5",
+    "pytest-asyncio>=0.25.0",
     "python-dotenv>=1.1.0",
     "pydantic>=2.12.5",
     "pydantic-settings>=2.13.1",
@@ -32,6 +33,11 @@ exclude = ["tests/", "logs/", "*.md"]
 # Required if dependencies include direct git repos
 # [tool.hatch.metadata]
 # allow-direct-references = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["src"]
 
 [project.scripts]
 morphologic = "morphologic_server.cli:main"

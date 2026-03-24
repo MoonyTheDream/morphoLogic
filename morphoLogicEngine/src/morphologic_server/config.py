@@ -23,7 +23,6 @@ class ServerSettings(BaseSettings):
     
     # Application
     SERVER_VERSION: str = Field(default="0.1.0", description="Server version")
-    LOG_LEVEL_DEBUG: bool = Field(default=False, description="Enable debug logging")
     ENVIRONMENT: str = Field(default="development", description="Environment (development, staging, production)")
     KAFKA_SECURITY_PROTOCOL: str = "" # set to "ssl" to enable TSL
     KAFKA_SSL_CA_LOCATIONS: str = ""
@@ -112,4 +111,4 @@ class ServerSettings(BaseSettings):
     
     def is_debug(self) -> bool:
         """Check if debug mode is enabled."""
-        return self.LOG_LEVEL_DEBUG and not self.is_production()
+        return not self.is_production()
