@@ -4,22 +4,22 @@ Aplication bootstrap.
 """
 
 import asyncio
-import json
+# import json
 import logging
 
-from morphologic_server import (
-    logger,
-    Context,
-    force_terminate_task_group,
-)
+# from morphologic_server import (
+#     logger,
+#     Context,
+#     force_terminate_task_group,
+# )
 from morphologic_server.config import ServerSettings
 
-# from morphologic_server.utils.search import get_objects_in_proximity
-from morphologic_server.services.message_handler import MessageHandler
-from .network.kafka import (
-    KafkaConnection,
-    CLIENTS_GENERAL_TOPIC as _CLIENTS_GENERAL_TOPIC,
-)
+# # from morphologic_server.utils.search import get_objects_in_proximity
+# from morphologic_server.services.message_handler import MessageHandler
+# from .network.kafka import (
+#     KafkaConnection,
+#     CLIENTS_GENERAL_TOPIC as _CLIENTS_GENERAL_TOPIC,
+# )
 
 # __all__ = ["awake"]
 
@@ -40,9 +40,9 @@ class MorphoLogicHeart:
     
     Usage (from cli.py):
         settings = ServerSettings()
-        server = Server(settings)
+        morpho_heart = Server(settings)
         async with asyncio.TaskGroup() as tg:
-            tg.create_task(server.run(tg))
+            tg.create_task(morpho_heart.awake(tg))
             tg.create_task(MorphoLogicCmd().cmdloop())
     """
     
