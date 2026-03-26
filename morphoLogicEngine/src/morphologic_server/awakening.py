@@ -51,9 +51,21 @@ class MorphoLogicHeart:
         self._stop = False
         
         # Adjust the module loger level as in the settings
-        level = logging.DEBUG if settings.is_debug() else logging.INFO
-        logging.getLogger("morphoLogic Server").setLevel(level)
+        self.log = logging.getLogger("morphoLogic Server")
+        self.log.setLevel(settings.logging_level())
+        
+    async def awake(self, th:  asyncio.TaskGroup) -> None:
+        """
+        Open a Kafka connection, start the message handler, and keep beating.
 
+        Args:
+            th (asyncio.TaskGroup): Takes the outer TaskGroup from cli.py so the server and CLI run as
+        concurent tasks in the same cancellation domain.
+
+        Returns:
+            _type_: None
+        """
+        self.log.info("MorphoLogic Heart is beating again. It's the %s in ")
     
 
 class AwakenedHeart:
