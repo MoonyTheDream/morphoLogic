@@ -4,6 +4,7 @@ Aplication bootstrap.
 """
 
 import asyncio
+
 # import json
 import logging
 
@@ -13,6 +14,8 @@ import logging
 #     force_terminate_task_group,
 # )
 from morphologic_server.config import ServerSettings
+from morphologic_server.network.kafka import KafkaConnection
+from morphologic_server.services.message_handler import MessageHandler
 
 # # from morphologic_server.utils.search import get_objects_in_proximity
 # from morphologic_server.services.message_handler import MessageHandler
@@ -37,7 +40,7 @@ class MorphoLogicHeart:
     """
     The Heart of the Morpho.
     The application server and entry point. All dependencies injected and no globals.
-    
+
     Usage (from cli.py):
         settings = ServerSettings()
         morpho_heart = Server(settings)
@@ -45,28 +48,40 @@ class MorphoLogicHeart:
             tg.create_task(morpho_heart.awake(tg))
             tg.create_task(MorphoLogicCmd().cmdloop())
     """
-    
-    def __init__ (self, settings: ServerSettings):
+
+    def __init__(self, settings: ServerSettings):
         self.settings = settings
         self._stop = False
-        
+
         # Adjust the module loger level as in the settings
         self.log = logging.getLogger("morphoLogic Server")
         self.log.setLevel(settings.logging_level())
-        
-    async def awake(self, th:  asyncio.TaskGroup) -> None:
+
+    async def awake(self, tg: asyncio.TaskGroup) -> None:
         """
         Open a Kafka connection, start the message handler, and keep beating.
 
         Args:
-            th (asyncio.TaskGroup): Takes the outer TaskGroup from cli.py so the server and CLI run as
+            tg (asyncio.TaskGroup): Takes the outer TaskGroup from cli.py so the server and CLI run as
         concurent tasks in the same cancellation domain.
 
         Returns:
             _type_: None
         """
-        self.log.info("MorphoLogic Heart is beating again. It's the %s in ")
-    
+        self.log.info(
+            "MorphoLogic Heart is beating again. It's the Artistic Beloved Hearth numbered %s.",
+            self.settings.SERVER_VERSION,
+        )
+
+        with KafkaConnection(self) as kafka:
+            handler = MessageHandler(heart=self, kafka=kafka, tg=tg)
+            tg.create_task(handler.start())
+
+            while not self._stop:
+                await asyncio.sleep(1) # temporary, there will be beating heart and timer
+
+        self.log.info("The Heart is going to rest. The server stopped.")
+
 
 class AwakenedHeart:
     """

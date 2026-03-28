@@ -1,14 +1,22 @@
 """MessageHandler — Kafka consumer loop + full protocol routing."""
 
+from __future__ import annotations
+
+
 import asyncio
 import json
+from typing import TYPE_CHECKING
+
 
 from confluent_kafka import Message
 
+if TYPE_CHECKING:
+    from morphologic_server.awakening import MorphoLogicHeart
+    
 from morphologic_server import logger
+
 from morphologic_server.network.kafka import (
     KafkaConnection,
-    CLIENTS_GENERAL_TOPIC as _CLIENTS_GENERAL_TOPIC,
 )
 
 
@@ -27,7 +35,8 @@ class KafkaMessage:
 class MessageHandler:
     """Consumes Kafka messages and routes them to the correct handler."""
 
-    def __init__(self, kafka: KafkaConnection, tg: asyncio.TaskGroup):
+    def __init__(self, heart: MorphoLogicHeart, kafka: KafkaConnection, tg: asyncio.TaskGroup):
+        self.heart = heart
         self.kafka = kafka
         self.tg = tg
         self._stop = False
@@ -85,7 +94,7 @@ class MessageHandler:
         if character is None:
             logger.info('Auth failed for "%s"', username)
             self.kafka.send_data_to_user(
-                _CLIENTS_GENERAL_TOPIC,
+                self.heart.settings.CLIENTS_GENERAL_TOPIC,
                 username,
                 direct_message="[color=tomato]Authentication failed. Check your username and password.[/color]\n",
             )
@@ -99,7 +108,7 @@ class MessageHandler:
         if created:
             logger.info('Created topic: "%s"', dedicated_topic)
         self.kafka.send_data_to_user(
-            _CLIENTS_GENERAL_TOPIC,
+            self.heart.settings.CLIENTS_GENERAL_TOPIC,
             username,
             server_message="SHH_LET'S_TALK_IN_PRIVATE",
             content=dedicated_topic,

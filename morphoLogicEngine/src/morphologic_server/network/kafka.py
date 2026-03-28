@@ -3,31 +3,23 @@ Initializing Kafka connection and creating context manager for
 Producer, Consumer and Admin
 """
 
+from __future__ import annotations
+
 import os
 import json
 
 from time import sleep
+from typing import TYPE_CHECKING
 
 from confluent_kafka import Producer, Consumer, KafkaException
 from confluent_kafka.admin import AdminClient, NewTopic
 
-from morphologic_server import logger, settings as _SETTINGS
 
+if TYPE_CHECKING:
+    from morphologic_server.awakening import MorphoLogicHeart
 
 from ..utils.time_helpers import get_gmt_time
 
-BOOTSTRAP_SERVER = os.getenv(
-    "KAFKA_BOOTSTRAP_SERVER", _SETTINGS.KAFKA_SERVER
-)
-SERVER_GENERAL_TOPIC = os.getenv(
-    "KAFKA_SERVER_GENERAL_TOPIC", _SETTINGS.SERVER_GENERAL_TOPIC
-)
-CLIENTS_GENERAL_TOPIC = os.getenv(
-    "KAFKA_CLIENTS_GENERAL_TOPIC", _SETTINGS.CLIENTS_GENERAL_TOPIC
-)
-SERVER_HANDSHAKE_TOPIC = os.getenv(
-    "KAFKA_HANDSHAKE_TOPIC", _SETTINGS.SERVER_HANDSHAKE_TOPIC
-)
 
 # 888    d8P            .d888 888
 # 888   d8P            d88P"  888
@@ -48,11 +40,11 @@ class KafkaConnection:
     and exposing some methods like create new topic etc.
     """
 
-    def __init__(self, bootstrap_server: str = BOOTSTRAP_SERVER):
+    def __init__(self, heart: MorphoLogicHeart):
+        self.heart = heart
         self.admin: AdminClient = None
         self.producer: Producer = None
         self.consumer: Consumer = None
-        self.bootstrap_server = bootstrap_server
         # self.general_topic = SERVER_GENERAL_TOPIC
 
     def _establish_kafka_connection(
@@ -66,14 +58,14 @@ class KafkaConnection:
             try:
                 cluster_metadata = self.admin.list_topics(timeout=5)
                 if cluster_metadata.brokers:
-                    logger.debug("Kafka connection verified.")
+                    self.heart.log.debug("Kafka connection verified.")
                     return
             except KafkaException as e:
                 if attemt < max_retries - 1:
-                    logger.warning("Kafka connection failed. Retrying.")
+                    self.heart.log.warning("Kafka connection failed. Retrying.")
                     sleep(wait_time)
                 else:
-                    logger.error(
+                    self.heart.log.error(
                         "Kafka connection failed after %d retries.", max_retries
                     )
                     raise RuntimeError(
@@ -85,49 +77,49 @@ class KafkaConnection:
         Handles the creation of Kafka Admin Client, Producer, and Consmer
         """
         try:
-            admin_conf = {"bootstrap.servers": BOOTSTRAP_SERVER, **self._ssl_conf()}
+            admin_conf = {"bootstrap.servers": self.heart.settings.KAFKA_SERVER, **self._ssl_conf()}
             self.admin = AdminClient(admin_conf)
             self._establish_kafka_connection()
 
-            producer_conf = {"bootstrap.servers": BOOTSTRAP_SERVER, "acks": "all", **self._ssl_conf()}
+            producer_conf = {"bootstrap.servers": self.heart.settings.KAFKA_SERVER, "acks": "all", **self._ssl_conf()}
             self.producer = Producer(producer_conf)
 
             consumer_conf = {
-                "bootstrap.servers": BOOTSTRAP_SERVER,
-                "group.id": _SETTINGS.KAFKA_GROUP_ID,
+                "bootstrap.servers": self.heart.settings.KAFKA_SERVER,
+                "group.id": self.heart.settings.KAFKA_GROUP_ID,
                 "auto.offset.reset": "earliest",
                 "enable.partition.eof": False,  # we'll be hitting end of partition quite often
                 **self._ssl_conf(),
             }
             self.consumer = Consumer(consumer_conf)
 
-            self.subscribe_to_topics([SERVER_GENERAL_TOPIC, SERVER_HANDSHAKE_TOPIC])
+            self.subscribe_to_topics([self.heart.settings.SERVER_GENERAL_TOPIC, self.heart.settings.SERVER_HANDSHAKE_TOPIC])
 
             return self
 
         except KafkaException:
-            logger.exception("Error setting up Kafka resources.")
+            self.heart.log.exception("Error setting up Kafka resources.")
             raise
         except Exception:
-            logger.exception("Error setting up Kafka resources.")
+            self.heart.log.exception("Error setting up Kafka resources.")
             raise
 
     def __exit__(self, exc_type, exc_value, traceback):
         """Cleanup: close consumer, flush producer"""
         if self.consumer:
             self.consumer.close()
-            logger.info("Closed Kafka consumer.")
+            self.heart.log.info("Closed Kafka consumer.")
 
         if self.producer:
             self.producer.flush(3)  # ensure all queued messages are delivered
-            logger.info("Flushed Kafka producer.")
+            self.heart.log.info("Flushed Kafka producer.")
             
     def _ssl_conf(self) -> dict:
-        if not _SETTINGS.KAFKA_SECURITY_PROTOCOL:
+        if not self.heart.settings.KAFKA_SECURITY_PROTOCOL:
             return {}
-        c = {"security.protocol": _SETTINGS.KAFKA_SECURITY_PROTOCOL}
-        if _SETTINGS.KAFKA_SSL_CA_LOCATIONS:
-            c["ssl.ca.location"] = _SETTINGS.KAFKA_SSL_CA_LOCATIONS
+        c = {"security.protocol": self.heart.settings.KAFKA_SECURITY_PROTOCOL}
+        if self.heart.settings.KAFKA_SSL_CA_LOCATIONS:
+            c["ssl.ca.location"] = self.heart.settings.KAFKA_SSL_CA_LOCATIONS
         return c
 
     def create_new_topics(self, topics: list[str]) -> list[str]:
@@ -149,9 +141,9 @@ class KafkaConnection:
                 for topic, future_topic in dict_future_topics.items():
                     b_topic = topic
                     future_topic.result()
-                logger.info('Created Kafka topic "%s"', topic)
+                self.heart.log.info('Created Kafka topic "%s"', topic)
             except Exception:
-                logger.exception('Failed to create topic "%s".', b_topic)
+                self.heart.log.exception('Failed to create topic "%s".', b_topic)
                 raise  # re-raise to exit the context manager
         new_topics_list = [
             topic.topic if isinstance(topic, NewTopic) else topic
@@ -166,7 +158,7 @@ class KafkaConnection:
     def subscribe_to_topics(self, topics: list[str]):
         """Subscribes the class' Kafka Consumer to specific topic."""
         self.consumer.subscribe(topics)
-        logger.info('Subscribed to Kafka topics "%s"', topics)
+        self.heart.log.info('Subscribed to Kafka topics "%s"', topics)
 
     def update_subscription(self, topics: list[str]):
         """Checks if listed topics are already subscribed and if not, subscribes"""
@@ -187,7 +179,7 @@ class KafkaConnection:
     def unsubscribe_from_topics(self, topics: list[str]):
         """Unsubscribes the class' Kafka Consumer from specific topic."""
         self.consumer.unsubscribe(topics)
-        logger.info('Unsubscribed from Kafka topics "%s"', topics)
+        self.heart.log.info('Unsubscribed from Kafka topics "%s"', topics)
 
     def send_data_to_user(
         self,
@@ -214,7 +206,7 @@ class KafkaConnection:
         # adding key might result in some consumers not consuming their message as each
         # consumer get's it's own partition when there's more that one consumers
         # and there might be more than one producer and consumer when multiple users will try to join
-        logger.debug('Produced message to %s: "%s"', topic, payload_data)
+        self.heart.log.debug('Produced message to %s: "%s"', topic, payload_data)
 
     def health_status(self):
         """Just a quick 'UP_AND_RUNNING' message to Kafka"""
@@ -228,8 +220,8 @@ class KafkaConnection:
         }
         wrapped_data = self._add_metadata(payload_data, "")
         wrapped_data = json.dumps(payload_data, ensure_ascii=False).encode("utf-8")
-        self.producer.produce(CLIENTS_GENERAL_TOPIC, value=wrapped_data)
-        logger.debug('Produced message to %s: "%s"', CLIENTS_GENERAL_TOPIC, payload_data)
+        self.producer.produce(self.heart.settings.CLIENTS_GENERAL_TOPIC, value=wrapped_data)
+        self.heart.log.debug('Produced message to %s: "%s"', self.heart.settings.CLIENTS_GENERAL_TOPIC, payload_data)
         
 
     def _add_metadata(self, data: dict, username: str) -> dict:
@@ -241,7 +233,7 @@ class KafkaConnection:
                 "metadata": {
                     "source": "server",
                     "to_user": username,
-                    "server_version": _SETTINGS.SERVER_VERSION,
+                    "server_version": self.heart.settings.SERVER_VERSION,
                     "timestamp": get_gmt_time(),
                 }
             }
