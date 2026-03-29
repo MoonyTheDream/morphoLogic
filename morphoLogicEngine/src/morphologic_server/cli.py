@@ -141,10 +141,10 @@ async def start_server(args):
         print("Awakening of the World.")
         remove_console_handler()
     try:
-        morphologic_heart = MorphoLogicHeart(ServerSettings())
+        morpho_heart = MorphoLogicHeart(ServerSettings())
         async with asyncio.TaskGroup() as tg:
             # Both tasks run concurrently — neither blocks the other.
-            tg.create_task(morphologic_heart.awake(tg))
+            tg.create_task(morpho_heart.awake(tg))
             tg.create_task(MorphoLogicCmd().cmdloop())
     except* TerminateTaskGroup:
         logger.info("Terminating tasks.")
