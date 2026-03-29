@@ -24,29 +24,33 @@ from .utils.async_cmd import AsyncCmd
 # ------------------------------------------------------------------------------------------------ #
 
 
-async def run_python_shell():
+async def run_python_shell(heart=None):
     """Coroutine to run the python shell."""
-    # from morphologic_server.db.models import TerrainType
     from morphologic_server.archetypes import base as archetypes
+
+    if heart is None:
+        from morphologic_server.db.engine import create_sessionmaker
+        from morphologic_server.db.memory import Memory
+        from morphologic_server.config import ServerSettings
+
+        settings = ServerSettings()
+        sessionmaker = create_sessionmaker(settings.DB_ADDRESS)
+        archetypes.Archetypes._sessionmaker = sessionmaker
+        memory = Memory(sessionmaker)
+    else:
+        memory = heart.memory
 
     banner = "morphoLogic async shell Type `await ...` freely — Ctrl-D to exit."
     print(banner)
 
-    # Define your local namespace
     context = {
         "force_terminate_task_group": force_terminate_task_group,
         "asyncio": asyncio,
         "logger": logger,
         "db_api": archetypes,
-        "self": await archetypes.get_self(),
-        "create_account": archetypes.create_account,
-        # "TerrainType": TerrainType,
-        # "find_account": archetypes.find_account,
-        # "tg": asyncio.current_task()
-        # .get_coro()
-        # .cr_frame.f_locals.get("tg", None),  # if accessible
+        "memory": memory,
+        "self": await memory.search("MoonyTheDream", archetypes.Character),
     }
-    # Start ptpython with asyncio support
     await embed(globals=context, return_asyncio_coroutine=True, title=banner)
 
 
@@ -75,6 +79,10 @@ Say help or just raise your eyebrows — ? — to learn more.
 """
     prompt = "(morphoLogicServer) "
 
+    def __init__(self, heart=None):
+        super().__init__()
+        self.heart = heart
+
     async def do_stop(self, _):
         """Stop the server."""
         print("Stars are fading — the Heaven's batteries are weakening.")
@@ -95,7 +103,7 @@ Say help or just raise your eyebrows — ? — to learn more.
             print("Detaching logger while shell is active.")
             remove_console_handler()
 
-        await run_python_shell()
+        await run_python_shell(self.heart)
 
         # global logger
         if log_to_console:
@@ -145,7 +153,7 @@ async def start_server(args):
         async with asyncio.TaskGroup() as tg:
             # Both tasks run concurrently — neither blocks the other.
             tg.create_task(morpho_heart.awake(tg))
-            tg.create_task(MorphoLogicCmd().cmdloop())
+            tg.create_task(MorphoLogicCmd(heart=morpho_heart).cmdloop())
     except* TerminateTaskGroup:
         logger.info("Terminating tasks.")
     except* asyncio.exceptions.CancelledError:
@@ -164,7 +172,7 @@ async def just_shell(args):
     """
     Run just the python shell.
     """
-    await run_python_shell()
+    await run_python_shell()  # heart=None → creates its own Memory
 
 
 async def run_seed(args):

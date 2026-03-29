@@ -83,14 +83,12 @@ class MessageHandler:
 
     async def _handshake_init(self, raw_msg: dict):
         """ITS'A_ME_MARIO → authenticate, create private topic, reply SHH_LET'S_TALK_IN_PRIVATE."""
-        from morphologic_server.archetypes.base import authenticate
-
         username = raw_msg["metadata"].get("username", "")
         if not username:
             return
 
         password = raw_msg["payload"].get("content", "")
-        character = await authenticate(username, password)
+        character = await self.heart.memory.authenticate(username, password)
         if character is None:
             logger.info('Auth failed for "%s"', username)
             self.kafka.send_data_to_user(
@@ -132,15 +130,13 @@ class MessageHandler:
             logger.error("Error sending surroundings to %s: %s", username, e)
 
     async def _do_send_surroundings(self, username: str):
-        from morphologic_server.utils.search import get_objects_in_proximity
-
         user = self._sessions.get(username)
         if user is None:
             return
 
         await user.refresh()
 
-        proximity = await get_objects_in_proximity(user)
+        proximity = await self.heart.memory.get_objects_in_proximity(user)
         area = await user.get_area_im_in()
 
         game_objects = proximity.get("game_objects", [])
@@ -200,14 +196,13 @@ class MessageHandler:
     async def _handle_user_input(self, username: str, text: str):
         """Parse and execute a typed command, then refresh surroundings."""
         from morphologic_server.game_logic.commands import handle_command
-        from morphologic_server.utils.search import get_objects_in_proximity
 
         user = self._sessions.get(username)
         if user is None:
             return
 
         try:
-            proximity = await get_objects_in_proximity(user)
+            proximity = await self.heart.memory.get_objects_in_proximity(user)
             feedback = await handle_command(text, user, proximity)
             if feedback:
                 self.kafka.send_data_to_user(

@@ -10,6 +10,10 @@ from morphologic_server.config import ServerSettings
 from morphologic_server.network.kafka import KafkaConnection
 from morphologic_server.services.message_handler import MessageHandler
 
+from morphologic_server.db.engine import create_sessionmaker
+from morphologic_server.db.memory import Memory
+from morphologic_server.archetypes.base import Archetypes
+
 
 #        d8888                        888
 #       d88888                        888
@@ -41,6 +45,15 @@ class MorphoLogicHeart:
         self.log = logging.getLogger("morphoLogic Server")
         self.log.setLevel(settings.logging_level())
 
+        # Spinning up the sessionmaker and Memory — all DB ops go through heart.memory
+        try:
+            self.db_sessionmaker = create_sessionmaker(settings.DB_ADDRESS)
+            self.memory = Memory(self.db_sessionmaker)
+            Archetypes._sessionmaker = self.db_sessionmaker
+        except Exception as e:
+            self.log.exception("Failed to connect to the database: %s", e)
+            raise
+
     async def awake(self, tg: asyncio.TaskGroup) -> None:
         """
         Open a Kafka connection, start the message handler, and keep beating.
@@ -62,7 +75,9 @@ class MorphoLogicHeart:
             tg.create_task(handler.start())
 
             while not self._stop:
-                await asyncio.sleep(1) # temporary, there will be beating heart and timer
+                await asyncio.sleep(
+                    1
+                )  # temporary, there will be beating heart and timer
 
         self.log.info("The Heart is going to rest. The server stopped.")
 
@@ -208,14 +223,15 @@ async def handle_message(msg, kafka: KafkaConnection, tg: asyncio.TaskGroup):
         #     )
 
 
-async def send_initial_objects_data(kafka: KafkaConnection, username: str):
-    from morphologic_server.archetypes.base import search, Character
+async def send_initial_objects_data(kafka: KafkaConnection, username: str, memory=None):
+    from morphologic_server.archetypes.base import Character
 
     # BARDZO WIP
-    user = await search("MoonyTheDream", Character)
-    # user = await search("AnotherCharacter", Character)
+    user = await memory.search("MoonyTheDream", Character) if memory else None
+    if user is None:
+        return
 
-    objects = await user.get_surrounding_description()
+    objects = await user.get_surrounding_description(memory)
     kafka.send_data_to_user(
         topic=username,
         username=username,

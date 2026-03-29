@@ -2,17 +2,8 @@
 
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
-from morphologic_server import settings, logger
 
-try:
-    engine = create_async_engine("postgresql+asyncpg://" + settings.DB_ADDRESS)
-except Exception as e:
-    logger.exception("Failed to connect to the database: %s", e)
-    raise
-
-DBAsyncSession = async_sessionmaker(
-    engine,
-    expire_on_commit=False,
-)
-
-
+def create_sessionmaker(db_address: str) -> async_sessionmaker:
+    """Create an async sessionmaker from a database address string."""
+    engine = create_async_engine("postgresql+asyncpg://" + db_address)
+    return async_sessionmaker(engine, expire_on_commit=False)

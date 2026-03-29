@@ -27,7 +27,7 @@
 
 # ------------------------------------------------------------------------------------------------ #
 
-from .config import ServerSettings
+# from .config import ServerSettings
 from .services.context import Context
 from .utils.asyncio_helpers import TerminateTaskGroup, force_terminate_task_group
 from .utils.logger import (
@@ -39,12 +39,12 @@ from .utils.logger import (
 
 # Single settings singleton — created once here, imported everywhere else as:
 #   from morphologic_server import settings
-settings = ServerSettings()
+# settings = ServerSettings()
 
 __all__ = [
     "logger",
     "Context",
-    "settings",
+    # "settings",
     "TerminateTaskGroup",
     "force_terminate_task_group",
     "remove_console_handler",
