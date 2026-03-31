@@ -23,7 +23,7 @@ class ServerSettings(BaseSettings):
     """
 
     # Application
-    SERVER_VERSION: str = Field(default="0.1.0", description="Server version")
+    SERVER_VERSION: str = Field(default="0.0.0", description="Server version")
     ENVIRONMENT: str = Field(
         default="development",
         description="Environment (development, staging, production)",

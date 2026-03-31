@@ -17,9 +17,8 @@ from morphologic_server import (
     add_console_handler,
 )
 from morphologic_server.awakening import MorphoLogicHeart
-from .app import Server
-from .config import ServerSettings
-from .utils.async_cmd import AsyncCmd
+from morphologic_server.config import ServerSettings
+from morphologic_server.utils.async_cmd import AsyncCmd
 
 # ------------------------------------------------------------------------------------------------ #
 

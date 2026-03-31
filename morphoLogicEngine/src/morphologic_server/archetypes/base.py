@@ -12,6 +12,7 @@ from geoalchemy2 import shape
 from geoalchemy2.functions import ST_DWithin, ST_Force2D, ST_Intersects
 from geoalchemy2.shape import from_shape  # , to_shape
 from shapely.geometry import Point, Polygon
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from morphologic_server import logger
 from morphologic_server.db.models import (
@@ -26,6 +27,7 @@ from morphologic_server.db.models import (
     CharacterDB,
     STANDARD_LENGTH as _DB_STANDARD_LENGTH,
 )
+
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ EXCEPTIONS ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 class PermissionDeniedError(Exception):
@@ -68,7 +70,7 @@ class Archetypes(ABC):
 
     linked_db_obj = BaseDB
     _db_obj = None
-    _sessionmaker = None  # Set at startup by MorphoLogicHeart
+    _sessionmaker:async_sessionmaker = None  # Set at startup by MorphoLogicHeart
 
     @property
     def db_obj(self):
