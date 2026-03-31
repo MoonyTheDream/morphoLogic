@@ -21,23 +21,15 @@ from geoalchemy2.shape import from_shape
 from shapely.geometry import Point, Polygon
 
 from morphologic_server import logger
-from morphologic_server.archetypes.base import (
-    Archetypes,
+from morphologic_server.db.models import (
+    Base,
     Account,
-    Character,
     CharacterSoul,
+    Character,
     Terrain,
+    TerrainType,
     Area,
     GameObject,
-)
-from morphologic_server.db.models import (
-    AccountDB,
-    CharacterSoulDB,
-    TerrainType,
-    TerrainDB,
-    AreaDB,
-    GameObjectDB,
-    CharacterDB,
 )
 
 
@@ -73,7 +65,7 @@ class Memory:
     #                                            SEARCHING                                         #
     # ******************************************************************************************** #
 
-    async def find_account(self, account_name: str) -> Optional["Account"]:
+    async def find_account(self, account_name: str) -> Optional[Account]:
         """
         Finds account by name.
         If "#<int>" is being searched, it will be searched by ID.
@@ -96,30 +88,24 @@ class Memory:
                         account_name,
                     )
                     return None
-                stmt = select(AccountDB).where(AccountDB.id == account_id)
+                stmt = select(Account).where(Account.id == account_id)
 
             else:
-                stmt = select(AccountDB).where(AccountDB.name == account_name)
+                stmt = select(Account).where(Account.name == account_name)
             result = await session.execute(stmt)
-            account = result.scalars().first()
+            return result.scalars().first()
 
-            if account:
-                return Account(account)
-            return None
-
-    async def search(self, name_or_id: str, archetype: Type["Archetypes"]):
+    async def search(self, name_or_id: str, model: Type[Base]):
         """Search for an object by name or ID.
         If "#[int]" is being searched, it will be searched by ID.
 
         Args:
             name_or_id (str): Name or #ID of the object to search for.
-            archetype (Archetypes): The archetype class to search in.
+            model (Base subclass): The model class to search in.
 
         Returns:
             Object: if found, None otherwise.
         """
-        model = archetype.linked_db_obj
-
         async with self._sessionmaker() as session:
             if name_or_id.startswith("#"):
                 try:
@@ -134,44 +120,37 @@ class Memory:
             else:
                 stmt = select(model).where(model.name == name_or_id)
             result = await session.execute(stmt)
-            obj = result.scalars().first()
+            return result.scalars().first()
 
-            return archetype(obj) if obj else None
-
-    async def simple_query(self, value, attribute: str, model: Type["Archetypes"]):
+    async def simple_query(self, value, attribute: str, model: Type[Base]):
         """Simple query to find rows from specified table by attribute.
 
         Args:
             value (any): the value to search for
             attribute (str): an attribute to search for
-            model (Archetypes): the model to search in
+            model (Base subclass): the model to search in
 
         Returns:
-            Archetypes: Returns object or objects if found, None otherwise.
+            list: Returns list of objects if found, empty list otherwise.
         """
         async with self._sessionmaker() as session:
-            stmt = select(model.linked_db_obj).where(
-                getattr(model.linked_db_obj, attribute) == value
+            stmt = select(model).where(
+                getattr(model, attribute) == value
             )
             result = await session.execute(stmt)
-            obj = result.scalars().all()
+            return result.scalars().all()
 
-            if obj:
-                return [model(o) for o in obj] if len(obj) > 1 else model(obj[0])
-            return None
-
-    async def search_by_xy(self, x: float, y: float, archetype: Type["Archetypes"]):
+    async def search_by_xy(self, x: float, y: float, model: Type[Base]):
         """Search for an object by XY coordinates.
 
         Args:
             x (float): x coordinate
             y (float): y coordinate
-            archetype (Archetypes child): The archetype class to search in.
+            model (Base subclass): The model class to search in.
         Returns:
             Object: if found, None otherwise.
         """
         point = from_shape(Point(x, y), srid=3857)
-        model = archetype.linked_db_obj
         async with self._sessionmaker() as session:
             stmt = select(model).where(
                 ST_DWithin(
@@ -181,9 +160,7 @@ class Memory:
                 )
             )
             result = await session.execute(stmt)
-            obj = result.scalars().first()
-
-            return archetype(obj) if obj else None
+            return result.scalars().first()
 
     async def get_objects_in_proximity(
         self, focal_point, radius: float = STANDARD_VISIBILITY_RADIUS
@@ -191,7 +168,7 @@ class Memory:
         """Get all game objects and characters within radius of a focal point.
 
         Args:
-            focal_point: An archetype with a .location property (Point with x, y, z).
+            focal_point: A model with a .location property (Point with x, y, z).
             radius (float): Search radius in metres.
 
         Returns:
@@ -207,15 +184,15 @@ class Memory:
 
         async with self._sessionmaker() as session:
             stmt1 = (
-                select(GameObjectDB)
-                .where(ST_3DDWithin(GameObjectDB.location, point_z, radius))
-                .order_by(ST_3DDistance(GameObjectDB.location, point_z))
+                select(GameObject)
+                .where(ST_3DDWithin(GameObject.location, point_z, radius))
+                .order_by(ST_3DDistance(GameObject.location, point_z))
             )
 
             stmt2 = (
-                select(CharacterDB)
-                .where(ST_3DDWithin(CharacterDB.location, point_z, radius))
-                .order_by(ST_3DDistance(CharacterDB.location, point_z))
+                select(Character)
+                .where(ST_3DDWithin(Character.location, point_z, radius))
+                .order_by(ST_3DDistance(Character.location, point_z))
             )
             result1 = await session.execute(stmt1)
             result2 = await session.execute(stmt2)
@@ -224,9 +201,8 @@ class Memory:
             characters = result2.scalars().all()
 
         game_objects = [
-            GameObject(obj) for obj in game_objects if obj.object_type != "character"
+            obj for obj in game_objects if obj.object_type != "character"
         ]
-        characters = [Character(obj) for obj in characters]
 
         return {
             "game_objects": game_objects,
@@ -237,19 +213,19 @@ class Memory:
     #                                            CREATING                                          #
     # ******************************************************************************************** #
 
-    async def create_account(self, name: str, email: str) -> Optional["Account"]:
+    async def create_account(self, name: str, email: str) -> Optional[Account]:
         """Creates an account in the database.
 
         Returns:
-            Account: Archetypes Account object if created, None otherwise.
+            Account: Account object if created, None otherwise.
         """
 
         async with self._sessionmaker() as session:
-            account = AccountDB(name=name, email=email, permission_level=2)
+            account = Account(name=name, email=email, permission_level=2)
             session.add(account)
             await session.commit()
             await session.refresh(account)
-            return Account(account)
+            return account
 
     async def create_character_and_soul(
         self,
@@ -262,20 +238,19 @@ class Memory:
         """Creates a character and a character soul in the database.
 
         Returns:
-            List[Character, CharacterSoul]: Archetypes Character and CharacterSoul objects if created,
-                None otherwise.
+            List[Character, CharacterSoul]: if created, None otherwise.
         """
 
         if location is None:
             location = DEFAULT_SPAWN_LOCATION
 
         async with self._sessionmaker() as session:
-            character = CharacterDB(
+            character = Character(
                 name=name,
                 description=description,
                 location=location,
             )
-            character_soul = CharacterSoulDB(
+            character_soul = CharacterSoul(
                 aura=0,
                 account_id=account_id,
                 permission_level=permission_level,
@@ -286,29 +261,29 @@ class Memory:
             await session.refresh(character_soul)
             await session.refresh(character)
 
-            return [Character(character), CharacterSoul(character_soul)]
+            return [character, character_soul]
 
     async def create_character(
         self,
         name: str,
-        soul: "CharacterSoul",
+        soul: CharacterSoul,
         description: str = "",
         location=None,
         attributes: dict = None,
-        container: "GameObject" = None,
+        container: GameObject = None,
         stored: list = None,
-    ) -> Optional["Character"]:
+    ) -> Optional[Character]:
         """Creates a character in the database.
 
         Returns:
-            Character: Archetypes Character object if created, None otherwise.
+            Character: Character object if created, None otherwise.
         """
 
         if location is None:
             location = DEFAULT_SPAWN_LOCATION
 
         async with self._sessionmaker() as session:
-            character = CharacterDB(
+            character = Character(
                 name=name,
                 soul=soul,
                 description=description,
@@ -320,11 +295,11 @@ class Memory:
             session.add(character)
             await session.commit()
             await session.refresh(character)
-            return Character(character)
+            return character
 
     async def create_or_edit_terrain(
         self, x: int, y: int, z: int = 0, terrain_type: TerrainType = TerrainType.SOIL
-    ) -> "Terrain":
+    ) -> Terrain:
         """Add or edit terrain in DB.
 
         Args:
@@ -342,9 +317,9 @@ class Memory:
             point_geom = shape.from_shape(point3d, srid=3857)
 
             # First check if the terrain already exists
-            stmt = select(TerrainDB).where(
+            stmt = select(Terrain).where(
                 ST_DWithin(
-                    ST_Force2D(TerrainDB.location),
+                    ST_Force2D(Terrain.location),
                     ST_Force2D(point_geom),
                     0.1,
                 )
@@ -354,18 +329,18 @@ class Memory:
 
             if terrain:
                 # Terrain already exists, update it
-                old_point = shape.to_shape(terrain.location)
+                old_point = shape.to_shape(terrain._location)
                 new_point = Point(old_point.x, old_point.y, float(z))
 
-                terrain.location = shape.from_shape(new_point, srid=3857)
+                terrain._location = shape.from_shape(new_point, srid=3857)
                 terrain.type = terrain_type
             else:
-                terrain = TerrainDB(location=point_geom, type=terrain_type)
+                terrain = Terrain(location=point_geom, type=terrain_type)
                 session.add(terrain)
 
             await session.commit()
             await session.refresh(terrain)
-            return Terrain(terrain)
+            return terrain
 
     async def create_area(
         self,
@@ -373,16 +348,16 @@ class Memory:
         name: str,
         description: str,
         priority: int = 0,
-    ) -> Optional["Area"]:
+    ) -> Optional[Area]:
         """Creates an area in the database.
 
         Returns:
-            Area: Archetypes Area object if created, None otherwise.
+            Area: Area object if created, None otherwise.
         """
 
         async with self._sessionmaker() as session:
             polygon = Polygon(polygon)
-            area = AreaDB(
+            area = Area(
                 polygon=shape.from_shape(polygon, srid=3857),
                 name=name,
                 description=description,
@@ -391,7 +366,7 @@ class Memory:
             session.add(area)
             await session.commit()
             await session.refresh(area)
-            return Area(area)
+            return area
 
     async def create_game_object(
         self,
@@ -399,13 +374,13 @@ class Memory:
         description: str = "",
         location=None,
         attributes: dict = None,
-        container: "GameObject" = None,
-        stored: Union[list["GameObject"], "GameObject"] = None,
-    ) -> Optional["GameObject"]:
+        container: GameObject = None,
+        stored: Union[list[GameObject], GameObject] = None,
+    ) -> Optional[GameObject]:
         """Creates a game object in the database.
 
         Returns:
-            GameObject: Archetypes GameObject object if created, None otherwise.
+            GameObject: GameObject object if created, None otherwise.
         """
 
         if location is None:
@@ -415,16 +390,14 @@ class Memory:
 
         kwargs = {}
         if container is not None:
-            container = container.db_obj
             kwargs["container"] = container
         if stored is not None:
             if not isinstance(stored, list):
                 stored = [stored]
-            stored = [stored.db_obj for obj in stored]
             kwargs["stored"] = stored
 
         async with self._sessionmaker() as session:
-            game_object = GameObjectDB(
+            game_object = GameObject(
                 name=name,
                 description=description,
                 location=location,
@@ -434,13 +407,13 @@ class Memory:
             session.add(game_object)
             await session.commit()
             await session.refresh(game_object)
-            return GameObject(game_object)
+            return game_object
 
     # ******************************************************************************************** #
     #                                         AUTHENTICATION                                       #
     # ******************************************************************************************** #
 
-    async def authenticate(self, username: str, password: str) -> Optional["Character"]:
+    async def authenticate(self, username: str, password: str) -> Optional[Character]:
         """Return the bound Character if username + password are valid, else None.
 
         Lookup chain: Account.name → account.character_souls[0] → soul.bound_character.

@@ -7,7 +7,7 @@ from sqlalchemy import pool
 
 from alembic import context
 
-from morphologic_server.db.models import BaseDB
+from morphologic_server.db.models import Base
 
 
 from dotenv import load_dotenv
@@ -23,7 +23,7 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # add your model's MetaData object here
-target_metadata = BaseDB.metadata
+target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

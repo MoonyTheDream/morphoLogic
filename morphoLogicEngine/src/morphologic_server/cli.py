@@ -25,7 +25,7 @@ from morphologic_server.utils.async_cmd import AsyncCmd
 
 async def run_python_shell(heart=None):
     """Coroutine to run the python shell."""
-    from morphologic_server.archetypes import base as archetypes
+    from morphologic_server.db import models
 
     if heart is None:
         from morphologic_server.db.engine import create_sessionmaker
@@ -34,7 +34,7 @@ async def run_python_shell(heart=None):
 
         settings = ServerSettings()
         sessionmaker = create_sessionmaker(settings.DB_ADDRESS)
-        archetypes.Archetypes._sessionmaker = sessionmaker
+        models.Base._sessionmaker = sessionmaker
         memory = Memory(sessionmaker)
     else:
         memory = heart.memory
@@ -46,9 +46,9 @@ async def run_python_shell(heart=None):
         "force_terminate_task_group": force_terminate_task_group,
         "asyncio": asyncio,
         "logger": logger,
-        "db_api": archetypes,
+        "db_api": models,
         "memory": memory,
-        "self": await memory.search("MoonyTheDream", archetypes.Character),
+        "self": await memory.search("MoonyTheDream", models.Character),
     }
     await embed(globals=context, return_asyncio_coroutine=True, title=banner)
 

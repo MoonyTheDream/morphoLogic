@@ -15,8 +15,8 @@ import asyncio
 
 from shapely.geometry import Point
 
-from morphologic_server.archetypes.base import (
-    Archetypes,
+from morphologic_server.db.models import (
+    Base,
     Character,
     GameObject,
 )
@@ -53,12 +53,12 @@ async def _ensure_object(memory, name: str, description: str, location: Point, c
 async def seed():
     from morphologic_server.db.engine import create_sessionmaker
     from morphologic_server.db.memory import Memory
-    from morphologic_server.archetypes.base import Area
+    from morphologic_server.db.models import Area
     from morphologic_server.config import ServerSettings
 
     settings = ServerSettings()
     sessionmaker = create_sessionmaker(settings.DB_ADDRESS)
-    Archetypes._sessionmaker = sessionmaker
+    Base._sessionmaker = sessionmaker
     memory = Memory(sessionmaker)
 
     logger.info("Seeding database…")
