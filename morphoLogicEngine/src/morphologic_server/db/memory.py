@@ -14,6 +14,7 @@ from geoalchemy2 import shape
 from geoalchemy2.functions import (
     ST_DWithin,
     ST_Force2D,
+    ST_Intersects,
     ST_3DDWithin,
     ST_3DDistance,
 )
@@ -207,6 +208,89 @@ class Memory:
         return {
             "game_objects": game_objects,
             "characters": characters,
+        }
+
+    async def get_full_surroundings(
+        self, character: Character, radius: float = STANDARD_VISIBILITY_RADIUS
+    ) -> dict:
+        """Get all surroundings data for a character in a single session.
+
+        Refreshes the character, then queries nearby objects, characters,
+        area, and terrain — all within one session checkout.
+
+        Returns:
+            dict: {"game_objects": [...], "characters": [...], "area": Area|None, "terrain": [...]}
+        """
+        point_z = from_shape(
+            Point(
+                character.location.x,
+                character.location.y,
+                character.location.z,
+            ),
+            srid=3857,
+        )
+
+        async with self._sessionmaker() as session:
+            # Refresh character state
+            refreshed = await session.execute(
+                select(Character).where(Character.id == character.id)
+            )
+            refreshed_char = refreshed.scalars().first()
+            if refreshed_char:
+                for attr in Character.__table__.columns.keys():
+                    setattr(character, attr, getattr(refreshed_char, attr))
+
+            # Nearby game objects (exclude characters from polymorphic query)
+            stmt_objects = (
+                select(GameObject)
+                .where(ST_3DDWithin(GameObject.location, point_z, radius))
+                .order_by(ST_3DDistance(GameObject.location, point_z))
+            )
+            stmt_chars = (
+                select(Character)
+                .where(ST_3DDWithin(Character.location, point_z, radius))
+                .order_by(ST_3DDistance(Character.location, point_z))
+            )
+            result_objects = await session.execute(stmt_objects)
+            result_chars = await session.execute(stmt_chars)
+
+            game_objects = [
+                obj
+                for obj in result_objects.scalars().all()
+                if obj.object_type != "character"
+            ]
+            characters = result_chars.scalars().all()
+
+            # Area the character is standing in
+            stmt_area = select(Area).where(
+                ST_Intersects(Area.polygon, ST_Force2D(character._location))
+            )
+            result_area = await session.execute(stmt_area)
+            areas = result_area.scalars().all()
+            areas.sort(key=lambda a: a.priority, reverse=True)
+            if len(areas) > 1 and areas[0].priority == areas[1].priority:
+                logger.warning(
+                    "More than one area of the same priority at location %s",
+                    character._location,
+                )
+            area = areas[0] if areas else None
+
+            # Nearby terrain
+            stmt_terrain = select(Terrain).where(
+                ST_DWithin(
+                    ST_Force2D(Terrain.location),
+                    ST_Force2D(character._location),
+                    radius,
+                )
+            )
+            result_terrain = await session.execute(stmt_terrain)
+            terrain = result_terrain.scalars().all()
+
+        return {
+            "game_objects": game_objects,
+            "characters": characters,
+            "area": area,
+            "terrain": terrain,
         }
 
     # ******************************************************************************************** #

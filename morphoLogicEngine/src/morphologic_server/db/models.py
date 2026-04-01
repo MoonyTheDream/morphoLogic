@@ -27,6 +27,17 @@ from morphologic_server.exceptions import PermissionDeniedError
 STANDARD_LENGTH = 60
 
 
+class PermisionLevel(E):
+    """Simple Enum representing available Permission Levels in DB Tables"""
+
+    ADMIN = 0
+    BUILDER = 1
+    PLAYER = 2
+
+
+_ALLOWED_TO_DELETE = PermisionLevel.BUILDER
+
+
 # 888888b.
 # 888  "88b
 # 888  .88P                                 888
@@ -113,6 +124,8 @@ class Account(Base):
             raise ValueError(
                 f"Account email cannot be longer than {STANDARD_LENGTH} characters."
             )
+        elif "@" not in value or "." not in value:
+            raise ValueError("Invalid email address.")
         return value
 
     @validates("permission_level")
@@ -128,9 +141,7 @@ class Account(Base):
         """Hash and store a password for this account."""
         import bcrypt
 
-        self.password_hash = bcrypt.hashpw(
-            plain.encode(), bcrypt.gensalt()
-        ).decode()
+        self.password_hash = bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
 
     def check_password(self, plain: str) -> bool:
         """Return True if plain matches the stored hash."""
@@ -208,30 +219,31 @@ class CharacterSoul(Base):
     # ******************************************************************************************** #
     #                                            METHODS                                           #
     # ******************************************************************************************** #
-    def permission_level_is(self, permission_levels: int | tuple[int]) -> bool:
-        """Check if the soul has the required permission level."""
-        permission_levels = (
-            permission_levels
-            if isinstance(permission_levels, tuple)
-            else (permission_levels,)
-        )
-        return self.permission_level in permission_levels
 
-    def check_permissions(self, permission_levels: int | tuple[int] = (0, 1)) -> None:
+    def check_permissions(
+        self, required_permission_level: PermisionLevel | int
+    ) -> bool:
         """Raises PermissionDeniedError if the soul lacks the required permission level."""
-        if not self.permission_level_is(permission_levels):
-            raise PermissionDeniedError(
-                "Permission denied. The puppeting soul of the caller object "
-                "don't have permission to delete this object."
-            )
+        required_permission_value = (
+            required_permission_level.value
+            if isinstance(required_permission_level, PermisionLevel)
+            else required_permission_level
+        )
+        if self.permission_level > required_permission_value:
+            return False
+        return True
 
     async def delete_object(self, target_object: "Base") -> dict:
         """Deletes given object from DB after checking permissions."""
-        self.check_permissions()
-        async with self._sessionmaker() as session:
-            await session.delete(target_object)
-            await session.commit()
-        return {"success": True, "message": "Target object deleted."}
+        if self.check_permissions(_ALLOWED_TO_DELETE):
+            async with self._sessionmaker() as session:
+                await session.delete(target_object)
+                await session.commit()
+            return {"success": True, "message": "Target object deleted."}
+        raise PermissionDeniedError(
+            "Permission denied. The puppeting soul of the caller object "
+            "don't have permission to delete this object."
+        )
 
 
 # 88888888888                               d8b
@@ -528,3 +540,16 @@ class Character(GameObject):
                 self._location,
             )
         return areas[0] if areas else None
+
+    async def get_terrain_nearby(self, distance_m: float = 10.0) -> list["Terrain"]:
+        """Get all terrain points within distance of this character's location."""
+        async with self._sessionmaker() as session:
+            stmt = select(Terrain).where(
+                ST_DWithin(
+                    ST_Force2D(Terrain.location),
+                    ST_Force2D(self._location),
+                    distance_m,
+                )
+            )
+            results = await session.execute(stmt)
+            return results.scalars().all()

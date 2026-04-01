@@ -19,6 +19,7 @@ from morphologic_server.db.models import (
     Base,
     Character,
     GameObject,
+    TerrainType,
 )
 from morphologic_server import logger
 
@@ -87,6 +88,26 @@ async def seed():
         logger.info("Seed: created area 'Polana'")
     else:
         logger.info("Seed: area 'Polana' already exists — skipping.")
+
+    # ── Terrain around spawn ──────────────────────────────────────────────── #
+    terrain_tiles = [
+        # (x, y, z, type)  — spread around spawn within visibility radius
+        ( 0,  0, 0, TerrainType.SOIL),
+        ( 3,  3, 0, TerrainType.SOIL),
+        (-3,  3, 0, TerrainType.SOIL),
+        ( 3, -3, 0, TerrainType.SOIL),
+        (-3, -3, 0, TerrainType.SOIL),
+        ( 6,  0, 0, TerrainType.SAND),
+        (-6,  0, 0, TerrainType.SAND),
+        ( 0,  6, 0, TerrainType.ROCK),
+        ( 0, -6, 0, TerrainType.ROCK),
+        ( 8,  4, 0, TerrainType.WATER),
+        (-5,  7, 0, TerrainType.WATER),
+        ( 5, -7, 0, TerrainType.SAND),
+    ]
+    for x, y, z, t_type in terrain_tiles:
+        await memory.create_or_edit_terrain(x, y, z, t_type)
+    logger.info("Seed: ensured %d terrain tiles.", len(terrain_tiles))
 
     # ── Game objects spread around spawn ─────────────────────────────────── #
     # Top-level objects (no container)

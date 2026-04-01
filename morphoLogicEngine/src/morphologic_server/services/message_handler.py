@@ -134,13 +134,11 @@ class MessageHandler:
         if user is None:
             return
 
-        await user.refresh()
-
-        proximity = await self.heart.memory.get_objects_in_proximity(user)
-        area = await user.get_area_im_in()
-
-        game_objects = proximity.get("game_objects", [])
-        characters = proximity.get("characters", [])
+        surroundings = await self.heart.memory.get_full_surroundings(user)
+        game_objects = surroundings["game_objects"]
+        characters = surroundings["characters"]
+        area = surroundings["area"]
+        terrain = surroundings["terrain"]
         area_name = area.name if area else "unknown"
 
         # Text description
@@ -181,6 +179,14 @@ class MessageHandler:
                 "x": round(obj.location.x - player_x, 2),
                 "y": round(obj.location.y - player_y, 2),
                 "description": obj.description,
+            }
+
+        for t in terrain:
+            objects_dict[f"t{t.id}"] = {
+                "name": t.type.value,
+                "type": "terrain",
+                "x": round(t.location.x - player_x, 2),
+                "y": round(t.location.y - player_y, 2),
             }
 
         self.kafka.send_data_to_user(
