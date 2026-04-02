@@ -13,6 +13,7 @@
                                 ⠀⠀⠀⠀⣾⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⣧⠀⠀⠀⠀
                                 ⠀⠀⠀⠀⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠀⠀⠀⠀
 """
+
 #                                         888               888                       d8b
 #                                         888               888                       Y8P
 #                                         888               888
@@ -28,29 +29,13 @@
 # ------------------------------------------------------------------------------------------------ #
 
 # from .config import ServerSettings
-from .services.context import Context
 from .utils.asyncio_helpers import TerminateTaskGroup, force_terminate_task_group
 from .utils.logger import (
     logger,
-    remove_console_handler,
-    add_console_handler,
-    check_if_logging_to_console,
 )
-
-# Single settings singleton — created once here, imported everywhere else as:
-#   from morphologic_server import settings
-# settings = ServerSettings()
 
 __all__ = [
     "logger",
-    "Context",
-    # "settings",
     "TerminateTaskGroup",
     "force_terminate_task_group",
-    "remove_console_handler",
-    "add_console_handler",
-    "check_if_logging_to_console",
 ]
-
-# if __name__ == "__main__":
-#     awake()

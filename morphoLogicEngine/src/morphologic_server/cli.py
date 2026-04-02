@@ -8,23 +8,26 @@ import asyncio
 import debugpy
 
 from ptpython.repl import embed
+
 from morphologic_server import (
-    logger,
     TerminateTaskGroup,
-    force_terminate_task_group,
-    check_if_logging_to_console,
-    remove_console_handler,
-    add_console_handler,
+    force_terminate_task_group
 )
 from morphologic_server.awakening import MorphoLogicHeart
 from morphologic_server.config import ServerSettings
 from morphologic_server.utils.async_cmd import AsyncCmd
+from morphologic_server.utils.logger import (
+    logger,
+    remove_console_handler,
+    add_console_handler,
+    check_if_logging_to_console,
+)
 
 # ------------------------------------------------------------------------------------------------ #
 
 
 async def run_python_shell(heart=None):
-    """Coroutine to run the python shell."""
+    """A coroutine to run the python shell."""
     from morphologic_server.db import models
 
     if heart is None:
@@ -43,10 +46,9 @@ async def run_python_shell(heart=None):
     print(banner)
 
     context = {
-        "force_terminate_task_group": force_terminate_task_group,
         "asyncio": asyncio,
         "logger": logger,
-        "db_api": models,
+        "models": models,
         "memory": memory,
         "self": await memory.search("MoonyTheDream", models.Character),
     }
@@ -150,7 +152,7 @@ async def start_server(args):
     try:
         morpho_heart = MorphoLogicHeart(ServerSettings())
         async with asyncio.TaskGroup() as tg:
-            # Both tasks run concurrently — neither blocks the other.
+            # Both tasks run concurrently.
             tg.create_task(morpho_heart.awake(tg))
             tg.create_task(MorphoLogicCmd(heart=morpho_heart).cmdloop())
     except* TerminateTaskGroup:
