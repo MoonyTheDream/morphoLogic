@@ -2,40 +2,40 @@
 
 from __future__ import annotations
 
-
 import asyncio
 import json
 from typing import TYPE_CHECKING
 
+from morphologic_server import logger
+from morphologic_server.network.kafka import (
+    KafkaConnection,
+)
+from morphologic_server.services.messages import ClientMessage, ServerMessage
 
 from confluent_kafka import Message
 
 if TYPE_CHECKING:
     from morphologic_server.awakening import MorphoLogicHeart
-    
-from morphologic_server import logger
-
-from morphologic_server.network.kafka import (
-    KafkaConnection,
-)
 
 
-class KafkaMessage:
-    """Parsed wrapper around a raw Kafka message."""
+# class ReceivedMessage:
+#     """Parsed wrapper around a raw Kafka message."""
 
-    def __init__(self, raw_msg: Message):
-        self.topic = raw_msg.topic()
-        self.msg = json.loads(raw_msg.value().decode("utf-8"))
-        logger.debug('Consumed from %s: "%s"', self.topic, self.msg)
-        self.system_msg = self.msg["payload"].get("system_message", "")
-        self.user_input = self.msg["payload"].get("user_input", "")
-        self.sending_user = self.msg["metadata"]["username"]
+#     def __init__(self, raw_msg: Message):
+#         self.topic = raw_msg.topic()
+#         self.msg = json.loads(raw_msg.value().decode("utf-8"))
+#         logger.debug('Consumed from %s: "%s"', self.topic, self.msg)
+#         self.type = self.msg["payload"]["type"]
+#         self.user = self.msg["metadata"]["username"]
+
 
 
 class MessageHandler:
     """Consumes Kafka messages and routes them to the correct handler."""
 
-    def __init__(self, heart: MorphoLogicHeart, kafka: KafkaConnection, tg: asyncio.TaskGroup):
+    def __init__(
+        self, heart: MorphoLogicHeart, kafka: KafkaConnection, tg: asyncio.TaskGroup
+    ):
         self.heart = heart
         self.kafka = kafka
         self.tg = tg
@@ -61,11 +61,13 @@ class MessageHandler:
                 if msg.error():
                     logger.warning("Kafka error: %s", msg.error().str())
                     continue
-                parsed = KafkaMessage(msg)
-                self.tg.create_task(self._route(parsed))
+                client_message = ClientMessage.model_validate_json(msg.value())
+                client_message.topic = msg.topic()
+                self.tg.create_task(self._route(client_message))
 
-    async def _route(self, msg: KafkaMessage):
+    async def _route(self, msg: ClientMessage):
         """Route a message to the correct handler based on system_message."""
+        
         match msg.system_msg:
             case "ITS'A_ME_MARIO":
                 await self._handshake_init(msg.msg)
@@ -150,8 +152,8 @@ class MessageHandler:
         )
         text = (
             f'Character {user.name} is in area "{area_name}" \n'
-            f' Characters around:\n {characters_str} \n\n'
-            f' Objects around:\n {objects_str}'
+            f" Characters around:\n {characters_str} \n\n"
+            f" Objects around:\n {objects_str}"
         )
 
         # Minimap data — relative positions in metres

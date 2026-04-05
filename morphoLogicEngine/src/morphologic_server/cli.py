@@ -48,6 +48,7 @@ async def run_python_shell(heart=None):
     context = {
         "asyncio": asyncio,
         "logger": logger,
+        "heart": heart,
         "models": models,
         "memory": memory,
         "self": await memory.search("MoonyTheDream", models.Character),

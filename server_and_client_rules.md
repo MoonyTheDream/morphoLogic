@@ -52,15 +52,13 @@ Może jednak niepotrzebne, próba loginu tym jest -->
 ```json
 {
   "metadata": {
-    "source": "client",
     "username": "<username>",
     "client_version": "<client_version>",
     "timestamp": "<timestamp>",
-    "client_ip": "<client.ip>"
   },
   "payload": {
-    "user_input": "<the_message>",
-    "system_message": "<the_message>",
+    "type": "user_input" | "system_message",
+    "message": "<the_message>",
     "content": "<optional_content_for_the_message>"
   }
 }
@@ -71,15 +69,13 @@ Może jednak niepotrzebne, próba loginu tym jest -->
 ```json
 {
   "metadata": {
-    "source": "<server/microserver>",
     "to_user": "<name_of_the_target_user>",
     "server_version": "<client_version>",
     "timestamp": "<timestamp>"
   },
   "payload": {
-    "server_message": "<the_message>",
-    "direct_message": "<the message wo show on client directly>",
-    "content": "<optional_content_for_the_message>"
+    "message": "<the_message>",
+    "content": "<optional_content_for_the_message>",
     "objects": {
       "id_of_object_01": {
         "value_01": "value",

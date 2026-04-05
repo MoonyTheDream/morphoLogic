@@ -160,3 +160,6 @@ cython_debug/
 
 # config files (as they may contain sensitive information)
 *.cfg
+
+# Calude stuff
+CLAUDE.md

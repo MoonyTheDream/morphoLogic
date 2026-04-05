@@ -176,10 +176,10 @@ class KafkaConnection:
             to_update += current_subscription
             self.subscribe_to_topics(to_update)
 
-    def unsubscribe_from_topics(self, topics: list[str]):
-        """Unsubscribes the class' Kafka Consumer from specific topic."""
-        self.consumer.unsubscribe(topics)
-        self.heart.log.info('Unsubscribed from Kafka topics "%s"', topics)
+    # def unsubscribe_from_topics(self, topics: list[str]):
+    #     """Unsubscribes the class' Kafka Consumer from specific topic."""
+    #     self.consumer.unsubscribe(topics)
+    #     self.heart.log.info('Unsubscribed from Kafka topics "%s"', topics)
 
     def send_data_to_user(
         self,
