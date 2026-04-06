@@ -3,7 +3,7 @@
 from enum import Enum as E
 from typing import ClassVar, List, Optional
 
-from sqlalchemy import Enum, ForeignKey, Index, Integer, String, Text, select
+from sqlalchemy import Enum, ForeignKey, Index, Integer, String, Text, func, select
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -40,9 +40,9 @@ _ALLOWED_TO_DELETE = PermisionLevel.BUILDER
 
 # 888888b.
 # 888  "88b
-# 888  .88P                                 888
-# 8888888K.   8888b.  .d8888b   .d88b.      888
-# 888  "Y88b     "88b 88K      d8P  Y8b     888
+# 888  .88P
+# 8888888K.   8888b.  .d8888b   .d88b.
+# 888  "Y88b     "88b 88K      d8P  Y8b
 # 888    888 .d888888 "Y8888b. 88888888
 # 888   d88P 888  888      X88 Y8b.
 # 8888888P"  "Y888888  88888P'  "Y8888
@@ -97,8 +97,8 @@ class Account(Base):
 
     __tablename__ = "accounts"
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(STANDARD_LENGTH))
-    email: Mapped[str] = mapped_column(String(STANDARD_LENGTH))
+    name: Mapped[str] = mapped_column(String(STANDARD_LENGTH), unique=True)
+    email: Mapped[str] = mapped_column(String(STANDARD_LENGTH), unique=True)
     password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # Permissions: 0 - admin, 1 - builder, 2 - player
@@ -216,6 +216,11 @@ class CharacterSoul(Base):
             )
         return value
 
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Table Args ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    __table_args__ = (
+        Index("ix_character_souls_account_id", "account_id"),
+    )
+
     # ******************************************************************************************** #
     #                                            METHODS                                           #
     # ******************************************************************************************** #
@@ -310,6 +315,19 @@ class Terrain(Base):
             raise ValueError("Terrain type must be an instance of TerrainType.")
         return value
 
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Table Args ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    # Functional GIST index on ST_Force2D(location) so the planner can use it for the
+    # 2D-distance queries in memory.py and Character.get_terrain_nearby, which wrap
+    # the column in ST_Force2D(). A plain GIST on `location` would be ignored by those
+    # queries because the expression doesn't match.
+    __table_args__ = (
+        Index(
+            "idx_terrain_location_2d",
+            func.ST_Force2D(_location),
+            postgresql_using="gist",
+        ),
+    )
+
     # ******************************************************************************************** #
     #                                            METHODS                                           #
     # ******************************************************************************************** #
@@ -371,6 +389,11 @@ class Area(Base):
                 f"Area name cannot be longer than {STANDARD_LENGTH} characters."
             )
         return value
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Table Args ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    __table_args__ = (
+        Index("idx_areas_polygon", "polygon", postgresql_using="gist"),
+    )
 
 
 #  .d8888b.                                   .d88888b.  888       d8b                   888
@@ -472,6 +495,8 @@ class GameObject(Base):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Table Args ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     __table_args__ = (
         Index("idx_game_objects_location", "location", postgresql_using="gist"),
+        Index("ix_game_objects_container_id", "container_id"),
+        Index("ix_game_objects_puppeted_by_id", "puppeted_by_id"),
     )
 
     __mapper_args__ = {
@@ -512,6 +537,11 @@ class Character(GameObject):
     name: Mapped[str] = column_property(GameObject.name)
 
     # ------------------------------------------------------------------------------------------------ #
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Table Args ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    __table_args__ = (
+        Index("ix_characters_soul_id", "soul_id"),
+    )
 
     __mapper_args__ = {
         "polymorphic_identity": ObjectType.CHARACTER,

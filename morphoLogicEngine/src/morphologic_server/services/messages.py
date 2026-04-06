@@ -1,6 +1,4 @@
 """ClientMessage and ServerMessage definitions using Pydantic models."""
-import json
-
 from typing import Literal
 
 from pydantic import BaseModel

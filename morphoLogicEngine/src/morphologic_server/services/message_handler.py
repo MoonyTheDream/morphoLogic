@@ -40,7 +40,6 @@ class MessageHandler:
         self.kafka = kafka
         self.tg = tg
         self._stop = False
-        # Maps Kafka username → authenticated Character
         self._sessions: dict = {}
 
     async def start(self):

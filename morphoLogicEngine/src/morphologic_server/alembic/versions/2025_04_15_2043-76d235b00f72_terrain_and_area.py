@@ -58,8 +58,6 @@ def downgrade() -> None:
                existing_type=sa.String(length=60),
                type_=sa.VARCHAR(length=50),
                existing_nullable=False)
-    op.drop_index('idx_terrain_location', table_name='terrain', postgresql_using='gist')
     op.drop_table('terrain')
-    op.drop_index('idx_areas_polygon', table_name='areas', postgresql_using='gist')
     op.drop_table('areas')
     # ### end Alembic commands ###
