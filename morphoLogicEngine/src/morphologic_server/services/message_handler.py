@@ -10,7 +10,7 @@ from morphologic_server import logger
 from morphologic_server.network.kafka import (
     KafkaConnection,
 )
-from morphologic_server.services.messages import ClientMessage, ServerMessage
+from morphologic_server.services.messages import ReceivedMessage
 
 from confluent_kafka import Message
 
@@ -55,40 +55,39 @@ class MessageHandler:
             msgs = await asyncio.to_thread(
                 lambda: self.kafka.consumer.consume(num_messages=1, timeout=0.2)
             )
-            if msgs:
-                msg = msgs[0] if isinstance(msgs, list) else msgs
+            for msg in msgs:
                 if msg.error():
                     logger.warning("Kafka error: %s", msg.error().str())
                     continue
-                client_message = ClientMessage.model_validate_json(msg.value())
-                client_message.topic = msg.topic()
-                self.tg.create_task(self._route(client_message))
+                received_msg = ReceivedMessage(msg)
+                self.tg.create_task(self._route(received_msg))
 
-    async def _route(self, msg: ClientMessage):
+    async def _route(self, received: ReceivedMessage):
         """Route a message to the correct handler based on system_message."""
         
-        match msg.system_msg:
-            case "ITS'A_ME_MARIO":
-                await self._handshake_init(msg.msg)
-            case "WALLS_HAVE_EARS_GOT_IT":
-                self._handshake_ack(msg.sending_user, msg.msg)
-            case "LOUD_AND_CLEAR":
-                await self._send_surroundings(msg.sending_user)
-            case "":
-                if msg.user_input:
-                    await self._handle_user_input(msg.sending_user, msg.user_input)
-            case _:
-                logger.warning('Unknown system_message: "%s"', msg.system_msg)
+        if received.type == "system_message":
+            match received.msg:
+                case "ITS'A_ME_MARIO":
+                    await self._handshake_init(received)
+                case "WALLS_HAVE_EARS_GOT_IT":
+                    self._handshake_ack(received.user)
+                case "LOUD_AND_CLEAR":
+                    await self._send_surroundings(msg.sending_user)
+                case "":
+                    if msg.user_input:
+                        await self._handle_user_input(msg.sending_user, msg.user_input)
+                case _:
+                    logger.warning('Unknown system_message: "%s"', msg.system_msg)
 
     # ── Handshake ────────────────────────────────────────────────────────────
 
-    async def _handshake_init(self, raw_msg: dict):
+    async def _handshake_init(self, received: ReceivedMessage):
         """ITS'A_ME_MARIO → authenticate, create private topic, reply SHH_LET'S_TALK_IN_PRIVATE."""
-        username = raw_msg["metadata"].get("username", "")
+        username = received.user
         if not username:
             return
 
-        password = raw_msg["payload"].get("content", "")
+        password = received.content or ""
         character = await self.heart.memory.authenticate(username, password)
         if character is None:
             logger.info('Auth failed for "%s"', username)
@@ -113,11 +112,11 @@ class MessageHandler:
             content=dedicated_topic,
         )
 
-    def _handshake_ack(self, username: str, raw_msg: dict):
+    def _handshake_ack(self, username: str):
         """WALLS_HAVE_EARS_GOT_IT → send CAN_YOU_HEAR_ME? to the user's private topic."""
         self.kafka.send_data_to_user(
             username,
-            username=raw_msg["metadata"]["username"],
+            username,
             server_message="CAN_YOU_HEAR_ME?",
         )
 

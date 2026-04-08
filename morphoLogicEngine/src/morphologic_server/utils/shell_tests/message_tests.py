@@ -1,7 +1,5 @@
 import json
 
-from typing import TYPE_CHECKING
-
 from morphologic_server.network.kafka import KafkaConnection
 from morphologic_server.services.messages import ReceivedMessage
 from morphologic_server.config import ServerSettings
