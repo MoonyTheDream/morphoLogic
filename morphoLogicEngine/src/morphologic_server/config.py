@@ -49,8 +49,8 @@ class ServerSettings(BaseSettings):
     )
 
     # Database configuration
-    DB_ADDRESS: Optional[str] = Field(
-        default=None, description="PostgreSQL connection URL"
+    DB_ADDRESS: str = Field(
+        default='localhost:5432', description="PostgreSQL connection URL"
     )
 
     model_config = {

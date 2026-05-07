@@ -57,7 +57,12 @@ STANDARD_VISIBILITY_RADIUS = 10.0  # in metres
 # 888   "   888 888        888   "   888 Y88b. .d88P 888  T88b     888
 # 888       888 8888888888 888       888  "Y88888P"  888   T88b    888
 class Memory:
-    """The world's Memory — all database operations in one place, injected with a sessionmaker."""
+    """
+    The world's Memory — all database operations in one place, injected with a sessionmaker.
+    The sessionmaker is injected via the constructor, allowing for better testability
+    and separation of concerns. When a server starts up, a Memory instance is created and passed
+    to the MorphoLogicHeart,
+    """
 
     def __init__(self, sessionmaker: async_sessionmaker):
         self._sessionmaker = sessionmaker

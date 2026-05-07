@@ -1,7 +1,16 @@
-"""ClientMessage and ServerMessage definitions using Pydantic models."""
+"""
+ClientMessage and ServerMessage definitions using Pydantic models.
+The general idea is to be able to easily access Kafka messages like in the following way:
+    msg = ReceivedMessage(raw_msg)
+    msg.user  # Access username
+    msg.type  # Access message type
+    msg.msg   # Access message content
+"""
 from typing import Literal
 
 from pydantic import BaseModel
+
+from confluent_kafka import Message as KafkaMessage
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Client Messages ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 class ClientMetadata(BaseModel):
@@ -23,9 +32,17 @@ class ClientMessage(BaseModel):
     topic: str = ""
     
 class ReceivedMessage():
-    """Parsed wrapper around a raw Kafka message."""
+    """
+    Parsed wrapper around a raw Kafka message.
+    Provides easy access to the message's topic, user, type, content, etc.
+    
+        msg.user  # Access username
+        msg.type  # Access message type ("user_input" or "system_message")
+        msg.msg   # Access the actual message content
+        msg.content # Access any additional content (if provided)
+    """
 
-    def __init__(self, raw_msg):
+    def __init__(self, raw_msg: KafkaMessage):
         self.topic = raw_msg.topic()
         self.data = ClientMessage.model_validate_json(raw_msg.value())
     

@@ -53,7 +53,8 @@ class Base(DeclarativeBase):
     Provides save/refresh/delete persistence methods.
     """
 
-    _sessionmaker: ClassVar[Optional[async_sessionmaker]] = None
+    _sessionmaker: ClassVar[async_sessionmaker]
+    id: Mapped[int] = mapped_column(primary_key=True)
 
     async def save(self):
         """Save the object to the database."""
