@@ -11,12 +11,14 @@ from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
     column_property,
+    declared_attr,
     mapped_column,
     relationship,
     validates,
 )
 
 from geoalchemy2 import Geometry
+from geoalchemy2.elements import WKBElement
 from geoalchemy2.functions import ST_DWithin, ST_Force2D, ST_Intersects
 from geoalchemy2.shape import from_shape, to_shape
 from shapely.geometry import Point
@@ -48,9 +50,14 @@ _ALLOWED_TO_DELETE = PermisionLevel.BUILDER
 # 8888888P"  "Y888888  88888P'  "Y8888
 # ------------------------------------------------------------------------------------------------ #
 class Base(DeclarativeBase):
-    """
-    Base class for all database models.
-    Provides save/refresh/delete persistence methods.
+    """Base class for all database models. Provides save/refresh/delete.
+
+    Convention: spatial columns are exposed through a ``hybrid_property``
+    (see ``GameObject.location``). Instance access returns a Shapely
+    ``Point``; class access returns the underlying ``Geometry`` column and
+    plugs straight into queries such as ``ST_DWithin`` / ``ST_Intersects``.
+    The raw column lives under a leading underscore (``_location``) and
+    shouldn't be touched outside the property's getter/setter.
     """
 
     _sessionmaker: ClassVar[async_sessionmaker]
@@ -83,6 +90,72 @@ class Base(DeclarativeBase):
         return {"success": True, "message": "Object deleted from database."}
 
 
+# 888b     d888 d8b          d8b
+# 8888b   d8888 Y8P          Y8P
+# 88888b.d88888
+# 888Y88888P888 888 888  888 888 88888b.  .d8888b
+# 888 Y888P 888 888 `Y8bd8P' 888 888 "88b 88K
+# 888  Y8P  888 888   X88K   888 888  888 "Y8888b.
+# 888   "   888 888 .d8""8b. 888 888  888      X88
+# 888       888 888 888  888 888 888  888  88888P'
+class Named:
+    """Mixin for objects with a name. Provides a name field and validation."""
+    name: Mapped[str] = mapped_column(String(STANDARD_LENGTH))
+    
+class Located:
+    """Mixin for objects with a location. Provides a location field and validation."""
+    _location: Mapped[WKBElement] = mapped_column(
+        "location", Geometry(geometry_type="POINTZ", srid=3857),
+        nullable=False
+    )
+    
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Location Property ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    @hybrid_property
+    def location(self):
+        """Return location as a Shapely Point."""
+        return to_shape(self._location)
+
+    @location.inplace.setter
+    def _location_set(self, value):
+        """Set location from (x, y, z) tuple or raw Geometry."""
+        if isinstance(value, tuple):
+            if any(v is None for v in value):
+                raise ValueError("Coordinates cannot be None.")
+            self._location = from_shape(Point(*value), srid=3857)
+        else:
+            self._location = value
+
+    @location.inplace.expression  # type: ignore[arg-type]
+    @classmethod
+    def _location_expr(cls):
+        """SQL expression returns the raw Geometry column.
+
+        The Python getter returns Shapely BaseGeometry; the SQL form returns
+        a WKBElement column. hybrid_property's single-type-parameter design
+        can't express that split, so we silence the resulting mismatch here.
+        Runtime behavior is correct.
+        """
+        return cls._location
+    
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Table Args ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    # Functional GIST index on ST_Force2D(location) so the planner can use it for the
+    # 2D-distance queries in memory.py and Character.get_terrain_nearby, which wrap
+    # the column in ST_Force2D(). A plain GIST on `location` would be ignored by those
+    # queries because the expression doesn't match.
+    
+    @declared_attr.directive
+    @classmethod
+    def __table_args__(cls):
+        return(
+            Index(
+                "idx_terrain_location_2d",
+                func.ST_Force2D(cls._location),
+                postgresql_using="gist",
+            ),
+        )
+
+
+
 #        d8888                                            888
 #       d88888                                            888
 #      d88P888                                            888
@@ -98,7 +171,7 @@ class Account(Base):
 
     __tablename__ = "accounts"
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(STANDARD_LENGTH), unique=True)
+    username: Mapped[str] = mapped_column(String(STANDARD_LENGTH), unique=True)
     email: Mapped[str] = mapped_column(String(STANDARD_LENGTH), unique=True)
     password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
@@ -111,7 +184,7 @@ class Account(Base):
     )
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Validation ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    @validates("name")
+    @validates("username")
     def _validate_name(self, key, value):
         if len(value) > STANDARD_LENGTH:
             raise ValueError(
@@ -218,9 +291,7 @@ class CharacterSoul(Base):
         return value
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Table Args ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    __table_args__ = (
-        Index("ix_character_souls_account_id", "account_id"),
-    )
+    __table_args__ = (Index("ix_character_souls_account_id", "account_id"),)
 
     # ******************************************************************************************** #
     #                                            METHODS                                           #
@@ -269,7 +340,7 @@ class TerrainType(E):
     WATER = "water"
 
 
-class Terrain(Base):
+class Terrain(Base, Located):
     """
     Class representing a table with each playable area in the game.
     """
@@ -277,35 +348,8 @@ class Terrain(Base):
     __tablename__ = "terrain"
     id: Mapped[int] = mapped_column(primary_key=True)
 
-    # Spatial location as a 3D point in SRID 3857 (metres, not really 3D)
-    _location: Mapped[str] = mapped_column(
-        "location", Geometry(geometry_type="POINTZ", srid=3857)
-    )
-
     # Type of terrain, like forest, desert, water, etc.
     type: Mapped[str] = mapped_column(Enum(TerrainType), default=TerrainType.SOIL)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Location Property ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    @hybrid_property
-    def location(self):
-        """Return location as a Shapely Point."""
-        return to_shape(self._location)
-
-    @location.inplace.setter
-    def _location_set(self, value):
-        """Set location from (x, y, z) tuple or raw Geometry."""
-        if isinstance(value, tuple):
-            if any(v is None for v in value):
-                raise ValueError("Coordinates cannot be None.")
-            self._location = from_shape(Point(*value), srid=3857)
-        else:
-            self._location = value
-
-    @location.inplace.expression
-    @classmethod
-    def _location_expr(cls):
-        """SQL expression returns raw Geometry column."""
-        return cls._location
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Validation ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     @validates("type")
@@ -316,18 +360,7 @@ class Terrain(Base):
             raise ValueError("Terrain type must be an instance of TerrainType.")
         return value
 
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Table Args ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    # Functional GIST index on ST_Force2D(location) so the planner can use it for the
-    # 2D-distance queries in memory.py and Character.get_terrain_nearby, which wrap
-    # the column in ST_Force2D(). A plain GIST on `location` would be ignored by those
-    # queries because the expression doesn't match.
-    __table_args__ = (
-        Index(
-            "idx_terrain_location_2d",
-            func.ST_Force2D(_location),
-            postgresql_using="gist",
-        ),
-    )
+    
 
     # ******************************************************************************************** #
     #                                            METHODS                                           #
@@ -392,9 +425,7 @@ class Area(Base):
         return value
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Table Args ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    __table_args__ = (
-        Index("idx_areas_polygon", "polygon", postgresql_using="gist"),
-    )
+    __table_args__ = (Index("idx_areas_polygon", "polygon", postgresql_using="gist"),)
 
 
 #  .d8888b.                                   .d88888b.  888       d8b                   888
@@ -540,9 +571,7 @@ class Character(GameObject):
     # ------------------------------------------------------------------------------------------------ #
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Table Args ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    __table_args__ = (
-        Index("ix_characters_soul_id", "soul_id"),
-    )
+    __table_args__ = (Index("ix_characters_soul_id", "soul_id"),)
 
     __mapper_args__ = {
         "polymorphic_identity": ObjectType.CHARACTER,
