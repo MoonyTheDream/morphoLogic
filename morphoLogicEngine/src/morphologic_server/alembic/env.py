@@ -25,6 +25,24 @@ if config.config_file_name is not None:
 # add your model's MetaData object here
 target_metadata = Base.metadata
 
+# Objects created by the PostGIS extension. They live in the DB but not in our
+# SQLAlchemy metadata, so without this filter Alembic's autogenerate keeps
+# proposing to drop them every run.
+_POSTGIS_MANAGED = frozenset({
+    "spatial_ref_sys",
+    "geometry_columns",
+    "geography_columns",
+})
+
+
+def include_object(_object, name, type_, _reflected, _compare_to):
+    """Filter passed to context.configure(...) — autogenerate ignores objects
+    we return False for."""
+    if type_ in ("table", "view") and name in _POSTGIS_MANAGED:
+        return False
+    return True
+
+
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
@@ -56,6 +74,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        include_object=include_object,
     )
 
     with context.begin_transaction():
@@ -82,7 +101,9 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection,
+            target_metadata=target_metadata,
+            include_object=include_object,
         )
 
         with context.begin_transaction():

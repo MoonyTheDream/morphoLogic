@@ -97,7 +97,7 @@ class Memory:
                 stmt = select(Account).where(Account.id == account_id)
 
             else:
-                stmt = select(Account).where(Account.name == account_name)
+                stmt = select(Account).where(Account.username == account_name)
             result = await session.execute(stmt)
             return result.scalars().first()
 
@@ -125,7 +125,15 @@ class Memory:
                 stmt = select(model).where(model.id == object_id)
             else:
                 stmt = select(model).where(model.name == name_or_id)
-            result = await session.execute(stmt)
+            try:
+                result = await session.execute(stmt)
+            except ConnectionRefusedError:
+                logger.error(
+                    "Database connection refused while searching for %s with name_or_id: %s\nCheck if the database server is running and accessible.",
+                    model.__name__,
+                    name_or_id,
+                )
+                raise
             return result.scalars().first()
 
     async def simple_query(self, value, attribute: str, model: Type[Base]):
@@ -505,7 +513,7 @@ class Memory:
     async def authenticate(self, username: str, password: str) -> Optional[Character]:
         """Return the bound Character if username + password are valid, else None.
 
-        Lookup chain: Account.name → account.character_souls[0] → soul.bound_character.
+        Lookup chain: Account.username → account.character_souls[0] → soul.bound_character.
         """
         account = await self.find_account(username)
         if account is None or not account.check_password(password):

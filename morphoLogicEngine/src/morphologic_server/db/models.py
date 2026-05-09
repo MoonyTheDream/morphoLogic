@@ -10,7 +10,6 @@ from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
-    column_property,
     declared_attr,
     mapped_column,
     relationship,
@@ -100,15 +99,28 @@ class Base(DeclarativeBase):
 # 888       888 888 888  888 888 888  888  88888P'
 class Named:
     """Mixin for objects with a name. Provides a name field and validation."""
+
     name: Mapped[str] = mapped_column(String(STANDARD_LENGTH))
     
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Validation ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    @validates("name")
+    def _validate_name(self, key, value):
+        if len(value) > STANDARD_LENGTH:
+            raise ValueError(
+                f"Area name cannot be longer than {STANDARD_LENGTH} characters."
+            )
+        return value
+
+
 class Located:
     """Mixin for objects with a location. Provides a location field and validation."""
+
     _location: Mapped[WKBElement] = mapped_column(
-        "location", Geometry(geometry_type="POINTZ", srid=3857),
+        "location",
+        Geometry(geometry_type="POINTZ", srid=3857, spatial_index=False),
         nullable=False
     )
-    
+
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Location Property ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     @hybrid_property
     def location(self):
@@ -136,24 +148,6 @@ class Located:
         Runtime behavior is correct.
         """
         return cls._location
-    
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Table Args ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    # Functional GIST index on ST_Force2D(location) so the planner can use it for the
-    # 2D-distance queries in memory.py and Character.get_terrain_nearby, which wrap
-    # the column in ST_Force2D(). A plain GIST on `location` would be ignored by those
-    # queries because the expression doesn't match.
-    
-    @declared_attr.directive
-    @classmethod
-    def __table_args__(cls):
-        return(
-            Index(
-                "idx_terrain_location_2d",
-                func.ST_Force2D(cls._location),
-                postgresql_using="gist",
-            ),
-        )
-
 
 
 #        d8888                                            888
@@ -170,7 +164,6 @@ class Account(Base):
     """
 
     __tablename__ = "accounts"
-    id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String(STANDARD_LENGTH), unique=True)
     email: Mapped[str] = mapped_column(String(STANDARD_LENGTH), unique=True)
     password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -185,7 +178,7 @@ class Account(Base):
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Validation ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     @validates("username")
-    def _validate_name(self, key, value):
+    def _validate_username(self, key, value):
         if len(value) > STANDARD_LENGTH:
             raise ValueError(
                 f"Account name cannot be longer than {STANDARD_LENGTH} characters."
@@ -252,7 +245,6 @@ class CharacterSoul(Base):
     """
 
     __tablename__ = "character_souls"
-    id: Mapped[int] = mapped_column(primary_key=True)
 
     # Name is not needed. Souls don't have a name. They have a meaning and attitude.
     aura: Mapped[int] = mapped_column(Integer, default=0)
@@ -346,7 +338,6 @@ class Terrain(Base, Located):
     """
 
     __tablename__ = "terrain"
-    id: Mapped[int] = mapped_column(primary_key=True)
 
     # Type of terrain, like forest, desert, water, etc.
     type: Mapped[str] = mapped_column(Enum(TerrainType), default=TerrainType.SOIL)
@@ -359,8 +350,6 @@ class Terrain(Base, Located):
         if not isinstance(value, TerrainType):
             raise ValueError("Terrain type must be an instance of TerrainType.")
         return value
-
-    
 
     # ******************************************************************************************** #
     #                                            METHODS                                           #
@@ -387,6 +376,22 @@ class Terrain(Base, Located):
                 return list(terrain)
             else:
                 return None
+            
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Table Args ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    # Functional GIST index on ST_Force2D(location) so the planner can use it for the
+    # 2D-distance queries in memory.py and Character.get_terrain_nearby, which wrap
+    # the column in ST_Force2D(). A plain GIST on `location` would be ignored by those
+    # queries because the expression doesn't match.
+    @declared_attr.directive
+    @classmethod
+    def __table_args__(cls):
+        return(
+            Index(
+                "idx_terrain_location_2d",
+                func.ST_Force2D(cls._location),
+                postgresql_using="gist",
+            ),
+        )
 
 
 #        d8888
@@ -397,7 +402,7 @@ class Terrain(Base, Located):
 #   d88P   888 888    88888888 .d888888
 #  d8888888888 888    Y8b.     888  888
 # d88P     888 888     "Y8888  "Y888888
-class Area(Base):
+class Area(Base, Named):
     """
     Class representing a table of areas in the game.
     It's a helper class to use for example as building, or a room, or any other area that might
@@ -406,23 +411,14 @@ class Area(Base):
     """
 
     __tablename__ = "areas"
-    id: Mapped[int] = mapped_column(primary_key=True)
 
     polygon: Mapped[str] = mapped_column(Geometry(geometry_type="POLYGON", srid=3857))
-    name: Mapped[str] = mapped_column(String(STANDARD_LENGTH))
     description: Mapped[Optional[str]] = mapped_column(Text)
     # Priority 0 is a ground level default area for description. Priority above 0 takes
     # over the lower priority. For now 1 is max.
     priority: Mapped[int] = mapped_column(Integer, default=0)
 
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Validation ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    @validates("name")
-    def _validate_name(self, key, value):
-        if len(value) > STANDARD_LENGTH:
-            raise ValueError(
-                f"Area name cannot be longer than {STANDARD_LENGTH} characters."
-            )
-        return value
+    
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Table Args ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     __table_args__ = (Index("idx_areas_polygon", "polygon", postgresql_using="gist"),)
@@ -447,23 +443,19 @@ class ObjectType(E):
     # NPC = "npc"
 
 
-class GameObject(Base):
+class GameObject(Base, Named, Located):
     """
     Representing a table of all game objects in the game, with position and attributes.
     """
 
     __tablename__ = "game_objects"
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(STANDARD_LENGTH))
+    
     description: Mapped[Optional[str]] = mapped_column(Text)
 
     # Object type for inheritance
     object_type: Mapped[ObjectType] = mapped_column(Enum(ObjectType))
 
-    # Spatial location as a 3D point in SRID 3857 (metres, not really 3D)
-    _location: Mapped[str] = mapped_column(
-        "location", Geometry(geometry_type="POINTZ", srid=3857)
-    )
 
     # JSONB column to store dynamic attributes
     attributes: Mapped[dict] = mapped_column(JSONB, default=dict)
@@ -493,43 +485,30 @@ class GameObject(Base):
     )
     # -------------------------------------------------------------------------------------------- #
 
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Location Property ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    @hybrid_property
-    def location(self):
-        """Return location as a Shapely Point."""
-        return to_shape(self._location)
-
-    @location.inplace.setter
-    def _location_set(self, value):
-        """Set location from (x, y, z) tuple or raw Geometry."""
-        if isinstance(value, tuple):
-            if any(v is None for v in value):
-                raise ValueError("Coordinates cannot be None.")
-            self._location = from_shape(Point(*value), srid=3857)
-        else:
-            self._location = value
-
-    @location.inplace.expression
-    @classmethod
-    def _location_expr(cls):
-        """SQL expression returns raw Geometry column."""
-        return cls._location
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Validation ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    @validates("name")
-    def _validate_name(self, key, value):
-        if len(value) > STANDARD_LENGTH:
-            raise ValueError(
-                f"Name cannot be longer than {STANDARD_LENGTH} characters."
-            )
-        return value
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Table Args ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     __table_args__ = (
-        Index("idx_game_objects_location", "location", postgresql_using="gist"),
+        # Index("idx_game_objects_location", "location", postgresql_using="gist"),
+        Index(
+            "idx_game_objects_location_nd",
+            "location",
+            postgresql_using="gist",
+            postgresql_ops={"location": "gist_geometry_ops_nd"}
+            ),
         Index("ix_game_objects_container_id", "container_id"),
         Index("ix_game_objects_puppeted_by_id", "puppeted_by_id"),
     )
+    # @declared_attr.directive
+    # @classmethod
+    # def __table_args__(cls):
+    #     return(
+    #         Index(
+    #             "idx_game_objects_location_nd",
+    #             "location",
+    #             postgresql_using="gist",
+    #             postgresql_ops={"location": "gist_geometry_ops_nd"}
+    #         ),
+    #     )
 
     __mapper_args__ = {
         "polymorphic_on": object_type,
@@ -564,10 +543,6 @@ class Character(GameObject):
     soul: Mapped["CharacterSoul"] = relationship(
         back_populates="bound_character", lazy="selectin"
     )
-
-    # Name inheritance
-    name: Mapped[str] = column_property(GameObject.name)
-
     # ------------------------------------------------------------------------------------------------ #
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Table Args ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #

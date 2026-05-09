@@ -6,8 +6,8 @@ for `pip install psycopg2` the `sudo apt install libpq-dev` is needed  before.
 - `alembic init alembic` - last one is a folder where it should initiate. The alembic.ini file will be level higher
 - `alembic init --template async alembc` is a way to create it with async template
 # Revisions
-- `alembic revision -m "name of revision`
-- `alembic revision --autogenerate -m "name of revision` - autogenerates if in .ini is the proper DeclarativeBase class.
+- `alembic revision --autogenerate -m "name of revision"` - autogenerates if in .ini is the proper DeclarativeBase class.
+- `alembic revision -m "name of revision"` - generates empty revision
 # Upgrades/downgrades
 - `alembic upgrade/downgrade <first 3 revision symbols>/+1/-2/head`
     
