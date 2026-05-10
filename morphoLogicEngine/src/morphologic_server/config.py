@@ -52,6 +52,10 @@ class ServerSettings(BaseSettings):
     DB_ADDRESS: str = Field(
         default='localhost:5432', description="PostgreSQL connection URL"
     )
+    
+    DB_ECHO: bool = Field(
+        default=False, description="Enable SQLAlchemy echo for debugging"
+    )
 
     model_config = {
         "env_file": str(Path(__file__).parent / ".env"),

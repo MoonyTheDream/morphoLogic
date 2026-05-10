@@ -28,11 +28,13 @@
 
 # ------------------------------------------------------------------------------------------------ #
 
-# from .config import ServerSettings
+from .config import ServerSettings
 from .utils.asyncio_helpers import TerminateTaskGroup, force_terminate_task_group
 from .utils.logger import (
     logger,
 )
+
+settings = ServerSettings()
 
 __all__ = [
     "logger",

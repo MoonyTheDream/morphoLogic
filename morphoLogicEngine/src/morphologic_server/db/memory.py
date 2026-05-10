@@ -33,7 +33,6 @@ from morphologic_server.db.models import (
     GameObject,
 )
 
-
 DEFAULT_SPAWN_LOCATION = from_shape(Point(0, 0, 0), srid=3857)
 
 STANDARD_VISIBILITY_RADIUS = 10.0  # in metres
@@ -101,6 +100,17 @@ class Memory:
             result = await session.execute(stmt)
             return result.scalars().first()
 
+    # 8888888888 8888888 Y88b   d88P 8888888 88888888888
+    # 888          888    Y88b d88P    888       888
+    # 888          888     Y88o88P     888       888
+    # 8888888      888      Y888P      888       888
+    # 888          888      d888b      888       888
+    # 888          888     d88888b     888       888
+    # 888          888    d88P Y88b    888       888
+    # 888        8888888 d88P   Y88b 8888888     888
+
+    # DO ZMIANY — LEPIEJ ZROBIĆ OSOBNE METHODS:
+    # find_character, find_game_object, find_area, find_terrain
     async def search(self, name_or_id: str, model: Type[Base]):
         """Search for an object by name or ID.
         If "#[int]" is being searched, it will be searched by ID.
@@ -148,9 +158,7 @@ class Memory:
             list: Returns list of objects if found, empty list otherwise.
         """
         async with self._sessionmaker() as session:
-            stmt = select(model).where(
-                getattr(model, attribute) == value
-            )
+            stmt = select(model).where(getattr(model, attribute) == value)
             result = await session.execute(stmt)
             return result.scalars().all()
 
@@ -214,9 +222,7 @@ class Memory:
             game_objects = result1.scalars().all()
             characters = result2.scalars().all()
 
-        game_objects = [
-            obj for obj in game_objects if obj.object_type != "character"
-        ]
+        game_objects = [obj for obj in game_objects if obj.object_type != "character"]
 
         return {
             "game_objects": game_objects,
