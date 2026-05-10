@@ -1,16 +1,26 @@
-"Database Models with Spatial Data and Domain Behavior"
+"""Database Models with Spatial Data and Domain Behavior"""
 
 from enum import Enum as E
-from typing import ClassVar, List, Optional
+from typing import cast, ClassVar, List, Optional
 
-from sqlalchemy import Enum, ForeignKey, Index, Integer, String, Text, func, select
+from sqlalchemy import (
+    Enum,
+    ForeignKey,
+    Index,
+    inspect,
+    Integer,
+    String,
+    Text,
+    func,
+    select,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import (
     DeclarativeBase,
-    Mapped,
     declared_attr,
+    Mapped,
     mapped_column,
     relationship,
     validates,
@@ -72,14 +82,12 @@ class Base(DeclarativeBase):
     async def refresh(self):
         """Refresh the object from the database."""
         async with self._sessionmaker() as session:
-            refreshed = await session.execute(
-                select(self.__class__).where(self.__class__.id == self.id)
-            )
-            refreshed = refreshed.scalars().first()
-            if refreshed:
-                # Copy state from refreshed instance
-                for attr in self.__class__.__table__.columns.keys():
-                    setattr(self, attr, getattr(refreshed, attr))
+            refreshed = await session.get(self.__class__, self.id)
+            if refreshed is None:
+                return
+            # Copy state from refreshed instance
+            for attr in inspect(self.__class__).mapper.column_attrs:
+                setattr(self, attr.key, getattr(refreshed, attr.key))
 
     async def delete(self):
         """Deletes the object from the database."""
@@ -101,7 +109,7 @@ class Named:
     """Mixin for objects with a name. Provides a name field and validation."""
 
     name: Mapped[str] = mapped_column(String(STANDARD_LENGTH))
-    
+
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Validation ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     @validates("name")
     def _validate_name(self, key, value):
@@ -115,17 +123,22 @@ class Named:
 class Located:
     """Mixin for objects with a location. Provides a location field and validation."""
 
+    # spatial_index=False: GeoAlchemy2's default 2D GIST is wrong for both
+    # subclasses here. Terrain needs a functional index on ST_Force2D(location)
+    # (its queries wrap the column in ST_Force2D); GameObject needs an N-D
+    # index for 3D queries. Each concrete class declares the right index in
+    # __table_args__ — see those for details.
     _location: Mapped[WKBElement] = mapped_column(
         "location",
         Geometry(geometry_type="POINTZ", srid=3857, spatial_index=False),
-        nullable=False
+        nullable=False,
     )
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Location Property ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     @hybrid_property
-    def location(self):
+    def location(self) -> Point:
         """Return location as a Shapely Point."""
-        return to_shape(self._location)
+        return cast(Point, to_shape(self._location))
 
     @location.inplace.setter
     def _location_set(self, value):
@@ -357,12 +370,6 @@ class Terrain(Base, Located):
     async def find_nearby(self, distance_m=1.0):
         """Find nearby terrain by coordinates and distance."""
         x, y = self.location.x, self.location.y
-        if x is None or y is None:
-            logger.warning(
-                "Terrain %s has no coordinates. Cannot find nearby terrain.",
-                self.id,
-            )
-            return None
 
         point = from_shape(Point(x, y), srid=3857)
         async with self._sessionmaker() as session:
@@ -376,7 +383,7 @@ class Terrain(Base, Located):
                 return list(terrain)
             else:
                 return None
-            
+
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Table Args ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     # Functional GIST index on ST_Force2D(location) so the planner can use it for the
     # 2D-distance queries in memory.py and Character.get_terrain_nearby, which wrap
@@ -385,7 +392,7 @@ class Terrain(Base, Located):
     @declared_attr.directive
     @classmethod
     def __table_args__(cls):
-        return(
+        return (
             Index(
                 "idx_terrain_location_2d",
                 func.ST_Force2D(cls._location),
@@ -418,8 +425,6 @@ class Area(Base, Named):
     # over the lower priority. For now 1 is max.
     priority: Mapped[int] = mapped_column(Integer, default=0)
 
-    
-
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Table Args ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     __table_args__ = (Index("idx_areas_polygon", "polygon", postgresql_using="gist"),)
 
@@ -450,12 +455,11 @@ class GameObject(Base, Named, Located):
 
     __tablename__ = "game_objects"
     id: Mapped[int] = mapped_column(primary_key=True)
-    
+
     description: Mapped[Optional[str]] = mapped_column(Text)
 
     # Object type for inheritance
     object_type: Mapped[ObjectType] = mapped_column(Enum(ObjectType))
-
 
     # JSONB column to store dynamic attributes
     attributes: Mapped[dict] = mapped_column(JSONB, default=dict)
@@ -485,30 +489,20 @@ class GameObject(Base, Named, Located):
     )
     # -------------------------------------------------------------------------------------------- #
 
-
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Table Args ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    # N-D operator class so the index works on the full POINTZ geometry
+    # (3D queries via ST_DWithin without ST_Force2D). A default 2D GIST
+    # would force a seq scan for any query touching Z.
     __table_args__ = (
-        # Index("idx_game_objects_location", "location", postgresql_using="gist"),
         Index(
-            "idx_game_objects_location_nd",
+            "idx_game_objects_location_3d",
             "location",
             postgresql_using="gist",
-            postgresql_ops={"location": "gist_geometry_ops_nd"}
-            ),
+            postgresql_ops={"location": "gist_geometry_ops_nd"},
+        ),
         Index("ix_game_objects_container_id", "container_id"),
         Index("ix_game_objects_puppeted_by_id", "puppeted_by_id"),
     )
-    # @declared_attr.directive
-    # @classmethod
-    # def __table_args__(cls):
-    #     return(
-    #         Index(
-    #             "idx_game_objects_location_nd",
-    #             "location",
-    #             postgresql_using="gist",
-    #             postgresql_ops={"location": "gist_geometry_ops_nd"}
-    #         ),
-    #     )
 
     __mapper_args__ = {
         "polymorphic_on": object_type,
