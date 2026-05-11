@@ -2,6 +2,7 @@
 SELECT 
     id,
     ST_Force2D(location) AS location_2d,
-    ST_AsText(location) AS location_readable
+    ST_AsText(location) AS location_readable,
+    type
 FROM public.terrain
 ORDER BY id ASC;

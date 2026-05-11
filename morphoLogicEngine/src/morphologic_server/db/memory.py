@@ -366,6 +366,14 @@ class Memory:
         if location is None:
             location = DEFAULT_SPAWN_LOCATION
 
+        kwargs = {}
+        if container is not None:
+            kwargs["container"] = container
+        if stored is not None:
+            if not isinstance(stored, list):
+                stored = [stored]
+            kwargs["stored"] = stored
+
         async with self._sessionmaker() as session:
             character = Character(
                 name=name,
@@ -373,8 +381,7 @@ class Memory:
                 description=description,
                 location=location,
                 attributes=attributes,
-                container=container,
-                stored=stored,
+                **kwargs,
             )
             session.add(character)
             await session.commit()

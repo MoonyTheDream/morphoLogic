@@ -181,7 +181,7 @@ async def run_seed(args):
     """Populate the database with test objects and areas."""
     from morphologic_server.scripts.seed import seed
 
-    await seed()
+    await seed(fresh=getattr(args, "fresh", False))
 
 
 # ------------------------------------------------------------------------------------------------ #
@@ -220,6 +220,11 @@ def main():
 
     seed_cmd = subparsers.add_parser(
         "seed", help="Populate the database with test objects and areas"
+    )
+    seed_cmd.add_argument(
+        "--fresh",
+        action="store_true",
+        help="Wipe all existing accounts, characters, objects, areas and terrain first.",
     )
     seed_cmd.set_defaults(func=run_seed)
 
