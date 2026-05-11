@@ -73,6 +73,13 @@ class Base(DeclarativeBase):
     _sessionmaker: ClassVar[async_sessionmaker]
     id: Mapped[int] = mapped_column(primary_key=True)
 
+    def __repr__(self) -> str:
+        cls = self.__class__.__name__
+        name = getattr(self, "name", None)
+        if name is not None:
+            return f"{cls}(id={self.id}, name={name!r})"
+        return f"{cls}(id={self.id})"
+
     async def save(self):
         """Save the object to the database."""
         async with self._sessionmaker() as session:
@@ -96,7 +103,7 @@ class Base(DeclarativeBase):
             await session.delete(self)
             await session.commit()
         return {"success": True, "message": "Object deleted from database."}
-    
+
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Helpers ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     async def load_related_attributes(self, *attrs: str):
         """Return a fresh copy of this instance with given relations loaded.
@@ -106,9 +113,7 @@ class Base(DeclarativeBase):
         trip instead of two.
         """
         async with self._sessionmaker() as session:
-            opts = tuple(
-                selectinload(getattr(self.__class__, a)) for a in attrs
-            )
+            opts = tuple(selectinload(getattr(self.__class__, a)) for a in attrs)
             stmt = (
                 select(self.__class__)
                 .where(self.__class__.id == self.id)
@@ -116,7 +121,7 @@ class Base(DeclarativeBase):
             )
             loaded = (await session.execute(stmt)).scalars().first()
             if loaded:
-                session.expunge(loaded)   # detach so it survives the session close
+                session.expunge(loaded)  # detach so it survives the session close
             return loaded
 
 
@@ -131,6 +136,7 @@ class Base(DeclarativeBase):
 class Named:
     """Mixin for objects with a name. Provides a name field and validation."""
 
+    id: Mapped[int]  # type hint only — actual column is on Base
     name: Mapped[str] = mapped_column(String(STANDARD_LENGTH))
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Validation ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
@@ -211,6 +217,9 @@ class Account(Base):
     character_souls: Mapped[Optional[List["CharacterSoul"]]] = relationship(
         back_populates="account", cascade="all, delete-orphan", lazy="raise"
     )
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(id={self.id}, username={self.username!r})"
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Validation ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     @validates("username")
@@ -376,7 +385,12 @@ class Terrain(Base, Located):
     __tablename__ = "terrain"
 
     # Type of terrain, like forest, desert, water, etc.
-    type: Mapped[str] = mapped_column(Enum(TerrainType), default=TerrainType.SOIL)
+    type: Mapped[TerrainType] = mapped_column(
+        Enum(TerrainType), default=TerrainType.SOIL
+    )
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(id={self.id}, type={self.type.value!r})"
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Validation ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     @validates("type")
