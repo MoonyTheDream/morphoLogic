@@ -128,7 +128,7 @@ async def seed():
 
     # ── Extra NPC character ───────────────────────────────────────────────── #
     # Only create if an account named "Another" exists; skip otherwise.
-    another_account = await memory.find_account("Another")
+    another_account = await memory.find_account("AnotherAccount")
     if another_account:
         existing_char = await memory.search("AnotherCharacter", Character)
         if not existing_char:

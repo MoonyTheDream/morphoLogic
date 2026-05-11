@@ -5,6 +5,8 @@ All database query and create operations live here, receiving the sessionmaker
 via constructor injection instead of relying on a module-level global.
 """
 
+import asyncio
+
 from typing import Optional, Type, Tuple, Union
 
 from sqlalchemy import select
@@ -205,24 +207,19 @@ class Memory:
         )
 
         async with self._sessionmaker() as session:
-            stmt1 = (
+            stmt = (
                 select(GameObject)
                 .where(ST_3DDWithin(GameObject.location, point_z, radius))
                 .order_by(ST_3DDistance(GameObject.location, point_z))
             )
 
-            stmt2 = (
-                select(Character)
-                .where(ST_3DDWithin(Character.location, point_z, radius))
-                .order_by(ST_3DDistance(Character.location, point_z))
-            )
-            result1 = await session.execute(stmt1)
-            result2 = await session.execute(stmt2)
+            result = await session.execute(stmt)
+            all_objects = result.scalars().all()
 
-            game_objects = result1.scalars().all()
-            characters = result2.scalars().all()
-
-        game_objects = [obj for obj in game_objects if obj.object_type != "character"]
+            characters = [obj for obj in all_objects if isinstance(obj, Character)]
+            game_objects = [
+                obj for obj in all_objects if not isinstance(obj, Character)
+            ]
 
         return {
             "game_objects": game_objects,
@@ -240,70 +237,54 @@ class Memory:
         Returns:
             dict: {"game_objects": [...], "characters": [...], "area": Area|None, "terrain": [...]}
         """
-        point_z = from_shape(
-            Point(
-                character.location.x,
-                character.location.y,
-                character.location.z,
-            ),
-            srid=3857,
+
+        async def _fetch_obejct():
+            async with self._sessionmaker() as session:
+                stmt = (
+                    select(GameObject)
+                    .where(
+                        ST_3DDWithin(GameObject.location, character._location, radius)
+                    )
+                    .order_by(ST_3DDistance(GameObject.location, character._location))
+                )
+                return (await session.execute(stmt)).scalars().all()
+
+        async def _fetch_area():
+            async with self._sessionmaker() as session:
+                stmt = (
+                    select(Area)
+                    .where(ST_Intersects(Area.polygon, ST_Force2D(character._location)))
+                    .order_by(Area.priority.desc())
+                    .limit(
+                        2
+                    )  # We only need to check the top 2 areas for priority conflicts
+                )
+                return (await session.execute(stmt)).scalars().all()
+
+        async def _fetch_terrain():
+            async with self._sessionmaker() as session:
+                stmt = select(Terrain).where(
+                    ST_DWithin(
+                        ST_Force2D(Terrain.location),
+                        ST_Force2D(character._location),
+                        radius,
+                    )
+                )
+                return (await session.execute(stmt)).scalars().all()
+
+        all_objects, areas, terrain = await asyncio.gather(
+            _fetch_obejct(), _fetch_area(), _fetch_terrain()
         )
 
-        async with self._sessionmaker() as session:
-            # Refresh character state
-            refreshed = await session.execute(
-                select(Character).where(Character.id == character.id)
-            )
-            refreshed_char = refreshed.scalars().first()
-            if refreshed_char:
-                for attr in Character.__table__.columns.keys():
-                    setattr(character, attr, getattr(refreshed_char, attr))
+        characters = [obj for obj in all_objects if isinstance(obj, Character)]
+        game_objects = [obj for obj in all_objects if not isinstance(obj, Character)]
 
-            # Nearby game objects (exclude characters from polymorphic query)
-            stmt_objects = (
-                select(GameObject)
-                .where(ST_3DDWithin(GameObject.location, point_z, radius))
-                .order_by(ST_3DDistance(GameObject.location, point_z))
+        if len(areas) > 1 and areas[0].priority == areas[1].priority:
+            logger.warning(
+                "More than one area of the same priority at location %s",
+                character._location,
             )
-            stmt_chars = (
-                select(Character)
-                .where(ST_3DDWithin(Character.location, point_z, radius))
-                .order_by(ST_3DDistance(Character.location, point_z))
-            )
-            result_objects = await session.execute(stmt_objects)
-            result_chars = await session.execute(stmt_chars)
-
-            game_objects = [
-                obj
-                for obj in result_objects.scalars().all()
-                if obj.object_type != "character"
-            ]
-            characters = result_chars.scalars().all()
-
-            # Area the character is standing in
-            stmt_area = select(Area).where(
-                ST_Intersects(Area.polygon, ST_Force2D(character._location))
-            )
-            result_area = await session.execute(stmt_area)
-            areas = result_area.scalars().all()
-            areas.sort(key=lambda a: a.priority, reverse=True)
-            if len(areas) > 1 and areas[0].priority == areas[1].priority:
-                logger.warning(
-                    "More than one area of the same priority at location %s",
-                    character._location,
-                )
-            area = areas[0] if areas else None
-
-            # Nearby terrain
-            stmt_terrain = select(Terrain).where(
-                ST_DWithin(
-                    ST_Force2D(Terrain.location),
-                    ST_Force2D(character._location),
-                    radius,
-                )
-            )
-            result_terrain = await session.execute(stmt_terrain)
-            terrain = result_terrain.scalars().all()
+        area = areas[0] if areas else None
 
         return {
             "game_objects": game_objects,
@@ -316,7 +297,7 @@ class Memory:
     #                                            CREATING                                          #
     # ******************************************************************************************** #
 
-    async def create_account(self, name: str, email: str) -> Optional[Account]:
+    async def create_account(self, username: str, email: str) -> Optional[Account]:
         """Creates an account in the database.
 
         Returns:
@@ -324,7 +305,7 @@ class Memory:
         """
 
         async with self._sessionmaker() as session:
-            account = Account(name=name, email=email, permission_level=2)
+            account = Account(username=username, email=email, permission_level=2)
             session.add(account)
             await session.commit()
             await session.refresh(account)
