@@ -23,6 +23,7 @@ from sqlalchemy.orm import (
     Mapped,
     mapped_column,
     relationship,
+    selectinload,
     validates,
 )
 
@@ -95,6 +96,28 @@ class Base(DeclarativeBase):
             await session.delete(self)
             await session.commit()
         return {"success": True, "message": "Object deleted from database."}
+    
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Helpers ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    async def load_related_attributes(self, *attrs: str):
+        """Return a fresh copy of this instance with given relations loaded.
+
+        Shell/test convenience. In app code, prefer .options(selectinload(...))
+        on the original query — it's explicit at the call site and one round
+        trip instead of two.
+        """
+        async with self._sessionmaker() as session:
+            opts = tuple(
+                selectinload(getattr(self.__class__, a)) for a in attrs
+            )
+            stmt = (
+                select(self.__class__)
+                .where(self.__class__.id == self.id)
+                .options(*opts)
+            )
+            loaded = (await session.execute(stmt)).scalars().first()
+            if loaded:
+                session.expunge(loaded)   # detach so it survives the session close
+            return loaded
 
 
 # 888b     d888 d8b          d8b
@@ -186,7 +209,7 @@ class Account(Base):
 
     # Relationship to character souls
     character_souls: Mapped[Optional[List["CharacterSoul"]]] = relationship(
-        back_populates="account", cascade="all, delete-orphan", lazy="selectin"
+        back_populates="account", cascade="all, delete-orphan", lazy="raise"
     )
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Validation ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
@@ -265,7 +288,7 @@ class CharacterSoul(Base):
     # Relation with Account
     account_id: Mapped[int] = mapped_column(Integer, ForeignKey("accounts.id"))
     account: Mapped["Account"] = relationship(
-        back_populates="character_souls", foreign_keys=account_id, lazy="selectin"
+        back_populates="character_souls", foreign_keys=account_id, lazy="raise"
     )
 
     # Permissions: 0 - admin, 1 - builder, 2 - player
@@ -276,13 +299,13 @@ class CharacterSoul(Base):
         back_populates="soul",
         passive_deletes=True,
         foreign_keys="Character.soul_id",
-        lazy="selectin",
+        lazy="raise",
     )
     puppeting: Mapped[Optional["GameObject"]] = relationship(
         back_populates="puppeted_by",
         passive_deletes=True,
         foreign_keys="GameObject.puppeted_by_id",
-        lazy="selectin",
+        lazy="raise",
     )
     # -------------------------------------------------------------------------------------------- #
 
@@ -485,7 +508,7 @@ class GameObject(Base, Named, Located):
         Integer, ForeignKey("character_souls.id", ondelete="SET NULL")
     )
     puppeted_by: Mapped["CharacterSoul"] = relationship(
-        back_populates="puppeting", lazy="selectin"
+        back_populates="puppeting", lazy="raise"
     )
     # -------------------------------------------------------------------------------------------- #
 
@@ -535,7 +558,7 @@ class Character(GameObject):
         Integer, ForeignKey("character_souls.id", ondelete="SET NULL")
     )
     soul: Mapped["CharacterSoul"] = relationship(
-        back_populates="bound_character", lazy="selectin"
+        back_populates="bound_character", lazy="raise"
     )
     # ------------------------------------------------------------------------------------------------ #
 

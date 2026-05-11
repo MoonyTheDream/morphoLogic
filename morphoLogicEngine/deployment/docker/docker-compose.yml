@@ -1,19 +1,52 @@
-version: "3.8"
+# morphoLogic — Docker Compose
+#
+# Two ways to use this file:
+#   1. Local dev DB only:    docker compose up -d postgres
+#      (run the server natively from your venv; .env points at localhost:5436)
+#   2. Full stack:           docker compose up -d
+#      (server + kafka + postgres all in containers, talking to each other)
+#
+# Run from this directory, or pass `-f morphoLogicEngine/deployment/docker/docker-compose.yml`.
 
 services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: morphoLogic_postgres
+    # Host:container port mapping. Container always listens on 5432 (Postgres
+    # default). Host port is 5436 to match the Pi, so .env switches between
+    # localhost and Pi by host only — port stays 5436 in both cases.
+    ports:
+      - "5436:5432"
+    environment:
+      POSTGRES_USER: morphoLogicServer
+      POSTGRES_PASSWORD: morphoLogicTEST
+      POSTGRES_DB: morphoLogicDB
+    volumes:
+      - morphologic_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U morphoLogicServer -d morphoLogicDB"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
   morphologic_server:
     build: .
-    # ports:
-    #   - "8080:8080"
-    #   - "9090:9090"
     depends_on:
-      - kafka
+      kafka:
+        condition: service_started
+      postgres:
+        condition: service_healthy
     environment:
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      # Inside the docker network, the server reaches postgres by service
+      # name on its container port (5432, not 5436).
+      DB_ADDRESS: "morphoLogicServer:morphoLogicTEST@postgres:5432/morphoLogicDB"
+      KAFKA_SERVER: "kafka:9092"
     restart: unless-stopped
 
   kafka:
-    image: apache/kafka:latest  # Uses the latest Kafka image (with KRaft mode)
+    image: apache/kafka:latest
     ports:
       - "9092:9092"
     environment:
@@ -26,3 +59,6 @@ services:
       KAFKA_CFG_LOG_DIRS: /tmp/kraft-combined-logs
     restart: unless-stopped
 
+volumes:
+  morphologic_pgdata:
+    name: morphologic_pgdata
