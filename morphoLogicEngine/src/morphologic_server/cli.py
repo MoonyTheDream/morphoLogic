@@ -25,7 +25,6 @@ from morphologic_server.utils.logger import (
 
 # ------------------------------------------------------------------------------------------------ #
 
-
 async def run_python_shell(heart=None):
     """A coroutine to run the python shell."""
     from morphologic_server.db import models
@@ -51,7 +50,7 @@ async def run_python_shell(heart=None):
         "heart": heart,
         "models": models,
         "memory": memory,
-        "self": await memory.search("MoonyTheDream", models.Character),
+        "self": await memory.find_character("MoonyTheDream", eagerly=True),
     }
     await embed(globals=context, return_asyncio_coroutine=True, title=banner)
 

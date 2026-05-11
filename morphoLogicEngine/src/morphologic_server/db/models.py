@@ -513,7 +513,7 @@ class GameObject(Base, Named, Located):
         lazy="noload",
     )
     stored: Mapped[List["GameObject"]] = relationship(
-        back_populates="container", lazy="noload"
+        back_populates="container", lazy="raise"
     )
     # -------------------------------------------------------------------------------------------- #
 

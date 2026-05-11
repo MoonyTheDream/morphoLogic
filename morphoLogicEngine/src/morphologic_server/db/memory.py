@@ -11,6 +11,7 @@ from typing import Optional, Type, Tuple, Union
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlalchemy.orm import selectinload
 
 from geoalchemy2 import shape
 from geoalchemy2.functions import (
@@ -33,6 +34,7 @@ from morphologic_server.db.models import (
     TerrainType,
     Area,
     GameObject,
+    ObjectType,
 )
 
 DEFAULT_SPAWN_LOCATION = from_shape(Point(0, 0, 0), srid=3857)
@@ -68,39 +70,104 @@ class Memory:
     def __init__(self, sessionmaker: async_sessionmaker):
         self._sessionmaker = sessionmaker
 
+    # def _check_if_id_search(self, name_or_id: str) -> Optional[int]:
+    #     """Check if the search string is an ID search (starts with "#") and return the ID as int if so."""
+    #     if name_or_id.startswith("#"):
+    #         try:
+    #             return int(name_or_id[1:])
+    #         except ValueError:
+    #             logger.warning(
+    #                 "Invalid ID format: %s. Expected format: #[int].",
+    #                 name_or_id,
+    #             )
+    #     return None
+
     # ******************************************************************************************** #
     #                                            SEARCHING                                         #
     # ******************************************************************************************** #
 
-    async def find_account(self, account_name: str) -> Optional[Account]:
-        """
-        Finds account by name.
-        If "#<int>" is being searched, it will be searched by ID.
+    async def find_account(self, username_or_id: str | int) -> Account | None:
+        """Finds and returns account by id or username.
 
         Args:
-            account_name (str): Name or #ID of the account to search for.
+            username_or_id (str | int): Username or ID of the account to search.
 
         Returns:
-            Account: if found, None otherwise.
+            Optional[Account]: Account object if found, else None.
         """
+        match username_or_id:
+            case int():
+                stmt = select(Account).where(Account.id == username_or_id)
+            case str():
+                stmt = select(Account).where(Account.username == username_or_id)
 
         async with self._sessionmaker() as session:
-
-            if account_name.startswith("#"):
-                try:
-                    account_id = int(account_name[1:])
-                except ValueError:
-                    logger.warning(
-                        "Invalid account ID format: %s. Expected format: #[int].",
-                        account_name,
-                    )
-                    return None
-                stmt = select(Account).where(Account.id == account_id)
-
-            else:
-                stmt = select(Account).where(Account.username == account_name)
             result = await session.execute(stmt)
-            return result.scalars().first()
+            return (await session.execute(stmt)).scalar_one_or_none()
+
+    async def find_character(
+        self,
+        character: str | int | Character,
+        eagerly: bool = False,
+    ) -> Character | None:
+        """
+        Finds character by name, ID or Character object,
+        Optionally eagerly loads the soul and account relationships.
+
+        Args:
+            character (str | int | Character): Name, ID, or Character object to search for.
+            eagerly (bool): Loads the soul and account if True. Default to False.
+        Returns:
+            Character: if found, None otherwise.
+        """
+        base = select(Character)
+        if eagerly:
+            base = base.options(
+                selectinload(Character.soul).selectinload(CharacterSoul.account),
+                selectinload(Character.container),
+                selectinload(Character.stored),
+            )
+
+        match character:
+            case Character():
+                stmt = base.where(Character.id == character.id)
+            case str():
+                stmt = base.where(Character.name == character)
+            case int():
+                stmt = base.where(Character.id == character)
+
+        async with self._sessionmaker() as session:
+            return (await session.execute(stmt)).scalars().first()
+
+    async def find_object(
+        self, name_or_id: str | int, eagerly: bool = False
+    ) -> GameObject | None:
+        """Finds GameObject that is not a Character.
+        Looks only for objects with exact name as given — to expand in the future
+        to use fuzzy search.
+
+        Args:
+            name_or_id (str | int): Name or ID of the searched object.
+            eagerly (bool): If True, also loads container and stored relationships. Defaults to False.
+
+        Returns:
+            Optional[GameObject]: Returns the first matching object if found.
+            None otherwise.
+        """
+        base = select(GameObject).where(GameObject.object_type != ObjectType.CHARACTER)
+        if eagerly:
+            base = base.options(selectinload(GameObject.container),
+                                selectinload(GameObject.stored))
+            
+        if isinstance(name_or_id, int):
+             stmt = base.where(GameObject.id == name_or_id)
+        elif isinstance(name_or_id, str):
+             stmt = base.where(GameObject.name == name_or_id)
+        else:
+            raise TypeError("name_or_id must be a string or an integer")
+        
+        async with self._sessionmaker() as session:
+            return (await session.execute(stmt)).scalars().first()
 
     # 8888888888 8888888 Y88b   d88P 8888888 88888888888
     # 888          888    Y88b d88P    888       888
