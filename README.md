@@ -49,7 +49,7 @@ pip install -e .
 cd src/morphologic_server
 cp .env.template .env       # if not already there
 # edit .env so DB_ADDRESS reads:
-#   morphoLogicServer:morphoLogicTEST@localhost:5436/morphoLogicDB
+#   <DB_USER>:<DB_PASSWORD>@localhost:5436/<DB_NAME>
 # and fill in KAFKA_SERVER as appropriate.
 
 # 5. Apply schema migrations.
@@ -61,8 +61,8 @@ morphologic seed
 # 6b. OR restore a dump from another machine (see pg_dump/pg_restore below):
 pg_restore \
   -h localhost -p 5436 \
-  -U morphoLogicServer \
-  -d morphoLogicDB \
+  -U <DB_USER> \
+  -d <DB_NAME> \
   --clean --if-exists --no-owner --no-privileges \
   morphologic-YYYYMMDD.dump
 
@@ -87,9 +87,8 @@ pip install -e .`
 ### PostgreSQL with PostGIS
 
 A `docker-compose.yml` at `morphoLogicEngine/deployment/docker/` defines a
-local PostGIS service with the same credentials and port (5436) as the Pi,
-so the only difference between local and remote is the host portion of
-`DB_ADDRESS`.
+local PostGIS service on port 5436. To target a remote host, only the host
+portion of `DB_ADDRESS` changes.
 
 #### Quick start (local dev DB)
 
@@ -108,7 +107,7 @@ After the container is up, point your `.env` at it:
 
 ```ini
 # src/morphologic_server/.env
-DB_ADDRESS = "morphoLogicServer:morphoLogicTEST@localhost:5436/morphoLogicDB"
+DB_ADDRESS = "<DB_USER>:<DB_PASSWORD>@localhost:5436/<DB_NAME>"
 ```
 
 Then prepare schema and seed data:
@@ -118,17 +117,6 @@ cd morphoLogicEngine/src/morphologic_server
 alembic upgrade head        # create tables
 morphologic seed            # populate test world
 ```
-
-#### Switching between local and Pi
-
-Keep both lines in `.env` and comment whichever you don't need:
-
-```ini
-DB_ADDRESS = "morphoLogicServer:morphoLogicTEST@localhost:5436/morphoLogicDB"
-# DB_ADDRESS = "morphoLogicServer:morphoLogicTEST@<REMOTE_HOST>:5436/morphoLogicDB"
-```
-
-Port and credentials are identical — only the host changes.
 
 #### Full stack in containers
 
@@ -166,22 +154,14 @@ you pick which tables to restore selectively if needed.
 # Dump from local dev DB
 pg_dump \
   -h localhost -p 5436 \
-  -U morphoLogicServer \
-  -d morphoLogicDB \
+  -U <DB_USER> \
+  -d <DB_NAME> \
   -Fc \
   -f morphologic-$(date +%Y%m%d).dump
-
-# Dump from the Pi
-pg_dump \
-  -h <REMOTE_HOST> -p 5436 \
-  -U morphoLogicServer \
-  -d morphoLogicDB \
-  -Fc \
-  -f morphologic-pi-$(date +%Y%m%d).dump
 ```
 
 You'll be prompted for the password. To avoid the prompt, set
-`PGPASSWORD=morphoLogicTEST` in the environment for that command, or use a
+`PGPASSWORD=<DB_PASSWORD>` in the environment for that command, or use a
 [`~/.pgpass` file](https://www.postgresql.org/docs/current/libpq-pgpass.html).
 
 #### Restore into a target
@@ -193,8 +173,8 @@ exists and is empty (or use `--clean` to drop existing objects first).
 # Restore into local dev DB (assumes container is up)
 pg_restore \
   -h localhost -p 5436 \
-  -U morphoLogicServer \
-  -d morphoLogicDB \
+  -U <DB_USER> \
+  -d <DB_NAME> \
   --clean --if-exists \
   --no-owner --no-privileges \
   morphologic-20260510.dump
@@ -214,14 +194,14 @@ recreate the DB before restoring. The compose container exposes `psql`:
 
 ```bash
 docker compose exec postgres \
-  psql -U morphoLogicServer -d postgres \
-       -c "DROP DATABASE IF EXISTS \"morphoLogicDB\";" \
-       -c "CREATE DATABASE \"morphoLogicDB\" OWNER \"morphoLogicServer\";"
+  psql -U <DB_USER> -d postgres \
+       -c "DROP DATABASE IF EXISTS \"<DB_NAME>\";" \
+       -c "CREATE DATABASE \"<DB_NAME>\" OWNER \"<DB_USER>\";"
 
 pg_restore \
   -h localhost -p 5436 \
-  -U morphoLogicServer \
-  -d morphoLogicDB \
+  -U <DB_USER> \
+  -d <DB_NAME> \
   --no-owner --no-privileges \
   morphologic-20260510.dump
 ```
@@ -233,7 +213,7 @@ share the *delta* — the rows you've added or changed during play. Dump
 just the relevant tables:
 
 ```bash
-pg_dump -h localhost -p 5436 -U morphoLogicServer -d morphoLogicDB \
+pg_dump -h localhost -p 5436 -U <DB_USER> -d <DB_NAME> \
   -Fc \
   -t game_objects -t characters -t character_souls \
   -f morphologic-state-only.dump
