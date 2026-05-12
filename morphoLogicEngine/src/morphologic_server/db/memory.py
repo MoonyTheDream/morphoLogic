@@ -112,8 +112,8 @@ class Memory:
         if eagerly:
             base = base.options(
                 selectinload(Character.soul).selectinload(CharacterSoul.account),
-                selectinload(Character.container),
-                selectinload(Character.stored),
+                selectinload(Character.holder),
+                selectinload(Character.holds),
             )
 
         match character:
@@ -136,7 +136,7 @@ class Memory:
 
         Args:
             name_or_id (str | int): Name or ID of the searched object.
-            eagerly (bool): If True, also loads container and stored relationships. Defaults to False.
+            eagerly (bool): If True, also loads holder and holds relationships. Defaults to False.
 
         Returns:
             Optional[GameObject]: Returns the first matching object if found.
@@ -145,7 +145,7 @@ class Memory:
         base = select(GameObject).where(GameObject.object_type != ObjectType.CHARACTER)
         if eagerly:
             base = base.options(
-                selectinload(GameObject.container), selectinload(GameObject.stored)
+                selectinload(GameObject.holder), selectinload(GameObject.holds)
             )
 
         if isinstance(name_or_id, int):
@@ -369,8 +369,8 @@ class Memory:
         description: str = "",
         location=None,
         attributes: dict = {},
-        container: GameObject | None = None,
-        stored: list[GameObject] = [],
+        holder: GameObject | None = None,
+        holds: list[GameObject] = [],
     ) -> Optional[Character]:
         """Creates a character in the database.
 
@@ -382,12 +382,12 @@ class Memory:
             location = DEFAULT_SPAWN_LOCATION
 
         kwargs = {}
-        if container is not None:
-            kwargs["container"] = container
-        if stored is not None:
-            if not isinstance(stored, list):
-                stored = [stored]
-            kwargs["stored"] = stored
+        if holder is not None:
+            kwargs["holder"] = holder
+        if holds is not None:
+            if not isinstance(holds, list):
+                holds = [holds]
+            kwargs["holds"] = holds
 
         async with self._sessionmaker() as session:
             character = Character(
@@ -480,8 +480,8 @@ class Memory:
         description: str = "",
         location=None,
         attributes: dict = None,
-        container: GameObject = None,
-        stored: Union[list[GameObject], GameObject] = None,
+        holder: GameObject = None,
+        holds: Union[list[GameObject], GameObject] = None,
     ) -> Optional[GameObject]:
         """Creates a game object in the database.
 
@@ -495,12 +495,12 @@ class Memory:
             location = from_shape(location, srid=3857)
 
         kwargs = {}
-        if container is not None:
-            kwargs["container"] = container
-        if stored is not None:
-            if not isinstance(stored, list):
-                stored = [stored]
-            kwargs["stored"] = stored
+        if holder is not None:
+            kwargs["holder"] = holder
+        if holds is not None:
+            if not isinstance(holds, list):
+                holds = [holds]
+            kwargs["holds"] = holds
 
         async with self._sessionmaker() as session:
             game_object = GameObject(

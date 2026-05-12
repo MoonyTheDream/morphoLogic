@@ -48,34 +48,34 @@ async def _ensure_object(
     name: str,
     description: str,
     location: Point | None = None,
-    container: GameObject | None = None,
+    holder: GameObject | None = None,
     *,
     attributes: dict | None = None,
 ):
     """Create a game object only if one with this name doesn't already exist.
 
-    If `container` is given and the object is created, its location is
-    overridden to match the container's — nested items live where their
-    container lives.
+    If `holder` is given and the object is created, its location is
+    overridden to match the holder's — nested items live where their
+    holder lives.
     """
     existing = await memory.search(name, GameObject)
     if existing:
         logger.info("Seed: object '%s' already exists — skipping.", name)
         return existing
 
-    if container is not None:
-        location = _pt(*container.location.coords[0])
+    if holder is not None:
+        location = _pt(*holder.location.coords[0])
     elif location is None:
-        raise ValueError(f"Seed: object '{name}' needs a location or a container.")
+        raise ValueError(f"Seed: object '{name}' needs a location or a holder.")
 
     obj = await memory.create_game_object(
         name=name,
         description=description,
         location=location,
-        container=container,
+        holder=holder,
         attributes=attributes,
     )
-    where = f" w '{container.name}'" if container is not None else ""
+    where = f" w '{holder.name}'" if holder is not None else ""
     logger.info("Seed: created object '%s'%s.", name, where)
     return obj
 
@@ -296,28 +296,28 @@ async def seed(fresh: bool = False):
         memory,
         "Sakiewka",
         "Skórzana sakiewka z monetami.",
-        container=skrzynia,
+        holder=skrzynia,
         attributes={"weight": 0.1},
     )
     await _ensure_object(
         memory,
         "Miedziana moneta",
         "Miedziana moneta.",
-        container=sakiewka,
+        holder=sakiewka,
         attributes={"weight": 0.005, "value": 1},
     )
     await _ensure_object(
         memory,
         "Srebrna moneta",
         "Srebrna moneta.",
-        container=sakiewka,
+        holder=sakiewka,
         attributes={"weight": 0.005, "value": 10},
     )
     await _ensure_object(
         memory,
         "Złota moneta",
         "Złota moneta.",
-        container=sakiewka,
+        holder=sakiewka,
         attributes={"weight": 0.008, "value": 100},
     )
 
@@ -370,21 +370,21 @@ async def seed(fresh: bool = False):
         memory,
         "Pędzel Moony'ego",
         "Cieniutki pędzel z czarną rączką.",
-        container=moony_char,
+        holder=moony_char,
         attributes={"weight": 0.05},
     )
     await _ensure_object(
         memory,
         "Pióro wieczne",
         "Eleganckie pióro wieczne ze stalówką ze srebra.",
-        container=moony_char,
+        holder=moony_char,
         attributes={"weight": 0.03, "ink": "black"},
     )
     await _ensure_object(
         memory,
         "Pergamin",
         "Zwitek czystego pergaminu.",
-        container=moony_char,
+        holder=moony_char,
         attributes={"weight": 0.02},
     )
 
@@ -408,14 +408,14 @@ async def seed(fresh: bool = False):
         memory,
         "Butelka miodu pitnego",
         "Pękata butelka miodu pitnego.",
-        container=kontuar,
+        holder=kontuar,
         attributes={"weight": 1.2, "capacity": 0.75},
     )
     await _ensure_object(
         memory,
         "Butelka wina",
         "Butelka czerwonego wina.",
-        container=kontuar,
+        holder=kontuar,
         attributes={"weight": 1.2, "capacity": 0.75},
     )
 
@@ -430,14 +430,14 @@ async def seed(fresh: bool = False):
         memory,
         "Kufel",
         "Gliniany kufel po piwie.",
-        container=stol_glowny,
+        holder=stol_glowny,
         attributes={"weight": 0.5, "capacity": 0.5},
     )
     talerz = await _ensure_object(
         memory,
         "Talerz",
         "Drewniany talerz z śladami tłuszczu.",
-        container=stol_glowny,
+        holder=stol_glowny,
         attributes={"weight": 0.4},
     )
     # Three-level nest: Stół → Talerz → Chleb.
@@ -445,7 +445,7 @@ async def seed(fresh: bool = False):
         memory,
         "Chleb",
         "Pajda razowego chleba.",
-        container=talerz,
+        holder=talerz,
         attributes={"weight": 0.5},
     )
 
@@ -460,7 +460,7 @@ async def seed(fresh: bool = False):
         memory,
         "Kufel piwa",
         "Pełny kufel jasnego piwa.",
-        container=stol_boczny,
+        holder=stol_boczny,
         attributes={"weight": 0.9, "capacity": 0.5},
     )
 

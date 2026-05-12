@@ -146,7 +146,7 @@ class MessageHandler:
             [f"{c.name} ({c.id})" for c in characters if c.id != user.id]
         )
         objects_str = "\n".join(
-            [f"{o.name} ({o.id})" for o in game_objects if o.container_id is None]
+            [f"{o.name} ({o.id})" for o in game_objects if o.holder_id is None]
         )
         text = (
             f'Character {user.name} is in area "{area_name}" \n'
@@ -171,8 +171,8 @@ class MessageHandler:
             }
 
         for obj in game_objects:
-            if obj.container_id is not None:
-                continue  # skip items stored inside containers
+            if obj.holder_id is not None:
+                continue  # skip items stored inside holders
             objects_dict[str(obj.id)] = {
                 "name": obj.name,
                 "type": "object",

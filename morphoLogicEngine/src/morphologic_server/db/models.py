@@ -502,18 +502,18 @@ class GameObject(Base, Named, Located):
     attributes: Mapped[dict] = mapped_column(JSONB, default=dict)
 
     # ~~~~~~~~ Containment Relationship: One-to-many (one Object Can Contain Many Others) ~~~~~~~~ #
-    container_id: Mapped[Optional[int]] = mapped_column(
+    holder_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("game_objects.id", ondelete="SET NULL")
     )
-    container: Mapped["GameObject"] = relationship(
-        back_populates="stored",
+    holder: Mapped["GameObject"] = relationship(
+        back_populates="holds",
         remote_side=id,
-        foreign_keys=[container_id],
+        foreign_keys=[holder_id],
         passive_deletes=True,
         lazy="noload",
     )
-    stored: Mapped[List["GameObject"]] = relationship(
-        back_populates="container", lazy="raise"
+    holds: Mapped[List["GameObject"]] = relationship(
+        back_populates="holder", lazy="raise"
     )
     # -------------------------------------------------------------------------------------------- #
 
@@ -537,7 +537,7 @@ class GameObject(Base, Named, Located):
             postgresql_using="gist",
             postgresql_ops={"location": "gist_geometry_ops_nd"},
         ),
-        Index("ix_game_objects_container_id", "container_id"),
+        Index("ix_game_objects_holder_id", "holder_id"),
         Index("ix_game_objects_puppeted_by_id", "puppeted_by_id"),
     )
 

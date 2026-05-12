@@ -35,9 +35,14 @@ _POSTGIS_MANAGED = frozenset({
 })
 
 
-def include_object(_object, name, type_, _reflected, _compare_to):
+def include_object(_object, name, type_, reflected, compare_to):
     """Filter passed to context.configure(...) — autogenerate ignores objects
     we return False for."""
+    # Skip any reflected table with no counterpart in our metadata. Catches
+    # the PostGIS Tiger geocoder tables (and any other extension-owned tables)
+    # that live in the DB but aren't part of our SQLAlchemy models.
+    if type_ == "table" and reflected and compare_to is None:
+        return False
     if type_ in ("table", "view") and name in _POSTGIS_MANAGED:
         return False
     return True
