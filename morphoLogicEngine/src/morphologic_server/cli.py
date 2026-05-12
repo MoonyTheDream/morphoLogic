@@ -7,6 +7,7 @@ import argparse
 import asyncio
 import debugpy
 
+from pathlib import Path
 from ptpython.repl import embed
 
 from morphologic_server import (
@@ -181,6 +182,18 @@ async def run_seed(args):
     from morphologic_server.scripts.seed import seed
 
     await seed(fresh=getattr(args, "fresh", False))
+    
+async def run_export_terrain(args):
+    """Export terrain data as a 3D model file."""
+    from morphologic_server.scripts.export_terrain import export_terrain
+
+    await export_terrain(output=Path(getattr(args, "output", "terrain_export.obj")))
+
+async def run_import_terrain(args):
+    """Import terrain (and shift objects' Z) from a 3D mesh file."""
+    from morphologic_server.scripts.import_terrain import import_terrain
+
+    await import_terrain(input_path=Path(args.input))
 
 
 # ------------------------------------------------------------------------------------------------ #
@@ -216,6 +229,8 @@ def main():
         help='Drop into async-aware interactive shell ("%(prog)s shell -h" for options)',
     )
     shell.set_defaults(func=just_shell)
+    
+    # -------------------------------------------------------------------------------------------- #
 
     seed_cmd = subparsers.add_parser(
         "seed", help="Populate the database with test objects and areas"
@@ -226,6 +241,33 @@ def main():
         help="Wipe all existing accounts, characters, objects, areas and terrain first.",
     )
     seed_cmd.set_defaults(func=run_seed)
+    
+    # -------------------------------------------------------------------------------------------- #
+    
+    export_terrain_cmd = subparsers.add_parser(
+        "export-terrain", help="Export terrain data as a 3D model file"
+    )
+    export_terrain_cmd.add_argument(
+        "-o", "--output",
+        type=str,
+        default="terrain_export.obj",
+        help="Output file path for the exported terrain model (default: terrain_export.obj)"
+    )
+    export_terrain_cmd.set_defaults(func=run_export_terrain)
+
+    # -------------------------------------------------------------------------------------------- #
+
+    import_terrain_cmd = subparsers.add_parser(
+        "import-terrain",
+        help="Import terrain from a 3D mesh file; wipes Terrain table and shifts object Z.",
+    )
+    import_terrain_cmd.add_argument(
+        "-i", "--input",
+        type=str,
+        required=True,
+        help="Input mesh file (.glb or .obj) with per-vertex colours.",
+    )
+    import_terrain_cmd.set_defaults(func=run_import_terrain)
 
     args = parser.parse_args()
 

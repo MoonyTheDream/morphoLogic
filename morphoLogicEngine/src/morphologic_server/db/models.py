@@ -85,14 +85,13 @@ class Base(DeclarativeBase):
         async with self._sessionmaker() as session:
             session.add(self)
             await session.commit()
-            await session.refresh(self)
 
     async def refresh(self):
         """Refresh the object from the database."""
         async with self._sessionmaker() as session:
             refreshed = await session.get(self.__class__, self.id)
             if refreshed is None:
-                return
+                raise ValueError("Object not found in database.")
             # Copy state from refreshed instance
             for attr in inspect(self.__class__).mapper.column_attrs:
                 setattr(self, attr.key, getattr(refreshed, attr.key))
@@ -510,7 +509,7 @@ class GameObject(Base, Named, Located):
         remote_side=id,
         foreign_keys=[holder_id],
         passive_deletes=True,
-        lazy="noload",
+        lazy="raise",
     )
     holds: Mapped[List["GameObject"]] = relationship(
         back_populates="holder", lazy="raise"

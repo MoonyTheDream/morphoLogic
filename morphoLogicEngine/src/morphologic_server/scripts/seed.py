@@ -58,7 +58,7 @@ async def _ensure_object(
     overridden to match the holder's — nested items live where their
     holder lives.
     """
-    existing = await memory.search(name, GameObject)
+    existing = await memory.find_object(name)
     if existing:
         logger.info("Seed: object '%s' already exists — skipping.", name)
         return existing
@@ -115,7 +115,7 @@ async def _ensure_player_character(
     existed (we don't re-fetch it — re-run with --fresh if you want to
     re-apply soul/puppet state).
     """
-    existing = await memory.search(name, Character)
+    existing = await memory.find_character(name)
     if existing:
         logger.info("Seed: character '%s' already exists — skipping.", name)
         return existing, None
@@ -151,7 +151,7 @@ async def _ensure_npc(
     attributes: dict | None = None,
 ) -> Character:
     """Create a soulless Character (NPC) — no account, no soul, just a body."""
-    existing = await memory.search(name, Character)
+    existing = await memory.find_character(name)
     if existing:
         logger.info("Seed: NPC '%s' already exists — skipping.", name)
         return existing
@@ -260,7 +260,7 @@ async def seed(fresh: bool = False):
         (50, 51, 0, TerrainType.SOIL),
     ]
     for x, y, z, t_type in terrain_tiles:
-        await memory.create_or_edit_terrain(x, y, z, t_type)
+        await memory.upsert_terrain_at(x, y, z, t_type)
     logger.info("Seed: ensured %d terrain tiles.", len(terrain_tiles))
 
     # ── Top-level objects scattered around spawn ─────────────────────────── #

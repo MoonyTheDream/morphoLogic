@@ -7,9 +7,9 @@ via constructor injection instead of relying on a module-level global.
 
 import asyncio
 
-from typing import Optional, Type, Tuple, Union
+from typing import Optional, Sequence, Type, Tuple, Union
 
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import selectinload
 
@@ -36,10 +36,15 @@ from morphologic_server.db.models import (
     GameObject,
     ObjectType,
 )
+from morphologic_server.terrain_palette import TerrainTile
 
 DEFAULT_SPAWN_LOCATION = from_shape(Point(0, 0, 0), srid=3857)
 
 STANDARD_VISIBILITY_RADIUS = 10.0  # in metres
+
+# Two terrain tiles within this 2D distance are considered the same tile.
+# EPSG:3857 units are metres.
+TERRAIN_MATCH_TOLERANCE_M = 0.1
 
 # 888    888                           888
 # 888    888                           888
@@ -179,6 +184,72 @@ class Memory:
         async with self._sessionmaker() as session:
             result = await session.execute(stmt)
             return result.scalars().first()
+        
+    async def get_all_terrain_data(self) -> list[Terrain]:
+        """Get all terrain data from the database.
+
+        Returns:
+            list[Terrain]: List of all terrain tiles.
+        """
+        async with self._sessionmaker() as session:
+            stmt = select(Terrain)
+            result = await session.execute(stmt)
+            return result.scalars().all()
+
+    async def find_all_game_objects(self) -> Sequence[GameObject]:
+        """Return every GameObject row, including Characters (which inherit from GameObject).
+
+        Unlike `find_object`, this does not filter by `object_type` — callers
+        that need the full population (e.g. the importer's Z-delta walk) use
+        this to iterate everything that has a location.
+        """
+        async with self._sessionmaker() as session:
+            return (await session.execute(select(GameObject))).scalars().all()
+
+    async def replace_terrain_and_shift_objects(
+        self, tiles: Sequence[TerrainTile]
+    ) -> tuple[int, int]:
+        """Atomic terrain replace + per-object Z-delta follow.
+
+        Steps inside one transaction:
+            1. Snapshot existing (x,y) → z map.
+            2. Wipe the Terrain table.
+            3. Insert new tiles from `tiles`.
+            4. For every GameObject (Characters included) standing over a cell
+               present in both snapshots, apply `obj.z += (new_z - old_z)`.
+
+        Returns `(tiles_inserted, objects_shifted)`. Off-palette warnings are
+        the importer's concern and are tallied outside this method.
+        """
+        async with self._sessionmaker() as session:
+            old_z: dict[tuple[int, int], int] = {}
+            for t in (await session.execute(select(Terrain))).scalars():
+                p = t.location
+                old_z[(round(p.x), round(p.y))] = round(p.z)
+
+            await session.execute(delete(Terrain))
+
+            session.add_all([
+                Terrain(location=(tile.x, tile.y, tile.z), type=tile.type)
+                for tile in tiles
+            ])
+
+            new_z = {(tile.x, tile.y): tile.z for tile in tiles}
+
+            objects_shifted = 0
+            for obj in (await session.execute(select(GameObject))).scalars():
+                p = obj.location
+                cell = (round(p.x), round(p.y))
+                if cell not in old_z or cell not in new_z:
+                    continue
+                delta = new_z[cell] - old_z[cell]
+                if delta == 0:
+                    continue
+                obj.location = (p.x, p.y, p.z + delta)
+                objects_shifted += 1
+
+            await session.commit()
+            return len(tiles), objects_shifted
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Seed.py Z Tego Korzysta ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     async def simple_query(self, value, attribute: str, model: Type[Base]):
@@ -400,52 +471,47 @@ class Memory:
             )
             session.add(character)
             await session.commit()
-            await session.refresh(character)
             return character
 
-    async def create_or_edit_terrain(
-        self, x: int, y: int, z: int = 0, terrain_type: TerrainType = TerrainType.SOIL
+    async def upsert_terrain_at(
+        self,
+        x: int,
+        y: int,
+        z: int = 0,
+        terrain_type: TerrainType = TerrainType.SOIL,
     ) -> Terrain:
-        """Add or edit terrain in DB.
+        """Create a terrain tile at (x, y, z), or update the existing tile near it.
 
-        Args:
-            x (int): x coordinate
-            y (int): y coordinate
-            z (int, optional): z coordinate. Defaults to 0.
-            terrain_type (TerrainType, optional): type of terrain. Defaults to TerrainType.SOIL.
+        Tile identity is 2D-proximity based: an existing tile within
+        ``TERRAIN_MATCH_TOLERANCE_M`` of (x, y) is updated in place
+        (location replaced with the new (x, y, z), type overwritten).
+        Otherwise a new tile is inserted.
 
-        Returns:
-            Terrain: Created or updated terrain object.
+        Not safe under concurrent writes — two simultaneous calls for the
+        same coordinate can both miss the existence check and both insert.
+        Add a unique 2D index on Terrain.location (or switch to
+        INSERT ... ON CONFLICT) before relying on this from concurrent code.
         """
+        point_geom = from_shape(Point(float(x), float(y), float(z)), srid=3857)
 
         async with self._sessionmaker() as session:
-            point3d = Point(float(x), float(y), float(z))
-            point_geom = shape.from_shape(point3d, srid=3857)
-
-            # First check if the terrain already exists
             stmt = select(Terrain).where(
                 ST_DWithin(
                     ST_Force2D(Terrain.location),
                     ST_Force2D(point_geom),
-                    0.1,
+                    TERRAIN_MATCH_TOLERANCE_M,
                 )
             )
-            result = await session.execute(stmt)
-            terrain = result.scalars().first()
+            terrain = (await session.execute(stmt)).scalars().first()
 
-            if terrain:
-                # Terrain already exists, update it
-                old_point = shape.to_shape(terrain._location)
-                new_point = Point(old_point.x, old_point.y, float(z))
-
-                terrain._location = shape.from_shape(new_point, srid=3857)
-                terrain.type = terrain_type
-            else:
+            if terrain is None:
                 terrain = Terrain(location=point_geom, type=terrain_type)
                 session.add(terrain)
+            else:
+                terrain.location = point_geom
+                terrain.type = terrain_type
 
             await session.commit()
-            await session.refresh(terrain)
             return terrain
 
     async def create_area(
