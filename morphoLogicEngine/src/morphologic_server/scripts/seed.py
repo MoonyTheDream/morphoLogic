@@ -34,10 +34,10 @@ from morphologic_server.db.models import (
 )
 from morphologic_server import logger
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _pt(x: float, y: float, z: float = 0.0) -> Point:
     return Point(x, y, z)
@@ -80,13 +80,17 @@ async def _ensure_object(
     return obj
 
 
-async def _ensure_account(memory, username: str, email: str) -> Account:
+async def _ensure_account(
+    memory, username: str, email: str, permission_level: int = 2
+) -> Account:
     """Find an account by username, or create it."""
     account = await memory.find_account(username)
     if account:
         logger.info("Seed: account '%s' already exists — skipping.", username)
         return account
-    account = await memory.create_account(username=username, email=email)
+    account = await memory.create_account(
+        username=username, email=email, permission_level=permission_level
+    )
     logger.info("Seed: created account '%s'.", username)
     return account
 
@@ -131,7 +135,9 @@ async def _ensure_player_character(
     await character.save()
     logger.info(
         "Seed: created character '%s' (perm=%d, puppet_self=%s).",
-        name, permission_level, puppet_self,
+        name,
+        permission_level,
+        puppet_self,
     )
     return character, soul
 
@@ -177,6 +183,7 @@ async def _wipe(sessionmaker):
 # ---------------------------------------------------------------------------
 # Main seed
 # ---------------------------------------------------------------------------
+
 
 async def seed(fresh: bool = False):
     from morphologic_server.db.engine import create_sessionmaker
@@ -234,18 +241,18 @@ async def seed(fresh: bool = False):
 
     # ── Terrain around spawn ──────────────────────────────────────────────── #
     terrain_tiles = [
-        ( 0,  0, 0, TerrainType.SOIL),
-        ( 3,  3, 0, TerrainType.SOIL),
-        (-3,  3, 0, TerrainType.SOIL),
-        ( 3, -3, 0, TerrainType.SOIL),
+        (0, 0, 0, TerrainType.SOIL),
+        (3, 3, 0, TerrainType.SOIL),
+        (-3, 3, 0, TerrainType.SOIL),
+        (3, -3, 0, TerrainType.SOIL),
         (-3, -3, 0, TerrainType.SOIL),
-        ( 6,  0, 0, TerrainType.SAND),
-        (-6,  0, 0, TerrainType.SAND),
-        ( 0,  6, 0, TerrainType.ROCK),
-        ( 0, -6, 0, TerrainType.ROCK),
-        ( 8,  4, 0, TerrainType.WATER),
-        (-5,  7, 0, TerrainType.WATER),
-        ( 5, -7, 0, TerrainType.SAND),
+        (6, 0, 0, TerrainType.SAND),
+        (-6, 0, 0, TerrainType.SAND),
+        (0, 6, 0, TerrainType.ROCK),
+        (0, -6, 0, TerrainType.ROCK),
+        (8, 4, 0, TerrainType.WATER),
+        (-5, 7, 0, TerrainType.WATER),
+        (5, -7, 0, TerrainType.SAND),
         # A patch around the karczma
         (50, 50, 0, TerrainType.SOIL),
         (49, 50, 0, TerrainType.SOIL),
@@ -257,17 +264,28 @@ async def seed(fresh: bool = False):
     logger.info("Seed: ensured %d terrain tiles.", len(terrain_tiles))
 
     # ── Top-level objects scattered around spawn ─────────────────────────── #
-    await _ensure_object(memory, "Stary dąb",        "Rozłożysty dąb z wyraźną dziuplą.",  _pt( 3,  4))
+    await _ensure_object(
+        memory, "Stary dąb", "Rozłożysty dąb z wyraźną dziuplą.", _pt(3, 4)
+    )
     kamien = await _ensure_object(
-        memory, "Kamień graniczny",
+        memory,
+        "Kamień graniczny",
         "Omszały kamień z wyrytym znakiem. Chwilami niby drży, mieni się w oczach.",
         _pt(-4, 2),
         attributes={"weight": 200, "sacred": True},
     )
-    await _ensure_object(memory, "Wiadro",  "Drewniane wiadro bez ucha.", _pt(1, -5), attributes={"weight": 1.5})
-    await _ensure_object(memory, "Ognisko", "Dopalające się ognisko.",    _pt(-2, -2))
+    await _ensure_object(
+        memory,
+        "Wiadro",
+        "Drewniane wiadro bez ucha.",
+        _pt(1, -5),
+        attributes={"weight": 1.5},
+    )
+    await _ensure_object(memory, "Ognisko", "Dopalające się ognisko.", _pt(-2, -2))
     skrzynia = await _ensure_object(
-        memory, "Skrzynia", "Ciężka drewniana skrzynia.",
+        memory,
+        "Skrzynia",
+        "Ciężka drewniana skrzynia.",
         _pt(7, 1),
         attributes={"weight": 20, "closed": False},
     )
@@ -275,22 +293,45 @@ async def seed(fresh: bool = False):
     # ── Nested objects around spawn ──────────────────────────────────────── #
     # Two-level nest: Skrzynia → Sakiewka → monety.
     sakiewka = await _ensure_object(
-        memory, "Sakiewka", "Skórzana sakiewka z monetami.",
+        memory,
+        "Sakiewka",
+        "Skórzana sakiewka z monetami.",
         container=skrzynia,
         attributes={"weight": 0.1},
     )
-    await _ensure_object(memory, "Miedziana moneta", "Miedziana moneta.", container=sakiewka, attributes={"weight": 0.005, "value": 1})
-    await _ensure_object(memory, "Srebrna moneta",   "Srebrna moneta.",   container=sakiewka, attributes={"weight": 0.005, "value": 10})
-    await _ensure_object(memory, "Złota moneta",     "Złota moneta.",     container=sakiewka, attributes={"weight": 0.008, "value": 100})
+    await _ensure_object(
+        memory,
+        "Miedziana moneta",
+        "Miedziana moneta.",
+        container=sakiewka,
+        attributes={"weight": 0.005, "value": 1},
+    )
+    await _ensure_object(
+        memory,
+        "Srebrna moneta",
+        "Srebrna moneta.",
+        container=sakiewka,
+        attributes={"weight": 0.005, "value": 10},
+    )
+    await _ensure_object(
+        memory,
+        "Złota moneta",
+        "Złota moneta.",
+        container=sakiewka,
+        attributes={"weight": 0.008, "value": 100},
+    )
 
     # ── Accounts ─────────────────────────────────────────────────────────── #
-    moony_account   = await _ensure_account(memory, "Moony",          "moony@example.com")
-    another_account = await _ensure_account(memory, "AnotherAccount", "another@example.com")
-    zjawek_account  = await _ensure_account(memory, "Zjawek",         "zjawek@example.com")
+    moony_account = await _ensure_account(memory, "Moony", "moony@example.com", permission_level=0)
+    another_account = await _ensure_account(
+        memory, "AnotherAccount", "another@example.com"
+    )
+    zjawek_account = await _ensure_account(memory, "Zjawek", "zjawek@example.com")
 
     # ── Player characters (puppeted by their own souls) ──────────────────── #
     moony_char, _ = await _ensure_player_character(
-        memory, moony_account,
+        memory,
+        moony_account,
         "MoonyTheDream",
         "Nikt taki, a jednak ktoś więcej.",
         position=(0.0, 0.0, 0.0),
@@ -300,7 +341,8 @@ async def seed(fresh: bool = False):
     )
 
     await _ensure_player_character(
-        memory, another_account,
+        memory,
+        another_account,
         "Wędrowiec",
         "Wędrująca dusza bez stałego celu.",
         position=(2.0, 3.0, 0.0),
@@ -310,7 +352,8 @@ async def seed(fresh: bool = False):
 
     # zjawek: bound character placed far away, soul puppets the boundary stone.
     zjawek_char, zjawek_soul = await _ensure_player_character(
-        memory, zjawek_account,
+        memory,
+        zjawek_account,
         "Zjawek z lasu",
         "Cień, który czasem wciela się w martwe rzeczy.",
         position=(-50.0, -50.0, 0.0),
@@ -324,19 +367,22 @@ async def seed(fresh: bool = False):
 
     # ── Moony's inventory (items contained inside the character) ─────────── #
     await _ensure_object(
-        memory, "Pędzel Moony'ego",
+        memory,
+        "Pędzel Moony'ego",
         "Cieniutki pędzel z czarną rączką.",
         container=moony_char,
         attributes={"weight": 0.05},
     )
     await _ensure_object(
-        memory, "Pióro wieczne",
+        memory,
+        "Pióro wieczne",
         "Eleganckie pióro wieczne ze stalówką ze srebra.",
         container=moony_char,
         attributes={"weight": 0.03, "ink": "black"},
     )
     await _ensure_object(
-        memory, "Pergamin",
+        memory,
+        "Pergamin",
         "Zwitek czystego pergaminu.",
         container=moony_char,
         attributes={"weight": 0.02},
@@ -352,38 +398,68 @@ async def seed(fresh: bool = False):
     )
 
     kontuar = await _ensure_object(
-        memory, "Kontuar", "Solidny dębowy kontuar, pociemniały od lat.",
+        memory,
+        "Kontuar",
+        "Solidny dębowy kontuar, pociemniały od lat.",
         _pt(49, 50),
         attributes={"weight": 80},
     )
-    await _ensure_object(memory, "Butelka miodu pitnego", "Pękata butelka miodu pitnego.", container=kontuar, attributes={"weight": 1.2, "capacity": 0.75})
-    await _ensure_object(memory, "Butelka wina",          "Butelka czerwonego wina.",      container=kontuar, attributes={"weight": 1.2, "capacity": 0.75})
+    await _ensure_object(
+        memory,
+        "Butelka miodu pitnego",
+        "Pękata butelka miodu pitnego.",
+        container=kontuar,
+        attributes={"weight": 1.2, "capacity": 0.75},
+    )
+    await _ensure_object(
+        memory,
+        "Butelka wina",
+        "Butelka czerwonego wina.",
+        container=kontuar,
+        attributes={"weight": 1.2, "capacity": 0.75},
+    )
 
     stol_glowny = await _ensure_object(
-        memory, "Stół przy palenisku", "Duży drewniany stół przy palenisku.",
+        memory,
+        "Stół przy palenisku",
+        "Duży drewniany stół przy palenisku.",
         _pt(51, 50),
         attributes={"weight": 30},
     )
-    await _ensure_object(memory, "Kufel", "Gliniany kufel po piwie.", container=stol_glowny, attributes={"weight": 0.5, "capacity": 0.5})
+    await _ensure_object(
+        memory,
+        "Kufel",
+        "Gliniany kufel po piwie.",
+        container=stol_glowny,
+        attributes={"weight": 0.5, "capacity": 0.5},
+    )
     talerz = await _ensure_object(
-        memory, "Talerz", "Drewniany talerz z śladami tłuszczu.",
+        memory,
+        "Talerz",
+        "Drewniany talerz z śladami tłuszczu.",
         container=stol_glowny,
         attributes={"weight": 0.4},
     )
     # Three-level nest: Stół → Talerz → Chleb.
     await _ensure_object(
-        memory, "Chleb", "Pajda razowego chleba.",
+        memory,
+        "Chleb",
+        "Pajda razowego chleba.",
         container=talerz,
         attributes={"weight": 0.5},
     )
 
     stol_boczny = await _ensure_object(
-        memory, "Stół w rogu", "Mniejszy stół w cieniu rogu.",
+        memory,
+        "Stół w rogu",
+        "Mniejszy stół w cieniu rogu.",
         _pt(52, 51),
         attributes={"weight": 25},
     )
     await _ensure_object(
-        memory, "Kufel piwa", "Pełny kufel jasnego piwa.",
+        memory,
+        "Kufel piwa",
+        "Pełny kufel jasnego piwa.",
         container=stol_boczny,
         attributes={"weight": 0.9, "capacity": 0.5},
     )

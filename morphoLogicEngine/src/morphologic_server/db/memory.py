@@ -70,18 +70,6 @@ class Memory:
     def __init__(self, sessionmaker: async_sessionmaker):
         self._sessionmaker = sessionmaker
 
-    # def _check_if_id_search(self, name_or_id: str) -> Optional[int]:
-    #     """Check if the search string is an ID search (starts with "#") and return the ID as int if so."""
-    #     if name_or_id.startswith("#"):
-    #         try:
-    #             return int(name_or_id[1:])
-    #         except ValueError:
-    #             logger.warning(
-    #                 "Invalid ID format: %s. Expected format: #[int].",
-    #                 name_or_id,
-    #             )
-    #     return None
-
     # ******************************************************************************************** #
     #                                            SEARCHING                                         #
     # ******************************************************************************************** #
@@ -93,7 +81,7 @@ class Memory:
             username_or_id (str | int): Username or ID of the account to search.
 
         Returns:
-            Optional[Account]: Account object if found, else None.
+            Account | None: Account object if found, else None.
         """
         match username_or_id:
             case int():
@@ -156,65 +144,43 @@ class Memory:
         """
         base = select(GameObject).where(GameObject.object_type != ObjectType.CHARACTER)
         if eagerly:
-            base = base.options(selectinload(GameObject.container),
-                                selectinload(GameObject.stored))
-            
+            base = base.options(
+                selectinload(GameObject.container), selectinload(GameObject.stored)
+            )
+
         if isinstance(name_or_id, int):
-             stmt = base.where(GameObject.id == name_or_id)
+            stmt = base.where(GameObject.id == name_or_id)
         elif isinstance(name_or_id, str):
-             stmt = base.where(GameObject.name == name_or_id)
+            stmt = base.where(GameObject.name == name_or_id)
         else:
             raise TypeError("name_or_id must be a string or an integer")
-        
+
         async with self._sessionmaker() as session:
             return (await session.execute(stmt)).scalars().first()
 
-    # 8888888888 8888888 Y88b   d88P 8888888 88888888888
-    # 888          888    Y88b d88P    888       888
-    # 888          888     Y88o88P     888       888
-    # 8888888      888      Y888P      888       888
-    # 888          888      d888b      888       888
-    # 888          888     d88888b     888       888
-    # 888          888    d88P Y88b    888       888
-    # 888        8888888 d88P   Y88b 8888888     888
-
-    # DO ZMIANY — LEPIEJ ZROBIĆ OSOBNE METHODS:
-    # find_character, find_game_object, find_area, find_terrain
-    async def search(self, name_or_id: str, model: Type[Base]):
-        """Search for an object by name or ID.
-        If "#[int]" is being searched, it will be searched by ID.
+    async def search_by_xy(self, x: float, y: float) -> GameObject | Character | None:
+        """Search for an object by XY coordinates.
 
         Args:
-            name_or_id (str): Name or #ID of the object to search for.
-            model (Base subclass): The model class to search in.
-
+            x (float): x coordinate
+            y (float): y coordinate
         Returns:
-            Object: if found, None otherwise.
+            GameObject | Character | None: Returns the first object found
+            at the coordinates, or None if no object is found.
         """
+        point = from_shape(Point(x, y), srid=3857)
+        stmt = select(GameObject).where(
+            ST_DWithin(
+                ST_Force2D(GameObject.location),
+                ST_Force2D(point),
+                0.1,
+            )
+        )
         async with self._sessionmaker() as session:
-            if name_or_id.startswith("#"):
-                try:
-                    object_id = int(name_or_id[1:])
-                except ValueError:
-                    logger.warning(
-                        "Invalid object ID format: %s. Expected format: #[int].",
-                        name_or_id,
-                    )
-                    return None
-                stmt = select(model).where(model.id == object_id)
-            else:
-                stmt = select(model).where(model.name == name_or_id)
-            try:
-                result = await session.execute(stmt)
-            except ConnectionRefusedError:
-                logger.error(
-                    "Database connection refused while searching for %s with name_or_id: %s\nCheck if the database server is running and accessible.",
-                    model.__name__,
-                    name_or_id,
-                )
-                raise
+            result = await session.execute(stmt)
             return result.scalars().first()
 
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Seed.py Z Tego Korzysta ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     async def simple_query(self, value, attribute: str, model: Type[Base]):
         """Simple query to find rows from specified table by attribute.
 
@@ -231,27 +197,7 @@ class Memory:
             result = await session.execute(stmt)
             return result.scalars().all()
 
-    async def search_by_xy(self, x: float, y: float, model: Type[Base]):
-        """Search for an object by XY coordinates.
-
-        Args:
-            x (float): x coordinate
-            y (float): y coordinate
-            model (Base subclass): The model class to search in.
-        Returns:
-            Object: if found, None otherwise.
-        """
-        point = from_shape(Point(x, y), srid=3857)
-        async with self._sessionmaker() as session:
-            stmt = select(model).where(
-                ST_DWithin(
-                    ST_Force2D(model.location),
-                    ST_Force2D(point),
-                    0.1,
-                )
-            )
-            result = await session.execute(stmt)
-            return result.scalars().first()
+    # -------------------------------------------------------------------------------------------- #
 
     async def get_objects_in_proximity(
         self, focal_point, radius: float = STANDARD_VISIBILITY_RADIUS
@@ -364,7 +310,9 @@ class Memory:
     #                                            CREATING                                          #
     # ******************************************************************************************** #
 
-    async def create_account(self, username: str, email: str) -> Optional[Account]:
+    async def create_account(
+        self, username: str, email: str, permission_level: int = 2
+    ) -> Optional[Account]:
         """Creates an account in the database.
 
         Returns:
@@ -372,7 +320,7 @@ class Memory:
         """
 
         async with self._sessionmaker() as session:
-            account = Account(username=username, email=email, permission_level=2)
+            account = Account(username=username, email=email, permission_level=permission_level)
             session.add(account)
             await session.commit()
             await session.refresh(account)
@@ -420,9 +368,9 @@ class Memory:
         soul: CharacterSoul,
         description: str = "",
         location=None,
-        attributes: dict = None,
-        container: GameObject = None,
-        stored: list = None,
+        attributes: dict = {},
+        container: GameObject | None = None,
+        stored: list[GameObject] = [],
     ) -> Optional[Character]:
         """Creates a character in the database.
 

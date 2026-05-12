@@ -558,7 +558,7 @@ class GameObject(Base, Named, Located):
 class Character(GameObject):
     """
     A table represents game objects that are playable characters. It is separated from soul as if
-    a CharacterSoul puppet something else that the Character itself should stay where it was before.
+    a CharacterSoul puppet something else that the Character itself, it should stay where it was before.
     """
 
     __tablename__ = "characters"
