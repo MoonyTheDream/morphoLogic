@@ -29,13 +29,21 @@ from sqlalchemy.orm import (
 
 from geoalchemy2 import Geometry
 from geoalchemy2.elements import WKBElement
-from geoalchemy2.functions import ST_DWithin, ST_Force2D, ST_Intersects
+from geoalchemy2.functions import (
+    ST_DWithin,
+    ST_Force2D,
+    ST_Intersects,
+    ST_Z,
+    ST_X,
+    ST_Y,
+)
 from geoalchemy2.shape import from_shape, to_shape
 from shapely.geometry import Point
 
 from morphologic_server import logger
 from morphologic_server.exceptions import PermissionDeniedError
 
+STANDARD_VIEW_DISTANCE = 15.0
 STANDARD_LENGTH = 60
 
 
@@ -606,7 +614,9 @@ class Character(GameObject):
             )
         return areas[0] if areas else None
 
-    async def get_terrain_nearby(self, distance_m: float = 10.0) -> list["Terrain"]:
+    async def get_terrain_nearby(
+        self, distance_m: float = STANDARD_VIEW_DISTANCE
+    ) -> list["Terrain"]:
         """Get all terrain points within distance of this character's location."""
         async with self._sessionmaker() as session:
             stmt = select(Terrain).where(
@@ -618,3 +628,21 @@ class Character(GameObject):
             )
             results = await session.execute(stmt)
             return results.scalars().all()
+
+    async def list_terrain_nearby(self, distance_m: float = STANDARD_VIEW_DISTANCE):
+
+        stmt = select(
+            ST_X(Terrain.location).label("x"),
+            ST_Y(Terrain.location).label("y"),
+            ST_Z(Terrain.location).label("z"),
+            Terrain.type,
+        ).where(
+            ST_DWithin(
+                ST_Force2D(Terrain.location),
+                ST_Force2D(self._location),
+                distance_m,
+            )
+        )
+        async with self._sessionmaker() as session:
+            results = await session.execute(stmt)
+            return results.mappings().all()
