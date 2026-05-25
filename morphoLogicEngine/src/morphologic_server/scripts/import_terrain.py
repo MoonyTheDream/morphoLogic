@@ -24,7 +24,7 @@ from morphologic_server.config import ServerSettings
 from morphologic_server.db.engine import create_sessionmaker
 from morphologic_server.db.memory import Memory
 from morphologic_server.db.models import Base
-from morphologic_server.terrain_palette import (
+from morphologic_server.scripts.terrain_palette import (
     TerrainTile,
     color_to_terrain_type,
 )

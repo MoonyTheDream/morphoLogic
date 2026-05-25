@@ -12,7 +12,7 @@ from morphologic_server.config import ServerSettings
 from morphologic_server.db.engine import create_sessionmaker
 from morphologic_server.db.memory import Memory
 from morphologic_server.db.models import Base, Terrain
-from morphologic_server.terrain_palette import LINEAR_PALETTE
+from morphologic_server.scripts.terrain_palette import LINEAR_PALETTE
 
 
 def _zup_to_gltf_yup(verts: np.ndarray) -> np.ndarray:

@@ -36,7 +36,7 @@ from morphologic_server.db.models import (
     GameObject,
     ObjectType,
 )
-from morphologic_server.terrain_palette import TerrainTile
+from morphologic_server.scripts.terrain_palette import TerrainTile
 
 DEFAULT_SPAWN_LOCATION = from_shape(Point(0, 0, 0), srid=3857)
 
@@ -394,7 +394,6 @@ class Memory:
             account = Account(username=username, email=email, permission_level=permission_level)
             session.add(account)
             await session.commit()
-            await session.refresh(account)
             return account
 
     async def create_character_and_soul(
@@ -404,7 +403,7 @@ class Memory:
         description: str = "",
         location=None,
         permission_level: int = 2,
-    ) -> Optional[list]:
+    ) -> Character:
         """Creates a character and a character soul in the database.
 
         Returns:
@@ -428,10 +427,7 @@ class Memory:
             )
             session.add(character_soul)
             await session.commit()
-            await session.refresh(character_soul)
-            await session.refresh(character)
-
-            return [character, character_soul]
+            return character # Character is enough. The soul is linked and can be accessed via character.soul.
 
     async def create_character(
         self,
@@ -442,7 +438,7 @@ class Memory:
         attributes: dict = {},
         holder: GameObject | None = None,
         holds: list[GameObject] = [],
-    ) -> Optional[Character]:
+    ) -> Character:
         """Creates a character in the database.
 
         Returns:
@@ -516,11 +512,11 @@ class Memory:
 
     async def create_area(
         self,
-        polygon: list[Tuple[float, float]],
+        vertices: list[Tuple[float, float]],
         name: str,
         description: str,
         priority: int = 0,
-    ) -> Optional[Area]:
+    ) -> Area:
         """Creates an area in the database.
 
         Returns:
@@ -528,7 +524,7 @@ class Memory:
         """
 
         async with self._sessionmaker() as session:
-            polygon = Polygon(polygon)
+            polygon = Polygon(vertices)
             area = Area(
                 polygon=shape.from_shape(polygon, srid=3857),
                 name=name,
@@ -537,7 +533,6 @@ class Memory:
             )
             session.add(area)
             await session.commit()
-            await session.refresh(area)
             return area
 
     async def create_game_object(
@@ -545,10 +540,10 @@ class Memory:
         name: str,
         description: str = "",
         location=None,
-        attributes: dict = None,
-        holder: GameObject = None,
-        holds: Union[list[GameObject], GameObject] = None,
-    ) -> Optional[GameObject]:
+        attributes: dict | None = None,
+        holder: GameObject | None = None,
+        holds: list[GameObject] | GameObject | None = None,
+    ) -> GameObject:
         """Creates a game object in the database.
 
         Returns:
@@ -585,7 +580,7 @@ class Memory:
     #                                         AUTHENTICATION                                       #
     # ******************************************************************************************** #
 
-    async def authenticate(self, username: str, password: str) -> Optional[Character]:
+    async def authenticate(self, username: str, password: str) -> Character | None:
         """Return the bound Character if username + password are valid, else None.
 
         Lookup chain: Account.username → account.character_souls[0] → soul.bound_character.

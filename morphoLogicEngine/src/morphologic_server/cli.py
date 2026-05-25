@@ -146,15 +146,18 @@ async def start_server(args):
     Start the server asynchronously.
     """
     if args.log:
-        print("Awakening of the World. The Scribes are here too.")
+        print("Awakening of the World. The Scribes raised their pens.")
     else:
         print("Awakening of the World.")
         remove_console_handler()
     try:
         morpho_heart = MorphoLogicHeart(ServerSettings())
         async with asyncio.TaskGroup() as tg:
-            # Both tasks run concurrently.
+            # Both tasks (Heart and CLI) run concurrently.
             tg.create_task(morpho_heart.awake(tg))
+            
+            # Injecting heart into the CLI so we can access the Memory and other dependencies in the shell.
+            # Otherwise the shell creates its own Memory instance which is disconnected from the running server.
             tg.create_task(MorphoLogicCmd(heart=morpho_heart).cmdloop())
     except* TerminateTaskGroup:
         logger.info("Terminating tasks.")

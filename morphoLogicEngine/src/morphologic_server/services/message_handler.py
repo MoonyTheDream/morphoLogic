@@ -57,7 +57,7 @@ class MessageHandler:
             )
             for msg in msgs:
                 if msg.error():
-                    logger.warning("Kafka error: %s", msg.error().str())
+                    logger.exception("Kafka error: %s", msg.error().str()) # type: ignore # we know this is a Message, not an error
                     continue
                 received_msg = ReceivedMessage(msg)
                 self.tg.create_task(self._route(received_msg))
@@ -72,12 +72,12 @@ class MessageHandler:
                 case "WALLS_HAVE_EARS_GOT_IT":
                     self._handshake_ack(received.user)
                 case "LOUD_AND_CLEAR":
-                    await self._send_surroundings(msg.sending_user)
-                case "":
-                    if msg.user_input:
-                        await self._handle_user_input(msg.sending_user, msg.user_input)
+                    await self._send_surroundings(received.user)
                 case _:
-                    logger.warning('Unknown system_message: "%s"', msg.system_msg)
+                    logger.warning('Unknown system_message: "%s"', received.msg)
+                    
+        if received.type == "user_input":
+            await self._handle_user_input(received.user, received.msg)
 
     # ── Handshake ────────────────────────────────────────────────────────────
 

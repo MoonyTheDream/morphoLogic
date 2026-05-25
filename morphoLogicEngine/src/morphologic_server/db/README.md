@@ -19,3 +19,12 @@ for `pip install psycopg2` the `sudo apt install libpq-dev` is needed  before.
 ## Upgrades/downgrades
 
 - `alembic upgrade/downgrade <first 3 revision symbols>/+1/-2/head`
+
+# Readable Terrain
+SELECT 
+    id,
+    ST_Force2D(location) AS location_2d,
+    ST_AsText(location) AS location_readable,
+    type
+FROM public.terrain
+ORDER BY id ASC;

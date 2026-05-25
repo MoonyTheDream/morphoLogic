@@ -44,7 +44,10 @@ class ReceivedMessage():
 
     def __init__(self, raw_msg: KafkaMessage):
         self.topic = raw_msg.topic()
-        self.data = ClientMessage.model_validate_json(raw_msg.value())
+        raw = raw_msg.value()
+        if raw is None:
+            raise ValueError("Kafka message has no value.")
+        self.data = ClientMessage.model_validate_json(raw)
     
     @property
     def user(self):
