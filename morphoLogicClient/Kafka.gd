@@ -57,25 +57,39 @@ func _process(_delta: float) -> void:
 			# var dict_data: Array[Dictionary] = JSON.parse_string(received_messages)
 			# call_deferred("emit_received_data", dict_data)
 
-
-func send_message(user_input: String = "", system_message: String = "", message_content: String = "") -> void:
+func _add_metadata(data: Dictionary) -> Dictionary:
+	# Add necessary metadata to the message before sending
+	data['metadata'] = {
+		"source": "client",
+		"username": ClientData.username,
+		"client_version": ClientData.version,
+		"timestamp": Time.get_datetime_string_from_system(true, true),
+		"session_token": "NOT_IMPLEMENTED_YET"
+	}
+	return data
+	
+func send_system_message(message: String = "", message_content: String = "") -> void:
 	var data_to_send: Dictionary
-	data_to_send['metadata'] = {
-			"source": "client",
-			"username": ClientData.username,
-			"client_version": ClientData.version,
-			"timestamp": Time.get_datetime_string_from_system(true, true),
-			"session_token": "NOT_IMPLEMENTED_YET"
-		}
 	data_to_send['payload'] = {
-		"user_input": user_input,
-		"system_message": system_message,
+		"type": "system_message",
+		"message": message,
 		"content": message_content,
 	}
+	data_to_send = _add_metadata(data_to_send)
 	var wrapped_message = JSON.stringify(data_to_send) + "\n"
-	
 
-	# var kafka_message = wrapped_message.to_utf8_buffer()
+	print("Sending message: %s" % wrapped_message)
+	producer.send_message(wrapped_message)
+
+func send_user_input(user_input: String) -> void:
+	var data_to_send: Dictionary
+	data_to_send['payload'] = {
+		"type": "user_input",
+		"message": user_input,
+	}
+	data_to_send = _add_metadata(data_to_send)
+	var wrapped_message = JSON.stringify(data_to_send) + "\n"
+
 	print("Sending message: %s" % wrapped_message)
 	producer.send_message(wrapped_message)
 
@@ -95,7 +109,7 @@ func change_consumer_topic(topic: String) -> void:
 
 func initialize_server_connection(password: String = "") -> void:
 	# Send handshake with password in the content field
-	self.send_message("", "ITS'A_ME_MARIO", password)
+	self.send_system_message("ITS'A_ME_MARIO", password)
 
 
 func _on_producer_ready():

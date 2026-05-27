@@ -10,6 +10,7 @@ def test_valid_client_message():
         "payload": {
             "type": "user_input",
             "message": "rozejrzyj się",
+            "content": None
         }
     }
     msg = ClientMessage.model_validate(good)

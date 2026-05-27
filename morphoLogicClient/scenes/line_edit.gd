@@ -48,7 +48,7 @@ func _send_to_tcp(content: String) -> void:
 	# 	for i in range(100):
 	# 		TCPDialog.send_tcp_message("odeslij")
 
-	Kafka.send_message(content)
+	Kafka.send_user_input(content)
 
 func _up():
 	_if_at_zero(true)

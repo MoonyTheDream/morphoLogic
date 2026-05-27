@@ -60,6 +60,7 @@ class MessageHandler:
                     logger.exception("Kafka error: %s", msg.error().str()) # type: ignore # we know this is a Message, not an error
                     continue
                 received_msg = ReceivedMessage(msg)
+                logger.debug('Consumed from %s: "%s"', received_msg.topic, received_msg.msg)
                 self.tg.create_task(self._route(received_msg))
 
     async def _route(self, received: ReceivedMessage):
@@ -68,10 +69,13 @@ class MessageHandler:
         if received.type == "system_message":
             match received.msg:
                 case "ITS'A_ME_MARIO":
+                    logger.debug('Received handshake initiation from "%s".', received.user)
                     await self._handshake_init(received)
                 case "WALLS_HAVE_EARS_GOT_IT":
+                    logger.debug('Received handshake ack from "%s".', received.user)    
                     self._handshake_ack(received.user)
                 case "LOUD_AND_CLEAR":
+                    logger.debug('Received surroundings request from "%s".', received.user)
                     await self._send_surroundings(received.user)
                 case _:
                     logger.warning('Unknown system_message: "%s"', received.msg)
