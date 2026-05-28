@@ -163,6 +163,9 @@ async def start_server(args):
         logger.info("Terminating tasks.")
     except* asyncio.exceptions.CancelledError:
         logger.warning("Keyboard Interrupt. Shutting down the server.")
+    except* Exception as e:
+        for exc in e.exceptions:
+            logger.exception("Ungandled in task group,", exc_info=exc)
 
 
 #          888               888 888

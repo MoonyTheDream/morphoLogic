@@ -79,12 +79,12 @@ class Memory:
     #                                            SEARCHING                                         #
     # ******************************************************************************************** #
 
-    async def find_account(self, username_or_id: str | int) -> Account | None:
+    async def find_account(self, username_or_id: str | int, eagerly: bool = False) -> Account | None:
         """Finds and returns account by id or username.
 
         Args:
             username_or_id (str | int): Username or ID of the account to search.
-
+            eagerly (bool): If True, also loads character souls and bound characters. Defaults to False.
         Returns:
             Account | None: Account object if found, else None.
         """
@@ -93,6 +93,11 @@ class Memory:
                 stmt = select(Account).where(Account.id == username_or_id)
             case str():
                 stmt = select(Account).where(Account.username == username_or_id)
+
+        if eagerly:
+            stmt = stmt.options(
+                selectinload(Account.character_souls).selectinload(CharacterSoul.bound_character),
+            )
 
         async with self._sessionmaker() as session:
             result = await session.execute(stmt)
@@ -585,10 +590,14 @@ class Memory:
 
         Lookup chain: Account.username → account.character_souls[0] → soul.bound_character.
         """
-        account = await self.find_account(username)
+        logger.debug("A")
+        account = await self.find_account(username, eagerly=True)
+        logger.debug("B")
         if account is None or not account.check_password(password):
             return None
+        logger.debug("C")
         souls = account.character_souls
         if not souls:
             return None
+        logger.debug("D")
         return souls[0].bound_character

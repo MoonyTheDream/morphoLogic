@@ -61,6 +61,7 @@ class MessageHandler:
                     continue
                 received_msg = ReceivedMessage(msg)
                 logger.debug('Consumed from %s: "%s"', received_msg.topic, received_msg.msg)
+                # ADD a try except here
                 self.tg.create_task(self._route(received_msg))
 
     async def _route(self, received: ReceivedMessage):
@@ -89,6 +90,7 @@ class MessageHandler:
         """ITS'A_ME_MARIO → authenticate, create private topic, reply SHH_LET'S_TALK_IN_PRIVATE."""
         username = received.user
         if not username:
+            logger.warning("Received handshake initiation with empty username.")
             return
 
         password = received.content or ""

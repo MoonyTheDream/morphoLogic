@@ -12,13 +12,14 @@ from time import sleep
 from typing import TYPE_CHECKING
 
 from confluent_kafka import Producer, Consumer, KafkaException
-from confluent_kafka.admin import AdminClient, NewTopic
+from confluent_kafka.admin import AdminClient
+from confluent_kafka.cimpl import NewTopic
 
 
 if TYPE_CHECKING:
     from morphologic_server.awakening import MorphoLogicHeart
 
-from ..utils.time_helpers import get_gmt_time
+from morphologic_server.utils.time_helpers import get_gmt_time
 
 
 # 888    d8P            .d888 888
@@ -42,9 +43,9 @@ class KafkaConnection:
 
     def __init__(self, heart: MorphoLogicHeart):
         self.heart = heart
-        self.admin: AdminClient = None
-        self.producer: Producer = None
-        self.consumer: Consumer = None
+        self.admin: AdminClient
+        self.producer: Producer
+        self.consumer: Consumer
         # self.general_topic = SERVER_GENERAL_TOPIC
 
     def _establish_kafka_connection(
@@ -188,7 +189,7 @@ class KafkaConnection:
         server_message: str = "",
         content: str = "",
         direct_message: str = "",
-        objects: dict = None,
+        objects: dict = {},
     ):
         """Wrapper for sending message. Add more preferences here later if needed"""
         # if data is None:
