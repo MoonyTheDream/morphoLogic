@@ -6,7 +6,7 @@
 
 - A given topic per client
   - `clientsGeneralTopic`
-  - `clientHandshakeTopic`
+  - `clientsHandshakeTopic`
 
 ### Communication client -> server
 

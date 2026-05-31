@@ -14,7 +14,6 @@ from morphologic_server.db.engine import create_sessionmaker
 from morphologic_server.db.memory import Memory
 from morphologic_server.db.models import Base
 
-
 # ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡏⢹⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
 # ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡇⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
 # ⣿⣿⣿⣿⠛⠻⣿⣿⣿⣿⡁⢿⣿⣿⣇⣸⣿⣿⡿⢈⣿⣿⣿⣿⠟⠛⣿⣿⣿⣿
@@ -33,6 +32,7 @@ from morphologic_server.db.models import Base
 #   d88P   888 888  888  888 .d888888 888888K  88888888
 #  d8888888888 Y88b 888 d88P 888  888 888 "88b Y8b.
 # d88P     888  "Y8888888P"  "Y888888 888  888  "Y8888
+
 
 class MorphoLogicHeart:
     """
@@ -80,6 +80,14 @@ class MorphoLogicHeart:
         )
 
         with KafkaConnection(self) as kafka:
+            await kafka.create_new_topics(
+                [
+                    self.settings.SERVER_GENERAL_TOPIC,
+                    self.settings.SERVER_HANDSHAKE_TOPIC,
+                    self.settings.CLIENTS_GENERAL_TOPIC,
+                    self.settings.CLIENTS_HANDSHAKE_TOPIC,
+                ]
+            )
             handler = MessageHandler(heart=self, kafka=kafka, tg=tg)
             tg.create_task(handler.start())
 

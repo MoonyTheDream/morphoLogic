@@ -41,6 +41,9 @@ class ServerSettings(BaseSettings):
     CLIENTS_GENERAL_TOPIC: str = Field(
         default="clientsGeneralTopic", description="Topic for general client messages"
     )
+    CLIENTS_HANDSHAKE_TOPIC: str = Field(
+        default="clientsHandshakeTopic", description="Topic for client handshake"
+    )
     SERVER_HANDSHAKE_TOPIC: str = Field(
         default="serverHandshakeTopic", description="Topic for server handshake"
     )

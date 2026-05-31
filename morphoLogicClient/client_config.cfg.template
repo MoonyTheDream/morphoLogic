@@ -6,7 +6,7 @@ debugpy = false
 bootstrapServer = "<mlkafka.address>:9093"
 securityProtocol = "ssl"
 serverHandshakeTopic = "serverHandshakeTopic"
-clientHandshakeTopic = "clientHandshakeTopic"
+clientsHandshakeTopic = "clientsHandshakeTopic"
 sslCaLocation = "res://cacert.pem"
 
 

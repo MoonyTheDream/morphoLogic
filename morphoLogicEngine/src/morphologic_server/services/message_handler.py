@@ -6,7 +6,6 @@ import asyncio
 import json
 from typing import TYPE_CHECKING
 
-from morphologic_server import logger
 from morphologic_server.network.kafka import (
     KafkaConnection,
 )
@@ -24,7 +23,7 @@ if TYPE_CHECKING:
 #     def __init__(self, raw_msg: Message):
 #         self.topic = raw_msg.topic()
 #         self.msg = json.loads(raw_msg.value().decode("utf-8"))
-#         logger.debug('Consumed from %s: "%s"', self.topic, self.msg)
+#         self.log.debug('Consumed from %s: "%s"', self.topic, self.msg)
 #         self.type = self.msg["payload"]["type"]
 #         self.user = self.msg["metadata"]["username"]
 
@@ -37,6 +36,7 @@ class MessageHandler:
         self, heart: MorphoLogicHeart, kafka: KafkaConnection, tg: asyncio.TaskGroup
     ):
         self.heart = heart
+        self.log = self.heart.log.getChild("handler")
         self.kafka = kafka
         self.tg = tg
         self._stop = False
@@ -57,10 +57,10 @@ class MessageHandler:
             )
             for msg in msgs:
                 if msg.error():
-                    logger.exception("Kafka error: %s", msg.error().str()) # type: ignore # we know this is a Message, not an error
+                    self.log.exception("Kafka error: %s", msg.error().str()) # type: ignore # we know this is a Message, not an error
                     continue
                 received_msg = ReceivedMessage(msg)
-                logger.debug('Consumed from %s: "%s"', received_msg.topic, received_msg.msg)
+                self.log.debug('Consumed from %s: "%s"', received_msg.topic, received_msg.msg)
                 # ADD a try except here
                 self.tg.create_task(self._route(received_msg))
 
@@ -70,16 +70,16 @@ class MessageHandler:
         if received.type == "system_message":
             match received.msg:
                 case "ITS'A_ME_MARIO":
-                    logger.debug('Received handshake initiation from "%s".', received.user)
+                    self.log.debug('Received handshake initiation from "%s".', received.user)
                     await self._handshake_init(received)
                 case "WALLS_HAVE_EARS_GOT_IT":
-                    logger.debug('Received handshake ack from "%s".', received.user)    
+                    self.log.debug('Received handshake ack from "%s".', received.user)    
                     self._handshake_ack(received.user)
                 case "LOUD_AND_CLEAR":
-                    logger.debug('Received surroundings request from "%s".', received.user)
+                    self.log.debug('Received surroundings request from "%s".', received.user)
                     await self._send_surroundings(received.user)
                 case _:
-                    logger.warning('Unknown system_message: "%s"', received.msg)
+                    self.log.warning('Unknown system_message: "%s"', received.msg)
                     
         if received.type == "user_input":
             await self._handle_user_input(received.user, received.msg)
@@ -90,13 +90,13 @@ class MessageHandler:
         """ITS'A_ME_MARIO → authenticate, create private topic, reply SHH_LET'S_TALK_IN_PRIVATE."""
         username = received.user
         if not username:
-            logger.warning("Received handshake initiation with empty username.")
+            self.log.warning("Received handshake initiation with empty username.")
             return
 
         password = received.content or ""
         character = await self.heart.memory.authenticate(username, password)
         if character is None:
-            logger.info('Auth failed for "%s"', username)
+            self.log.info('Auth failed for "%s"', username)
             self.kafka.send_data_to_user(
                 self.heart.settings.CLIENTS_GENERAL_TOPIC,
                 username,
@@ -105,12 +105,12 @@ class MessageHandler:
             return
 
         self._sessions[username] = character
-        logger.info('"%s" authenticated as %s', username, character.name)
+        self.log.info('"%s" authenticated as %s', username, character.name)
 
-        created = self.kafka.create_new_topics([username])
+        created = await self.kafka.create_new_topics([username])
         dedicated_topic = created[0] if created else username
         if created:
-            logger.info('Created topic: "%s"', dedicated_topic)
+            self.log.info('Created topic: "%s"', dedicated_topic)
         self.kafka.send_data_to_user(
             self.heart.settings.CLIENTS_GENERAL_TOPIC,
             username,
@@ -133,7 +133,7 @@ class MessageHandler:
         try:
             await self._do_send_surroundings(username)
         except Exception as e:
-            logger.error("Error sending surroundings to %s: %s", username, e)
+            self.log.error("Error sending surroundings to %s: %s", username, e)
 
     async def _do_send_surroundings(self, username: str):
         user = self._sessions.get(username)
@@ -222,4 +222,4 @@ class MessageHandler:
                 )
             await self._send_surroundings(username)
         except Exception as e:
-            logger.error("Error handling input from %s: %s", username, e)
+            self.log.error("Error handling input from %s: %s", username, e)

@@ -5,6 +5,7 @@ Producer, Consumer and Admin
 
 from __future__ import annotations
 
+import asyncio
 import os
 import json
 
@@ -43,13 +44,14 @@ class KafkaConnection:
 
     def __init__(self, heart: MorphoLogicHeart):
         self.heart = heart
+        self.log = self.heart.log.getChild("kafka") 
         self.admin: AdminClient
         self.producer: Producer
         self.consumer: Consumer
         # self.general_topic = SERVER_GENERAL_TOPIC
 
     def _establish_kafka_connection(
-        self, max_retries=4, wait_time=1
+        self, max_retries=1, wait_time=1
     ):
         """
         Verifies the connection to Kafka by requesting cluster metadata.
@@ -59,14 +61,14 @@ class KafkaConnection:
             try:
                 cluster_metadata = self.admin.list_topics(timeout=5)
                 if cluster_metadata.brokers:
-                    self.heart.log.debug("Kafka connection verified.")
+                    self.log.debug("Kafka connection verified.")
                     return
             except KafkaException as e:
                 if attemt < max_retries - 1:
-                    self.heart.log.warning("Kafka connection failed. Retrying.")
+                    self.log.warning("Kafka connection failed. Retrying.")
                     sleep(wait_time)
                 else:
-                    self.heart.log.error(
+                    self.log.error(
                         "Kafka connection failed after %d retries.", max_retries
                     )
                     raise RuntimeError(
@@ -99,21 +101,21 @@ class KafkaConnection:
             return self
 
         except KafkaException:
-            self.heart.log.exception("Error setting up Kafka resources.")
+            self.log.exception("Error setting up Kafka resources.")
             raise
-        except Exception:
-            self.heart.log.exception("Error setting up Kafka resources.")
+        except Exception as e:
+            self.log.exception("Error setting up Kafka resources: %s", e)
             raise
 
     def __exit__(self, exc_type, exc_value, traceback):
         """Cleanup: close consumer, flush producer"""
         if self.consumer:
             self.consumer.close()
-            self.heart.log.info("Closed Kafka consumer.")
+            self.log.info("Closed Kafka consumer.")
 
         if self.producer:
             self.producer.flush(3)  # ensure all queued messages are delivered
-            self.heart.log.info("Flushed Kafka producer.")
+            self.log.info("Flushed Kafka producer.")
             
     def _ssl_conf(self) -> dict:
         if not self.heart.settings.KAFKA_SECURITY_PROTOCOL:
@@ -123,28 +125,29 @@ class KafkaConnection:
             c["ssl.ca.location"] = self.heart.settings.KAFKA_SSL_CA_LOCATIONS
         return c
 
-    def create_new_topics(self, topics: list[str]) -> list[str]:
+    async def create_new_topics(self, topics: list[str]) -> list[str]:
         """
-        KONIECZNIE TRZEBA TO ZROBIĆ JAKO THREAD LUB ASYNC JAKIŚ
         Creating a new topic. If it already exists we just log this info and continue.
         """
         new_topics_list = []
         b_topic = ""
-        # Check if topics already exists
+
+        cluster_metadata = await asyncio.to_thread(self.admin.list_topics)
+        current_topics = cluster_metadata.topics
+
         for topic in topics:
-            if not self._topic_exists(topic):
+            if topic not in current_topics:
                 new_topics_list.append(NewTopic(topic))
 
         if new_topics_list:
             dict_future_topics = self.admin.create_topics(new_topics_list)
-            # Check futures for validating
             try:
                 for topic, future_topic in dict_future_topics.items():
                     b_topic = topic
-                    future_topic.result()
-                self.heart.log.info('Created Kafka topic "%s"', topic)
+                    await asyncio.wrap_future(future_topic)
+                    self.log.info('Created Kafka topic "%s"', topic)
             except Exception:
-                self.heart.log.exception('Failed to create topic "%s".', b_topic)
+                self.log.exception('Failed to create topic "%s".', b_topic)
                 raise  # re-raise to exit the context manager
         new_topics_list = [
             topic.topic if isinstance(topic, NewTopic) else topic
@@ -152,14 +155,10 @@ class KafkaConnection:
         ]
         return new_topics_list
 
-    def _topic_exists(self, topic: str) -> bool:
-        metadata = self.admin.list_topics()
-        return topic in metadata.topics
-
     def subscribe_to_topics(self, topics: list[str]):
         """Subscribes the class' Kafka Consumer to specific topic."""
         self.consumer.subscribe(topics)
-        self.heart.log.info('Subscribed to Kafka topics "%s"', topics)
+        self.log.info('Subscribed to Kafka topics "%s"', topics)
 
     def update_subscription(self, topics: list[str]):
         """Checks if listed topics are already subscribed and if not, subscribes"""
@@ -180,7 +179,7 @@ class KafkaConnection:
     # def unsubscribe_from_topics(self, topics: list[str]):
     #     """Unsubscribes the class' Kafka Consumer from specific topic."""
     #     self.consumer.unsubscribe(topics)
-    #     self.heart.log.info('Unsubscribed from Kafka topics "%s"', topics)
+    #     self.log.info('Unsubscribed from Kafka topics "%s"', topics)
 
     def send_data_to_user(
         self,
@@ -207,7 +206,7 @@ class KafkaConnection:
         # adding key might result in some consumers not consuming their message as each
         # consumer get's it's own partition when there's more that one consumers
         # and there might be more than one producer and consumer when multiple users will try to join
-        self.heart.log.debug('Produced message to %s: "%s"', topic, payload_data)
+        self.log.debug('Produced message to %s: "%s"', topic, payload_data)
 
     def health_status(self):
         """Just a quick 'UP_AND_RUNNING' message to Kafka"""
@@ -222,7 +221,7 @@ class KafkaConnection:
         wrapped_data = self._add_metadata(payload_data, "")
         wrapped_data = json.dumps(payload_data, ensure_ascii=False).encode("utf-8")
         self.producer.produce(self.heart.settings.CLIENTS_GENERAL_TOPIC, value=wrapped_data)
-        self.heart.log.debug('Produced message to %s: "%s"', self.heart.settings.CLIENTS_GENERAL_TOPIC, payload_data)
+        self.log.debug('Produced message to %s: "%s"', self.heart.settings.CLIENTS_GENERAL_TOPIC, payload_data)
         
 
     def _add_metadata(self, data: dict, username: str) -> dict:

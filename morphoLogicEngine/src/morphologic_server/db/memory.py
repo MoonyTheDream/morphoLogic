@@ -590,14 +590,10 @@ class Memory:
 
         Lookup chain: Account.username → account.character_souls[0] → soul.bound_character.
         """
-        logger.debug("A")
         account = await self.find_account(username, eagerly=True)
-        logger.debug("B")
         if account is None or not account.check_password(password):
             return None
-        logger.debug("C")
         souls = account.character_souls
         if not souls:
             return None
-        logger.debug("D")
         return souls[0].bound_character

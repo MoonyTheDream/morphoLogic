@@ -29,7 +29,7 @@ formatter = logging.Formatter(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 
-logger = logging.getLogger("morphoLogic Server")
+logger = logging.getLogger("mL_Server")
 
 _log_dir = Path(__file__).resolve().parents[3] / "logs"
 _log_dir.mkdir(parents=True, exist_ok=True)
