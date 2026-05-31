@@ -28,7 +28,6 @@ if TYPE_CHECKING:
 #         self.user = self.msg["metadata"]["username"]
 
 
-
 class MessageHandler:
     """Consumes Kafka messages and routes them to the correct handler."""
 
@@ -57,32 +56,63 @@ class MessageHandler:
             )
             for msg in msgs:
                 if msg.error():
-                    self.log.exception("Kafka error: %s", msg.error().str()) # type: ignore # we know this is a Message, not an error
+                    self.log.error("Kafka error: %s", msg.error().str())  # type: ignore # we know this is a Message, not an error
                     continue
-                received_msg = ReceivedMessage(msg)
-                self.log.debug('Consumed from %s: "%s"', received_msg.topic, received_msg.msg)
-                # ADD a try except here
+                try:
+                    received_msg = ReceivedMessage(msg)
+                except Exception:
+                    self.log.exception(
+                        "Dropping unparseable message from %s", msg.topic()
+                    )
+                    continue
+                self.log.debug(
+                    'Consumed from %s: "%s"', received_msg.topic, received_msg.msg
+                )
                 self.tg.create_task(self._route(received_msg))
 
     async def _route(self, received: ReceivedMessage):
         """Route a message to the correct handler based on system_message."""
-        
-        if received.type == "system_message":
-            match received.msg:
-                case "ITS'A_ME_MARIO":
-                    self.log.debug('Received handshake initiation from "%s".', received.user)
-                    await self._handshake_init(received)
-                case "WALLS_HAVE_EARS_GOT_IT":
-                    self.log.debug('Received handshake ack from "%s".', received.user)    
-                    self._handshake_ack(received.user)
-                case "LOUD_AND_CLEAR":
-                    self.log.debug('Received surroundings request from "%s".', received.user)
-                    await self._send_surroundings(received.user)
-                case _:
-                    self.log.warning('Unknown system_message: "%s"', received.msg)
-                    
-        if received.type == "user_input":
-            await self._handle_user_input(received.user, received.msg)
+
+        try:
+            if received.type == "system_message":
+                match received.msg:
+                    case "ITS'A_ME_MARIO":
+                        self.log.debug(
+                            'Received handshake initiation from "%s".', received.user
+                        )
+                        await self._handshake_init(received)
+                    case "WALLS_HAVE_EARS_GOT_IT":
+                        self.log.debug(
+                            'Received handshake ack from "%s".', received.user
+                        )
+                        self._handshake_ack(received.user)
+                    case "LOUD_AND_CLEAR":
+                        self.log.debug(
+                            'Received surroundings request from "%s".', received.user
+                        )
+                        await self._send_surroundings(received.user)
+                    case _:
+                        self.log.warning('Unknown system_message: "%s"', received.msg)
+
+            if received.type == "user_input":
+                await self._handle_user_input(received.user, received.msg)
+        except Exception:
+            self.log.exception(
+                "Routing failed for %s (type: %s)", received.user, received.type
+            )
+            if received.user:
+                self.kafka.send_data_to_user(
+                    self.heart.settings.CLIENTS_GENERAL_TOPIC,
+                    received.user,
+                    direct_message="[color=tomato]Internal server error.[/color]\n",
+                )
+            # Duplicated for now, we weill add a plce that store which sessions listenes to whick topics.
+            if received.user:
+                self.kafka.send_data_to_user(
+                    received.user,
+                    received.user,
+                    direct_message="[color=tomato]Internal server error.[/color]\n",
+                )
 
     # ── Handshake ────────────────────────────────────────────────────────────
 
@@ -132,8 +162,8 @@ class MessageHandler:
         """LOUD_AND_CLEAR → query DB for surroundings, send SURROUNDINGS_DATA."""
         try:
             await self._do_send_surroundings(username)
-        except Exception as e:
-            self.log.error("Error sending surroundings to %s: %s", username, e)
+        except Exception:
+            self.log.exception("Error sending surroundings to %s", username)
 
     async def _do_send_surroundings(self, username: str):
         user = self._sessions.get(username)
@@ -221,5 +251,5 @@ class MessageHandler:
                     username, username, direct_message=feedback + "\n"
                 )
             await self._send_surroundings(username)
-        except Exception as e:
-            self.log.error("Error handling input from %s: %s", username, e)
+        except Exception:
+            self.log.exception("Error handling input from %s", username)

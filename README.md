@@ -238,7 +238,7 @@ The package name is `morphologic-server`, but the name of the program is `morpho
 
 ### CLI
 
-The CLI has some basic functions. When the morphoLogic Server is run by `morphologic start` the CLI will start altogether.
+The CLI has some basic functions. When the morphoLogic Engine is run by `morphologic start` the CLI will start altogether.
 
 - `stop` — a command to stop the server
 - `detach` — detaches (turns off) the CLI, the server keeps running

@@ -1,4 +1,4 @@
-"""Custom exceptions for morphoLogic server."""
+"""Custom exceptions for morphoLogic Engine."""
 
 
 class PermissionDeniedError(Exception):

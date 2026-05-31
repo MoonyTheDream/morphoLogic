@@ -48,6 +48,7 @@ import string
 import sys
 
 from asyncio.coroutines import iscoroutinefunction
+from threading import Thread
 
 
 __all__ = ["AsyncCmd"]
@@ -113,6 +114,21 @@ class AsyncCmd:
             self.stdout = sys.stdout
         self.cmdqueue = []
         self.completekey = completekey
+        
+    async def _read_line_async(self):
+        loop = asyncio.get_running_loop()
+        fut = loop.create_future()
+        
+        def _reader():
+            try:
+                result = self.stdin.readline()
+            except Exception as exc:
+                loop.call_soon_threadsafe(fut.set_exception, exc)
+            else:
+                loop.call_soon_threadsafe(fut.set_result, result)
+                
+        Thread(target=_reader, daemon=True).start()
+        return await fut
 
     async def cmdloop(self, intro=None):
         """Repeatedly issue a prompt, accept input, parse an initial prefix
@@ -151,7 +167,8 @@ class AsyncCmd:
                     else:
                         if self.use_rawinput:
                             try:
-                                line = await asyncio.to_thread(self.stdin.readline)
+                                # Change Here
+                                line = await self._read_line_async()
                             except (EOFError, ValueError):
                                 line = "EOF"
                         else:

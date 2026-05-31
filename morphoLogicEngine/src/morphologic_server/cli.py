@@ -69,7 +69,7 @@ async def run_python_shell(heart=None):
 #                                                                    888
 class MorphoLogicCmd(AsyncCmd):
     """
-    Command-line interface for the morphoLogic server.
+    Command-line interface for the morphoLogic Engine.
     It's using modified Cmd object from cmd package. Modifications makes the cmd_loop a coroutine
     function.
     """
@@ -286,7 +286,7 @@ def main():
     else:
         parser.print_help()
 
-    logger.info("Closed down the morphoLogic Server.")
+    logger.info("Closed down the morphoLogic Engine.")
 
 
 if __name__ == "__main__":

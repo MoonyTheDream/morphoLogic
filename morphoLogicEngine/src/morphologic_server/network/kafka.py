@@ -51,29 +51,31 @@ class KafkaConnection:
         # self.general_topic = SERVER_GENERAL_TOPIC
 
     def _establish_kafka_connection(
-        self, max_retries=1, wait_time=1
+        self, max_retries=3, wait_time=0.5
     ):
         """
         Verifies the connection to Kafka by requesting cluster metadata.
         Retries a few times before giving up.
         """
-        for attemt in range(max_retries):
+        for attempt in range(max_retries):
             try:
                 cluster_metadata = self.admin.list_topics(timeout=5)
                 if cluster_metadata.brokers:
-                    self.log.debug("Kafka connection verified.")
+                    self.log.debug("Kafka connected: %d broker(s).", len(cluster_metadata.brokers))
                     return
-            except KafkaException as e:
-                if attemt < max_retries - 1:
-                    self.log.warning("Kafka connection failed. Retrying.")
+                else:
+                    raise KafkaException("No brokers found in cluster metadata.")
+            except KafkaException:
+                if attempt < max_retries - 1:
+                    self.log.exception("Kafka connection failed. Attempt %d/%d.", attempt+1, max_retries)
                     sleep(wait_time)
                 else:
-                    self.log.error(
+                    self.log.exception(
                         "Kafka connection failed after %d retries.", max_retries
                     )
                     raise RuntimeError(
                         "Kafka cluster is unreachable. Check if the broker is running."
-                    ) from e
+                    )
 
     def __enter__(self):
         """
@@ -96,7 +98,7 @@ class KafkaConnection:
             }
             self.consumer = Consumer(consumer_conf)
 
-            self.subscribe_to_topics([self.heart.settings.SERVER_GENERAL_TOPIC, self.heart.settings.SERVER_HANDSHAKE_TOPIC])
+            # self.subscribe_to_topics([self.heart.settings.SERVER_GENERAL_TOPIC, self.heart.settings.SERVER_HANDSHAKE_TOPIC])
 
             return self
 

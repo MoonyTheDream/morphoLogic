@@ -51,7 +51,7 @@ class MorphoLogicHeart:
         self._stop = False
 
         # Adjust the module loger level as in the settings
-        self.log = logging.getLogger("morphoLogic Server")
+        self.log = logging.getLogger("morphoLogicEngine")
         self.log.setLevel(settings.logging_level())
 
         # Spinning up the sessionmaker and Memory — all DB ops go through heart.memory
@@ -88,6 +88,8 @@ class MorphoLogicHeart:
                     self.settings.CLIENTS_HANDSHAKE_TOPIC,
                 ]
             )
+            kafka.subscribe_to_topics([self.settings.SERVER_GENERAL_TOPIC, self.settings.SERVER_HANDSHAKE_TOPIC])
+            
             handler = MessageHandler(heart=self, kafka=kafka, tg=tg)
             tg.create_task(handler.start())
 

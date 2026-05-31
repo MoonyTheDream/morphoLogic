@@ -97,11 +97,6 @@ func set_producer_topic(topic: String) -> void:
 	producer.set_topic(topic)
 
 func change_consumer_topic(topic: String) -> void:
-	# _is_kafka_ready = false
-	# consumer.stop()
-	# consumer.set_topic(topic)
-	# consumer.start()
-	# await consumer.consumer_ready
 	consumer.change_topic(topic)
 	await consumer.consumer_ready # Wait for Kafka consumer to be ready
 
