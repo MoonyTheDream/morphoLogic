@@ -2,6 +2,9 @@ extends Node
 
 signal new_data_arrived(data)
 
+var is_connected := false
+var connection_failed := false
+
 @onready var producer = KafkaProducer.new()
 @onready var consumer := KafkaConsumer.new()
 # var _is_kafka_ready := false
@@ -43,7 +46,7 @@ func _process(_delta: float) -> void:
 	if Kafka.consumer.is_running() and InputHandler.message_processed == true:
 		var message = consumer.get_message()
 		if message:
-			print("Received message: %s" % message)
+			GlobalLogger.debug("kafka", "Received message: %s" % message)
 
 			if message != "":
 				var data = JSON.parse_string(message)
@@ -52,7 +55,7 @@ func _process(_delta: float) -> void:
 					InputHandler.message_processed = false
 					new_data_arrived.emit(data)
 				else:
-					print("Failed to parse message: %s" % message)
+					GlobalLogger.warning("kafka", "Failed to parse message: %s" % message)
 
 			# var dict_data: Array[Dictionary] = JSON.parse_string(received_messages)
 			# call_deferred("emit_received_data", dict_data)
@@ -78,7 +81,7 @@ func send_system_message(message: String = "", message_content: String = "") -> 
 	data_to_send = _add_metadata(data_to_send)
 	var wrapped_message = JSON.stringify(data_to_send) + "\n"
 
-	print("Sending message: %s" % wrapped_message)
+	GlobalLogger.debug("kafka", "Sending message: %s" % wrapped_message)
 	producer.send_message(wrapped_message)
 
 func send_user_input(user_input: String) -> void:
@@ -90,7 +93,7 @@ func send_user_input(user_input: String) -> void:
 	data_to_send = _add_metadata(data_to_send)
 	var wrapped_message = JSON.stringify(data_to_send) + "\n"
 
-	print("Sending message: %s" % wrapped_message)
+	GlobalLogger.debug("kafka", "Sending message: %s" % wrapped_message)
 	producer.send_message(wrapped_message)
 
 func set_producer_topic(topic: String) -> void:
@@ -108,14 +111,20 @@ func initialize_server_connection(password: String = "") -> void:
 
 
 func _on_producer_ready():
-	print("Started Kafka Producer.")
+	GlobalLogger.info("kafka", "Started Kafka Producer.")
 
 
 func _on_consumer_ready():
 	# print("Consumer subscribed")
-	print("Started Kafka Consumer on topic: '%s'" % ClientData.clients_general_topic)
+	GlobalLogger.info("kafka", "Started Kafka Consumer on topic: '%s'" % ClientData.clients_general_topic)
+	is_connected = true
 	# print("Starting Kafka Consumer on topic: '%s'" % topic)
 
 
 func _on_error(msg: String):
-	printerr("Kafka error: ", msg)
+	if "timed out" in msg.to_lower():
+		GlobalLogger.error("kafka", "Connection timed out: %s" % msg)
+		connection_failed = true
+	else:
+		GlobalLogger.error("kafka", "Kafka error: %s" % msg)
+	InputHandler.draw_message.emit(tr("[color=tomato]Kafka error: %s[/color]" % msg))

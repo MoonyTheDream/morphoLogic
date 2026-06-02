@@ -11,8 +11,15 @@ func _ready() -> void:
 	self.text_submitted.connect(_inputHandler) # later it will be part of _send_to_tcp
 	# await get_tree().create_timer(0.30).timeout # Better UX and time for other services to start
 	
-	if not Kafka.consumer.is_running():
-		await Kafka.consumer.consumer_ready # Wait for Kafka consumer to be ready
+	var txt_f = get_node("%MainTextField")
+	if not Kafka.is_connected:
+		txt_f.draw_new_message(tr("[color=gray]Reaching the realm...[/color]\n"))
+		var deadline := Time.get_ticks_msec() + 10000 # 10 ceiling
+		while not Kafka.is_connected and not Kafka.connection_failed and Time.get_ticks_msec() < deadline:
+			await get_tree().process_frame
+	if not Kafka.is_connected:
+		txt_f.draw_new_message(tr("[color=tomato]Couldn't reach the realm. It might stuck in the Dream. Try to wake up later.[/color]\n"))
+		return   # don't ask for credentials into a dead socket
 
 	var username = await self.request_username()
 	# Username is needed in each message to Kafka

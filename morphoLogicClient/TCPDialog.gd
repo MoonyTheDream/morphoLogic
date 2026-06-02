@@ -33,7 +33,7 @@ func send_tcp_message(user_input: String = "", system_message: String = "", mess
 		var data = wrapped_message.to_utf8_buffer()
 		TCPClient.put_data(data)
 	else:
-		print("Not connected. Message \"%s\" has not been sent." % wrapped_message)
+		GlobalLogger.warning("tcp", "Not connected. Message \"%s\" has not been sent." % wrapped_message)
 
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.

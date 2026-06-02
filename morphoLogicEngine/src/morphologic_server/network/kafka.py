@@ -76,6 +76,14 @@ class KafkaConnection:
                     raise RuntimeError(
                         "Kafka cluster is unreachable. Check if the broker is running."
                     )
+                    
+    def _delivery_report(self, err, msg):
+        """Called once for each message produced to indicate delivery result.
+           Triggered by poll() or flush()."""
+        if err is not None:
+            self.log.error('Delivery FAILED to %s: %s', msg.topic(), err)
+        else:
+            self.log.debug('Delivered to %s [p%s]', msg.topic(), msg.partition())
 
     def __enter__(self):
         """
@@ -92,7 +100,7 @@ class KafkaConnection:
             consumer_conf = {
                 "bootstrap.servers": self.heart.settings.KAFKA_SERVER,
                 "group.id": self.heart.settings.KAFKA_GROUP_ID,
-                "auto.offset.reset": "earliest",
+                "auto.offset.reset": "latest",
                 "enable.partition.eof": False,  # we'll be hitting end of partition quite often
                 **self._ssl_conf(),
             }
@@ -178,10 +186,6 @@ class KafkaConnection:
             to_update += current_subscription
             self.subscribe_to_topics(to_update)
 
-    # def unsubscribe_from_topics(self, topics: list[str]):
-    #     """Unsubscribes the class' Kafka Consumer from specific topic."""
-    #     self.consumer.unsubscribe(topics)
-    #     self.log.info('Unsubscribed from Kafka topics "%s"', topics)
 
     def send_data_to_user(
         self,
@@ -202,13 +206,14 @@ class KafkaConnection:
                 "objects": objects,
             }
         }
-        wrapped_data = self._add_metadata(payload_data, username)
+        self._add_metadata(payload_data, username)
         wrapped_data = json.dumps(payload_data, ensure_ascii=False).encode("utf-8")
-        self.producer.produce(topic, value=wrapped_data)  # no key, as:
+        self.producer.produce(topic, value=wrapped_data, on_delivery=self._delivery_report)  # no key, as:
         # adding key might result in some consumers not consuming their message as each
         # consumer get's it's own partition when there's more that one consumers
         # and there might be more than one producer and consumer when multiple users will try to join
         self.log.debug('Produced message to %s: "%s"', topic, payload_data)
+        self.producer.poll(0)  # trigger delivery report callbacks
 
     def health_status(self):
         """Just a quick 'UP_AND_RUNNING' message to Kafka"""
@@ -220,11 +225,11 @@ class KafkaConnection:
                 "objects": None,
             }
         }
-        wrapped_data = self._add_metadata(payload_data, "")
+        self._add_metadata(payload_data, "")
         wrapped_data = json.dumps(payload_data, ensure_ascii=False).encode("utf-8")
-        self.producer.produce(self.heart.settings.CLIENTS_GENERAL_TOPIC, value=wrapped_data)
+        self.producer.produce(self.heart.settings.CLIENTS_GENERAL_TOPIC, value=wrapped_data, on_delivery=self._delivery_report)
         self.log.debug('Produced message to %s: "%s"', self.heart.settings.CLIENTS_GENERAL_TOPIC, payload_data)
-        
+        self.producer.poll(0)  # trigger delivery report callbacks
 
     def _add_metadata(self, data: dict, username: str) -> dict:
         """

@@ -1,8 +1,8 @@
+[general]
+debugLogging = false
 [kafka]
 serverGeneralTopic = "serverGeneralTopic"
 clientsGeneralTopic = "clientsGeneralTopic"
-log_level_debug = true
-debugpy = false
 bootstrapServer = "<mlkafka.address>:9093"
 securityProtocol = "ssl"
 serverHandshakeTopic = "serverHandshakeTopic"
