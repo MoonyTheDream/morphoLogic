@@ -163,3 +163,4 @@ cython_debug/
 
 # Calude stuff
 CLAUDE.md
+.claude/
