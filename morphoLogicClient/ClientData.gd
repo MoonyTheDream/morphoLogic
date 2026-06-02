@@ -5,6 +5,7 @@ const CONFIG_PATH = "res://client_config.cfg"
 var server_general_topic := ""
 var clients_general_topic := ""
 var version := "0.1.0"
+var debug_logging := false
 var username = null
 var bootstrap_server := ""
 var security_protocol: String = ""
@@ -20,6 +21,7 @@ func load_settings(path: String = CONFIG_PATH) -> ConfigFile:
 
 func _ready():
 	var config := load_settings()
+	debug_logging = config.get_value("general", "debugLogging", false)
 	server_general_topic = config.get_value("kafka", "serverGeneralTopic", "serverGeneralTopic")
 	clients_general_topic = config.get_value("kafka", "clientsGeneralTopic", "clientsGeneralTopic")
 	bootstrap_server = config.get_value("kafka", "bootstrapServer", "localhost:9092")

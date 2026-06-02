@@ -1,37 +1,44 @@
 """MessageHandler — Kafka consumer loop + full protocol routing."""
 
+from __future__ import annotations
+
 import asyncio
 import json
+from typing import TYPE_CHECKING
+
+from morphologic_server.network.kafka import (
+    KafkaConnection,
+)
+from morphologic_server.services.messages import ReceivedMessage
 
 from confluent_kafka import Message
 
-from morphologic_server import logger
-from morphologic_server.network.kafka import (
-    KafkaConnection,
-    CLIENTS_GENERAL_TOPIC as _CLIENTS_GENERAL_TOPIC,
-)
+if TYPE_CHECKING:
+    from morphologic_server.awakening import MorphoLogicHeart
 
 
-class KafkaMessage:
-    """Parsed wrapper around a raw Kafka message."""
+# class ReceivedMessage:
+#     """Parsed wrapper around a raw Kafka message."""
 
-    def __init__(self, raw_msg: Message):
-        self.topic = raw_msg.topic()
-        self.msg = json.loads(raw_msg.value().decode("utf-8"))
-        logger.debug('Consumed from %s: "%s"', self.topic, self.msg)
-        self.system_msg = self.msg["payload"].get("system_message", "")
-        self.user_input = self.msg["payload"].get("user_input", "")
-        self.sending_user = self.msg["metadata"]["username"]
+#     def __init__(self, raw_msg: Message):
+#         self.topic = raw_msg.topic()
+#         self.msg = json.loads(raw_msg.value().decode("utf-8"))
+#         self.log.debug('Consumed from %s: "%s"', self.topic, self.msg)
+#         self.type = self.msg["payload"]["type"]
+#         self.user = self.msg["metadata"]["username"]
 
 
 class MessageHandler:
     """Consumes Kafka messages and routes them to the correct handler."""
 
-    def __init__(self, kafka: KafkaConnection, tg: asyncio.TaskGroup):
+    def __init__(
+        self, heart: MorphoLogicHeart, kafka: KafkaConnection, tg: asyncio.TaskGroup
+    ):
+        self.heart = heart
+        self.log = self.heart.log.getChild("handler")
         self.kafka = kafka
         self.tg = tg
         self._stop = False
-        # Maps Kafka username → authenticated Character
         self._sessions: dict = {}
 
     async def start(self):
@@ -47,69 +54,105 @@ class MessageHandler:
             msgs = await asyncio.to_thread(
                 lambda: self.kafka.consumer.consume(num_messages=1, timeout=0.2)
             )
-            if msgs:
-                msg = msgs[0] if isinstance(msgs, list) else msgs
+            for msg in msgs:
                 if msg.error():
-                    logger.warning("Kafka error: %s", msg.error().str())
+                    self.log.error("Kafka error: %s", msg.error().str())  # type: ignore # we know this is a Message, not an error
                     continue
-                parsed = KafkaMessage(msg)
-                self.tg.create_task(self._route(parsed))
+                try:
+                    received_msg = ReceivedMessage(msg)
+                except Exception:
+                    self.log.exception(
+                        "Dropping unparseable message from %s", msg.topic()
+                    )
+                    continue
+                self.log.debug(
+                    'Consumed from %s: "%s"', received_msg.topic, received_msg.msg
+                )
+                self.tg.create_task(self._route(received_msg))
 
-    async def _route(self, msg: KafkaMessage):
+    async def _route(self, received: ReceivedMessage):
         """Route a message to the correct handler based on system_message."""
-        match msg.system_msg:
-            case "ITS'A_ME_MARIO":
-                await self._handshake_init(msg.msg)
-            case "WALLS_HAVE_EARS_GOT_IT":
-                self._handshake_ack(msg.sending_user, msg.msg)
-            case "LOUD_AND_CLEAR":
-                await self._send_surroundings(msg.sending_user)
-            case "":
-                if msg.user_input:
-                    await self._handle_user_input(msg.sending_user, msg.user_input)
-            case _:
-                logger.warning('Unknown system_message: "%s"', msg.system_msg)
+
+        try:
+            if received.type == "system_message":
+                match received.msg:
+                    case "ITS'A_ME_MARIO":
+                        self.log.debug(
+                            'Received handshake initiation from "%s".', received.user
+                        )
+                        await self._handshake_init(received)
+                    case "WALLS_HAVE_EARS_GOT_IT":
+                        self.log.debug(
+                            'Received handshake ack from "%s".', received.user
+                        )
+                        self._handshake_ack(received.user)
+                    case "LOUD_AND_CLEAR":
+                        self.log.debug(
+                            'Received surroundings request from "%s".', received.user
+                        )
+                        await self._send_surroundings(received.user)
+                    case _:
+                        self.log.warning('Unknown system_message: "%s"', received.msg)
+
+            if received.type == "user_input":
+                await self._handle_user_input(received.user, received.msg)
+        except Exception:
+            self.log.exception(
+                "Routing failed for %s (type: %s)", received.user, received.type
+            )
+            if received.user:
+                self.kafka.send_data_to_user(
+                    self.heart.settings.CLIENTS_GENERAL_TOPIC,
+                    received.user,
+                    direct_message="[color=tomato]Internal server error.[/color]\n",
+                )
+            # Duplicated for now, we weill add a plce that store which sessions listenes to whick topics.
+            if received.user:
+                self.kafka.send_data_to_user(
+                    received.user,
+                    received.user,
+                    direct_message="[color=tomato]Internal server error.[/color]\n",
+                )
 
     # ── Handshake ────────────────────────────────────────────────────────────
 
-    async def _handshake_init(self, raw_msg: dict):
+    async def _handshake_init(self, received: ReceivedMessage):
         """ITS'A_ME_MARIO → authenticate, create private topic, reply SHH_LET'S_TALK_IN_PRIVATE."""
-        from morphologic_server.archetypes.base import authenticate
-
-        username = raw_msg["metadata"].get("username", "")
+        username = received.user
         if not username:
+            self.log.warning("Received handshake initiation with empty username.")
             return
 
-        password = raw_msg["payload"].get("content", "")
-        character = await authenticate(username, password)
+        password = received.content or ""
+        character = await self.heart.memory.authenticate(username, password)
         if character is None:
-            logger.info('Auth failed for "%s"', username)
+            self.log.info('Auth failed for "%s"', username)
             self.kafka.send_data_to_user(
-                _CLIENTS_GENERAL_TOPIC,
+                self.heart.settings.CLIENTS_GENERAL_TOPIC,
                 username,
                 direct_message="[color=tomato]Authentication failed. Check your username and password.[/color]\n",
             )
             return
 
         self._sessions[username] = character
-        logger.info('"%s" authenticated as %s', username, character.name)
+        self.log.info('"%s" authenticated as %s', username, character.name)
 
-        created = self.kafka.create_new_topics([username])
+        created = await self.kafka.create_new_topics([username])
         dedicated_topic = created[0] if created else username
         if created:
-            logger.info('Created topic: "%s"', dedicated_topic)
+            self.log.info('Created topic: "%s"', dedicated_topic)
         self.kafka.send_data_to_user(
-            _CLIENTS_GENERAL_TOPIC,
+            self.heart.settings.CLIENTS_GENERAL_TOPIC,
             username,
             server_message="SHH_LET'S_TALK_IN_PRIVATE",
             content=dedicated_topic,
         )
 
-    def _handshake_ack(self, username: str, raw_msg: dict):
+    def _handshake_ack(self, username: str):
         """WALLS_HAVE_EARS_GOT_IT → send CAN_YOU_HEAR_ME? to the user's private topic."""
         self.kafka.send_data_to_user(
             username,
-            username=raw_msg["metadata"]["username"],
+            username,
             server_message="CAN_YOU_HEAR_ME?",
         )
 
@@ -119,23 +162,19 @@ class MessageHandler:
         """LOUD_AND_CLEAR → query DB for surroundings, send SURROUNDINGS_DATA."""
         try:
             await self._do_send_surroundings(username)
-        except Exception as e:
-            logger.error("Error sending surroundings to %s: %s", username, e)
+        except Exception:
+            self.log.exception("Error sending surroundings to %s", username)
 
     async def _do_send_surroundings(self, username: str):
-        from morphologic_server.utils.search import get_objects_in_proximity
-
         user = self._sessions.get(username)
         if user is None:
             return
 
-        await user.refresh()
-
-        proximity = await get_objects_in_proximity(user)
-        area = await user.get_area_im_in()
-
-        game_objects = proximity.get("game_objects", [])
-        characters = proximity.get("characters", [])
+        surroundings = await self.heart.memory.get_full_surroundings(user)
+        game_objects = surroundings["game_objects"]
+        characters = surroundings["characters"]
+        area = surroundings["area"]
+        terrain = surroundings["terrain"]
         area_name = area.name if area else "unknown"
 
         # Text description
@@ -143,12 +182,12 @@ class MessageHandler:
             [f"{c.name} ({c.id})" for c in characters if c.id != user.id]
         )
         objects_str = "\n".join(
-            [f"{o.name} ({o.id})" for o in game_objects if o.container_id is None]
+            [f"{o.name} ({o.id})" for o in game_objects if o.holder_id is None]
         )
         text = (
             f'Character {user.name} is in area "{area_name}" \n'
-            f' Characters around:\n {characters_str} \n\n'
-            f' Objects around:\n {objects_str}'
+            f" Characters around:\n {characters_str} \n\n"
+            f" Objects around:\n {objects_str}"
         )
 
         # Minimap data — relative positions in metres
@@ -168,14 +207,22 @@ class MessageHandler:
             }
 
         for obj in game_objects:
-            if obj.container_id is not None:
-                continue  # skip items stored inside containers
+            if obj.holder_id is not None:
+                continue  # skip items stored inside holders
             objects_dict[str(obj.id)] = {
                 "name": obj.name,
                 "type": "object",
                 "x": round(obj.location.x - player_x, 2),
                 "y": round(obj.location.y - player_y, 2),
                 "description": obj.description,
+            }
+
+        for t in terrain:
+            objects_dict[f"t{t.id}"] = {
+                "name": t.type.value,
+                "type": "terrain",
+                "x": round(t.location.x - player_x, 2),
+                "y": round(t.location.y - player_y, 2),
             }
 
         self.kafka.send_data_to_user(
@@ -191,19 +238,18 @@ class MessageHandler:
     async def _handle_user_input(self, username: str, text: str):
         """Parse and execute a typed command, then refresh surroundings."""
         from morphologic_server.game_logic.commands import handle_command
-        from morphologic_server.utils.search import get_objects_in_proximity
 
         user = self._sessions.get(username)
         if user is None:
             return
 
         try:
-            proximity = await get_objects_in_proximity(user)
+            proximity = await self.heart.memory.get_objects_in_proximity(user)
             feedback = await handle_command(text, user, proximity)
             if feedback:
                 self.kafka.send_data_to_user(
                     username, username, direct_message=feedback + "\n"
                 )
             await self._send_surroundings(username)
-        except Exception as e:
-            logger.error("Error handling input from %s: %s", username, e)
+        except Exception:
+            self.log.exception("Error handling input from %s", username)

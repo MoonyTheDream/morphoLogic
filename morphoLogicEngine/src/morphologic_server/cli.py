@@ -1,50 +1,58 @@
 """Module responsible for the command line interface of the server."""
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Imports ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+import sys
+
 import argparse
 import asyncio
 import debugpy
-import sys
 
+from pathlib import Path
 from ptpython.repl import embed
+
 from morphologic_server import (
-    logger,
     TerminateTaskGroup,
-    force_terminate_task_group,
-    check_if_logging_to_console,
+    force_terminate_task_group
+)
+from morphologic_server.awakening import MorphoLogicHeart
+from morphologic_server.config import ServerSettings
+from morphologic_server.utils.async_cmd import AsyncCmd
+from morphologic_server.utils.logger import (
+    logger,
     remove_console_handler,
     add_console_handler,
+    check_if_logging_to_console,
 )
-from .app import Server
-from .config import ServerSettings
-from .utils.async_cmd import AsyncCmd
 
 # ------------------------------------------------------------------------------------------------ #
 
+async def run_python_shell(heart=None):
+    """A coroutine to run the python shell."""
+    from morphologic_server.db import models
 
-async def run_python_shell():
-    """Coroutine to run the python shell."""
-    # from morphologic_server.db.models import TerrainType
-    from morphologic_server.archetypes import base as archetypes 
+    if heart is None:
+        from morphologic_server.db.engine import create_sessionmaker
+        from morphologic_server.db.memory import Memory
+        from morphologic_server.config import ServerSettings
+
+        settings = ServerSettings()
+        sessionmaker = create_sessionmaker(settings.DB_ADDRESS)
+        models.Base._sessionmaker = sessionmaker
+        memory = Memory(sessionmaker)
+    else:
+        memory = heart.memory
 
     banner = "morphoLogic async shell Type `await ...` freely — Ctrl-D to exit."
     print(banner)
 
-    # Define your local namespace
     context = {
-        "force_terminate_task_group": force_terminate_task_group,
         "asyncio": asyncio,
         "logger": logger,
-        "db_api": archetypes,
-        "self": await archetypes.get_self(),
-        "create_account": archetypes.create_account,
-        # "TerrainType": TerrainType,
-        # "find_account": archetypes.find_account,
-        # "tg": asyncio.current_task()
-        # .get_coro()
-        # .cr_frame.f_locals.get("tg", None),  # if accessible
+        "heart": heart,
+        "models": models,
+        "memory": memory,
+        "self": await memory.find_character("MoonyTheDream", eagerly=True),
     }
-    # Start ptpython with asyncio support
     await embed(globals=context, return_asyncio_coroutine=True, title=banner)
 
 
@@ -61,7 +69,7 @@ async def run_python_shell():
 #                                                                    888
 class MorphoLogicCmd(AsyncCmd):
     """
-    Command-line interface for the morphoLogic server.
+    Command-line interface for the morphoLogic Engine.
     It's using modified Cmd object from cmd package. Modifications makes the cmd_loop a coroutine
     function.
     """
@@ -73,16 +81,20 @@ Say help or just raise your eyebrows — ? — to learn more.
 """
     prompt = "(morphoLogicServer) "
 
+    def __init__(self, heart=None):
+        super().__init__()
+        self.heart = heart
+
     async def do_stop(self, _):
         """Stop the server."""
-        print("Stars are fading... All the Heaven's batteries are turning off.")
+        print("Stars are fading — the Heaven's batteries are weakening.")
         await force_terminate_task_group()
         return True  # Exits the cmd loop
 
     def do_debug(self, _):
         """Listen on debugpy."""
         debugpy.listen(("localhost", 5678))
-        debugpy.wait_for_client()
+        debugpy.wait_for_client()   
         print("Debugger attached")
 
     async def do_shell(self, arg):
@@ -93,7 +105,7 @@ Say help or just raise your eyebrows — ? — to learn more.
             print("Detaching logger while shell is active.")
             remove_console_handler()
 
-        await run_python_shell()
+        await run_python_shell(self.heart)
 
         # global logger
         if log_to_console:
@@ -134,20 +146,26 @@ async def start_server(args):
     Start the server asynchronously.
     """
     if args.log:
-        print("Awakening of the World. The Scribes are here too.")
+        print("Awakening of the World. The Scribes raised their pens.")
     else:
         print("Awakening of the World.")
         remove_console_handler()
     try:
-        server = Server(ServerSettings())
+        morpho_heart = MorphoLogicHeart(ServerSettings())
         async with asyncio.TaskGroup() as tg:
-            # Both tasks run concurrently — neither blocks the other.
-            tg.create_task(server.run(tg))
-            tg.create_task(MorphoLogicCmd().cmdloop())
+            # Both tasks (Heart and CLI) run concurrently.
+            tg.create_task(morpho_heart.awake(tg))
+            
+            # Injecting heart into the CLI so we can access the Memory and other dependencies in the shell.
+            # Otherwise the shell creates its own Memory instance which is disconnected from the running server.
+            tg.create_task(MorphoLogicCmd(heart=morpho_heart).cmdloop())
     except* TerminateTaskGroup:
         logger.info("Terminating tasks.")
     except* asyncio.exceptions.CancelledError:
         logger.warning("Keyboard Interrupt. Shutting down the server.")
+    except* Exception as e:
+        for exc in e.exceptions:
+            logger.exception("Ungandled in task group,", exc_info=exc)
 
 
 #          888               888 888
@@ -162,13 +180,26 @@ async def just_shell(args):
     """
     Run just the python shell.
     """
-    await run_python_shell()
+    await run_python_shell()  # heart=None → creates its own Memory
 
 
 async def run_seed(args):
     """Populate the database with test objects and areas."""
     from morphologic_server.scripts.seed import seed
-    await seed()
+
+    await seed(fresh=getattr(args, "fresh", False))
+    
+async def run_export_terrain(args):
+    """Export terrain data as a 3D model file."""
+    from morphologic_server.scripts.export_terrain import export_terrain
+
+    await export_terrain(output=Path(getattr(args, "output", "terrain_export.obj")))
+
+async def run_import_terrain(args):
+    """Import terrain (and shift objects' Z) from a 3D mesh file."""
+    from morphologic_server.scripts.import_terrain import import_terrain
+
+    await import_terrain(input_path=Path(args.input))
 
 
 # ------------------------------------------------------------------------------------------------ #
@@ -204,11 +235,45 @@ def main():
         help='Drop into async-aware interactive shell ("%(prog)s shell -h" for options)',
     )
     shell.set_defaults(func=just_shell)
+    
+    # -------------------------------------------------------------------------------------------- #
 
     seed_cmd = subparsers.add_parser(
         "seed", help="Populate the database with test objects and areas"
     )
+    seed_cmd.add_argument(
+        "--fresh",
+        action="store_true",
+        help="Wipe all existing accounts, characters, objects, areas and terrain first.",
+    )
     seed_cmd.set_defaults(func=run_seed)
+    
+    # -------------------------------------------------------------------------------------------- #
+    
+    export_terrain_cmd = subparsers.add_parser(
+        "export-terrain", help="Export terrain data as a 3D model file"
+    )
+    export_terrain_cmd.add_argument(
+        "-o", "--output",
+        type=str,
+        default="terrain_export.obj",
+        help="Output file path for the exported terrain model (default: terrain_export.obj)"
+    )
+    export_terrain_cmd.set_defaults(func=run_export_terrain)
+
+    # -------------------------------------------------------------------------------------------- #
+
+    import_terrain_cmd = subparsers.add_parser(
+        "import-terrain",
+        help="Import terrain from a 3D mesh file; wipes Terrain table and shifts object Z.",
+    )
+    import_terrain_cmd.add_argument(
+        "-i", "--input",
+        type=str,
+        required=True,
+        help="Input mesh file (.glb or .obj) with per-vertex colours.",
+    )
+    import_terrain_cmd.set_defaults(func=run_import_terrain)
 
     args = parser.parse_args()
 
@@ -221,7 +286,7 @@ def main():
     else:
         parser.print_help()
 
-    logger.info("Closed down the morphoLogic Server.")
+    logger.info("Closed down the morphoLogic Engine.")
 
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@ import re
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from morphologic_server.archetypes.base import Character
+    from morphologic_server.db.models import Character
 
 _MOVE_RE = re.compile(r"^(?:go|run|walk|move)\s+to\s+(.+)$", re.IGNORECASE)
 

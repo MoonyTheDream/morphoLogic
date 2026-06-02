@@ -11,21 +11,8 @@ func _ready() -> void:
 	while not Kafka.consumer.is_running():
 		await get_tree().process_frame
 
-	# Kafka.send_message("", "YO_ANYBODY_HOME?")
-	
-	# var kafka_message: Dictionary
-
-	# while (true):
-		
-	# 	kafka_message = await Kafka.new_data_arrived
-
-	# 	if kafka_message['payload'].get("server_message", "") == "UP_AND_RUNNING":
-	# 		draw_message.emit(tr("[color=green_yellow]Server is up and running. Singing probably too.[/color]\n"))
-	# 		break
-		
 	Kafka.new_data_arrived.connect(parse_message)
 
-# func is_server_alive() -> bool:
 
 func parse_message(data: Dictionary) -> void:
 	if data and data['metadata'].get("to_user", "") == ClientData.username:
@@ -43,12 +30,12 @@ func parse_message(data: Dictionary) -> void:
 
 				# TCPDialog.send_tcp_message("", "PRODUCE_TO_TOPIC", ClientData.server_general_topic)
 				# Kafka.set_producer_topic(ClientData.server_general_topic)
-				Kafka.send_message("", "WALLS_HAVE_EARS_GOT_IT")
+				Kafka.send_system_message("WALLS_HAVE_EARS_GOT_IT")
 				# _wait_for_ack()
 			"CAN_YOU_HEAR_ME?":
 				var success_msg = tr("[color=green_yellow]Succsessfuly Established Server Connection.[/color]\n")
 				draw_message.emit(success_msg)
-				Kafka.send_message("", "LOUD_AND_CLEAR")
+				Kafka.send_system_message("LOUD_AND_CLEAR")
 			"SURROUNDINGS_DATA":
 				update_objects.emit(message_content)
 

@@ -212,7 +212,7 @@ producer_conf = {"bootstrap.servers": settings.KAFKA_SERVER, "acks": "all", **se
 consumer_conf = {
     "bootstrap.servers": settings.KAFKA_SERVER,
     "group.id": settings.KAFKA_GROUP_ID,
-    "auto.offset.reset": "earliest",
+    "auto.offset.reset": "latest", # latest will set an offset for freshly received messages from now on
     "enable.partition.eof": False,
     **self._ssl_conf(),
 }

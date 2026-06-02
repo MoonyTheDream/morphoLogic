@@ -3,31 +3,25 @@ Initializing Kafka connection and creating context manager for
 Producer, Consumer and Admin
 """
 
+from __future__ import annotations
+
+import asyncio
 import os
 import json
 
 from time import sleep
+from typing import TYPE_CHECKING
 
 from confluent_kafka import Producer, Consumer, KafkaException
-from confluent_kafka.admin import AdminClient, NewTopic
+from confluent_kafka.admin import AdminClient
+from confluent_kafka.cimpl import NewTopic
 
-from morphologic_server import logger, settings as _SETTINGS
 
+if TYPE_CHECKING:
+    from morphologic_server.awakening import MorphoLogicHeart
 
-from ..utils.time_helpers import get_gmt_time
+from morphologic_server.utils.time_helpers import get_gmt_time
 
-BOOTSTRAP_SERVER = os.getenv(
-    "KAFKA_BOOTSTRAP_SERVER", _SETTINGS.KAFKA_SERVER
-)
-SERVER_GENERAL_TOPIC = os.getenv(
-    "KAFKA_SERVER_GENERAL_TOPIC", _SETTINGS.SERVER_GENERAL_TOPIC
-)
-CLIENTS_GENERAL_TOPIC = os.getenv(
-    "KAFKA_CLIENTS_GENERAL_TOPIC", _SETTINGS.CLIENTS_GENERAL_TOPIC
-)
-SERVER_HANDSHAKE_TOPIC = os.getenv(
-    "KAFKA_HANDSHAKE_TOPIC", _SETTINGS.SERVER_HANDSHAKE_TOPIC
-)
 
 # 888    d8P            .d888 888
 # 888   d8P            d88P"  888
@@ -48,110 +42,122 @@ class KafkaConnection:
     and exposing some methods like create new topic etc.
     """
 
-    def __init__(self, bootstrap_server: str = BOOTSTRAP_SERVER):
-        self.admin: AdminClient = None
-        self.producer: Producer = None
-        self.consumer: Consumer = None
-        self.bootstrap_server = bootstrap_server
+    def __init__(self, heart: MorphoLogicHeart):
+        self.heart = heart
+        self.log = self.heart.log.getChild("kafka") 
+        self.admin: AdminClient
+        self.producer: Producer
+        self.consumer: Consumer
         # self.general_topic = SERVER_GENERAL_TOPIC
 
     def _establish_kafka_connection(
-        self, max_retries=4, wait_time=1
+        self, max_retries=3, wait_time=0.5
     ):
         """
         Verifies the connection to Kafka by requesting cluster metadata.
         Retries a few times before giving up.
         """
-        for attemt in range(max_retries):
+        for attempt in range(max_retries):
             try:
                 cluster_metadata = self.admin.list_topics(timeout=5)
                 if cluster_metadata.brokers:
-                    logger.debug("Kafka connection verified.")
+                    self.log.debug("Kafka connected: %d broker(s).", len(cluster_metadata.brokers))
                     return
-            except KafkaException as e:
-                if attemt < max_retries - 1:
-                    logger.warning("Kafka connection failed. Retrying.")
+                else:
+                    raise KafkaException("No brokers found in cluster metadata.")
+            except KafkaException:
+                if attempt < max_retries - 1:
+                    self.log.exception("Kafka connection failed. Attempt %d/%d.", attempt+1, max_retries)
                     sleep(wait_time)
                 else:
-                    logger.error(
+                    self.log.exception(
                         "Kafka connection failed after %d retries.", max_retries
                     )
                     raise RuntimeError(
                         "Kafka cluster is unreachable. Check if the broker is running."
-                    ) from e
+                    )
+                    
+    def _delivery_report(self, err, msg):
+        """Called once for each message produced to indicate delivery result.
+           Triggered by poll() or flush()."""
+        if err is not None:
+            self.log.error('Delivery FAILED to %s: %s', msg.topic(), err)
+        else:
+            self.log.debug('Delivered to %s [p%s]', msg.topic(), msg.partition())
 
     def __enter__(self):
         """
         Handles the creation of Kafka Admin Client, Producer, and Consmer
         """
         try:
-            admin_conf = {"bootstrap.servers": BOOTSTRAP_SERVER, **self._ssl_conf()}
+            admin_conf = {"bootstrap.servers": self.heart.settings.KAFKA_SERVER, **self._ssl_conf()}
             self.admin = AdminClient(admin_conf)
             self._establish_kafka_connection()
 
-            producer_conf = {"bootstrap.servers": BOOTSTRAP_SERVER, "acks": "all", **self._ssl_conf()}
+            producer_conf = {"bootstrap.servers": self.heart.settings.KAFKA_SERVER, "acks": "all", **self._ssl_conf()}
             self.producer = Producer(producer_conf)
 
             consumer_conf = {
-                "bootstrap.servers": BOOTSTRAP_SERVER,
-                "group.id": _SETTINGS.KAFKA_GROUP_ID,
-                "auto.offset.reset": "earliest",
+                "bootstrap.servers": self.heart.settings.KAFKA_SERVER,
+                "group.id": self.heart.settings.KAFKA_GROUP_ID,
+                "auto.offset.reset": "latest",
                 "enable.partition.eof": False,  # we'll be hitting end of partition quite often
                 **self._ssl_conf(),
             }
             self.consumer = Consumer(consumer_conf)
 
-            self.subscribe_to_topics([SERVER_GENERAL_TOPIC, SERVER_HANDSHAKE_TOPIC])
+            # self.subscribe_to_topics([self.heart.settings.SERVER_GENERAL_TOPIC, self.heart.settings.SERVER_HANDSHAKE_TOPIC])
 
             return self
 
         except KafkaException:
-            logger.exception("Error setting up Kafka resources.")
+            self.log.exception("Error setting up Kafka resources.")
             raise
-        except Exception:
-            logger.exception("Error setting up Kafka resources.")
+        except Exception as e:
+            self.log.exception("Error setting up Kafka resources: %s", e)
             raise
 
     def __exit__(self, exc_type, exc_value, traceback):
         """Cleanup: close consumer, flush producer"""
         if self.consumer:
             self.consumer.close()
-            logger.info("Closed Kafka consumer.")
+            self.log.info("Closed Kafka consumer.")
 
         if self.producer:
             self.producer.flush(3)  # ensure all queued messages are delivered
-            logger.info("Flushed Kafka producer.")
+            self.log.info("Flushed Kafka producer.")
             
     def _ssl_conf(self) -> dict:
-        if not _SETTINGS.KAFKA_SECURITY_PROTOCOL:
+        if not self.heart.settings.KAFKA_SECURITY_PROTOCOL:
             return {}
-        c = {"security.protocol": _SETTINGS.KAFKA_SECURITY_PROTOCOL}
-        if _SETTINGS.KAFKA_SSL_CA_LOCATIONS:
-            c["ssl.ca.location"] = _SETTINGS.KAFKA_SSL_CA_LOCATIONS
+        c = {"security.protocol": self.heart.settings.KAFKA_SECURITY_PROTOCOL}
+        if self.heart.settings.KAFKA_SSL_CA_LOCATIONS:
+            c["ssl.ca.location"] = self.heart.settings.KAFKA_SSL_CA_LOCATIONS
         return c
 
-    def create_new_topics(self, topics: list[str]) -> list[str]:
+    async def create_new_topics(self, topics: list[str]) -> list[str]:
         """
-        KONIECZNIE TRZEBA TO ZROBIĆ JAKO THREAD LUB ASYNC JAKIŚ
         Creating a new topic. If it already exists we just log this info and continue.
         """
         new_topics_list = []
         b_topic = ""
-        # Check if topics already exists
+
+        cluster_metadata = await asyncio.to_thread(self.admin.list_topics)
+        current_topics = cluster_metadata.topics
+
         for topic in topics:
-            if not self._topic_exists(topic):
+            if topic not in current_topics:
                 new_topics_list.append(NewTopic(topic))
 
         if new_topics_list:
             dict_future_topics = self.admin.create_topics(new_topics_list)
-            # Check futures for validating
             try:
                 for topic, future_topic in dict_future_topics.items():
                     b_topic = topic
-                    future_topic.result()
-                logger.info('Created Kafka topic "%s"', topic)
+                    await asyncio.wrap_future(future_topic)
+                    self.log.info('Created Kafka topic "%s"', topic)
             except Exception:
-                logger.exception('Failed to create topic "%s".', b_topic)
+                self.log.exception('Failed to create topic "%s".', b_topic)
                 raise  # re-raise to exit the context manager
         new_topics_list = [
             topic.topic if isinstance(topic, NewTopic) else topic
@@ -159,14 +165,10 @@ class KafkaConnection:
         ]
         return new_topics_list
 
-    def _topic_exists(self, topic: str) -> bool:
-        metadata = self.admin.list_topics()
-        return topic in metadata.topics
-
     def subscribe_to_topics(self, topics: list[str]):
         """Subscribes the class' Kafka Consumer to specific topic."""
         self.consumer.subscribe(topics)
-        logger.info('Subscribed to Kafka topics "%s"', topics)
+        self.log.info('Subscribed to Kafka topics "%s"', topics)
 
     def update_subscription(self, topics: list[str]):
         """Checks if listed topics are already subscribed and if not, subscribes"""
@@ -184,10 +186,6 @@ class KafkaConnection:
             to_update += current_subscription
             self.subscribe_to_topics(to_update)
 
-    def unsubscribe_from_topics(self, topics: list[str]):
-        """Unsubscribes the class' Kafka Consumer from specific topic."""
-        self.consumer.unsubscribe(topics)
-        logger.info('Unsubscribed from Kafka topics "%s"', topics)
 
     def send_data_to_user(
         self,
@@ -196,7 +194,7 @@ class KafkaConnection:
         server_message: str = "",
         content: str = "",
         direct_message: str = "",
-        objects: dict = None,
+        objects: dict = {},
     ):
         """Wrapper for sending message. Add more preferences here later if needed"""
         # if data is None:
@@ -208,13 +206,14 @@ class KafkaConnection:
                 "objects": objects,
             }
         }
-        wrapped_data = self._add_metadata(payload_data, username)
+        self._add_metadata(payload_data, username)
         wrapped_data = json.dumps(payload_data, ensure_ascii=False).encode("utf-8")
-        self.producer.produce(topic, value=wrapped_data)  # no key, as:
+        self.producer.produce(topic, value=wrapped_data, on_delivery=self._delivery_report)  # no key, as:
         # adding key might result in some consumers not consuming their message as each
         # consumer get's it's own partition when there's more that one consumers
         # and there might be more than one producer and consumer when multiple users will try to join
-        logger.debug('Produced message to %s: "%s"', topic, payload_data)
+        self.log.debug('Produced message to %s: "%s"', topic, payload_data)
+        self.producer.poll(0)  # trigger delivery report callbacks
 
     def health_status(self):
         """Just a quick 'UP_AND_RUNNING' message to Kafka"""
@@ -226,11 +225,11 @@ class KafkaConnection:
                 "objects": None,
             }
         }
-        wrapped_data = self._add_metadata(payload_data, "")
+        self._add_metadata(payload_data, "")
         wrapped_data = json.dumps(payload_data, ensure_ascii=False).encode("utf-8")
-        self.producer.produce(CLIENTS_GENERAL_TOPIC, value=wrapped_data)
-        logger.debug('Produced message to %s: "%s"', CLIENTS_GENERAL_TOPIC, payload_data)
-        
+        self.producer.produce(self.heart.settings.CLIENTS_GENERAL_TOPIC, value=wrapped_data, on_delivery=self._delivery_report)
+        self.log.debug('Produced message to %s: "%s"', self.heart.settings.CLIENTS_GENERAL_TOPIC, payload_data)
+        self.producer.poll(0)  # trigger delivery report callbacks
 
     def _add_metadata(self, data: dict, username: str) -> dict:
         """
@@ -241,7 +240,7 @@ class KafkaConnection:
                 "metadata": {
                     "source": "server",
                     "to_user": username,
-                    "server_version": _SETTINGS.SERVER_VERSION,
+                    "server_version": self.heart.settings.SERVER_VERSION,
                     "timestamp": get_gmt_time(),
                 }
             }

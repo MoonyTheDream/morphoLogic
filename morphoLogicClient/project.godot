@@ -24,6 +24,7 @@ config/icon="uid://d2rakuvfhfult"
 [autoload]
 
 ClientData="*res://ClientData.gd"
+GlobalLogger="*uid://1knwelemwrq2"
 Kafka="*res://Kafka.gd"
 InputHandler="*res://io_handler.gd"
 
