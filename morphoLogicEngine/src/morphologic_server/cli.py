@@ -53,6 +53,10 @@ async def run_python_shell(heart=None):
         "memory": memory,
         "self": await memory.find_character("MoonyTheDream", eagerly=True),
     }
+    if sys.platform == "win32":
+        loop = asyncio.get_running_loop()
+        loop.add_signal_handler = lambda *args, **kwargs: None  # Disable signal handling on Windows to prevent issues with Ctrl-C in the shell.
+        loop.remove_signal_handler = lambda *args, **kwargs: None
     await embed(globals=context, return_asyncio_coroutine=True, title=banner)
 
 

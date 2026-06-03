@@ -3,8 +3,11 @@ debugLogging = false
 [kafka]
 serverGeneralTopic = "serverGeneralTopic"
 clientsGeneralTopic = "clientsGeneralTopic"
+
+# Use `127.0.0.1:9092` and no ssl for local server
 bootstrapServer = "<mlkafka.address>:9093"
 securityProtocol = "ssl"
+
 serverHandshakeTopic = "serverHandshakeTopic"
 clientsHandshakeTopic = "clientsHandshakeTopic"
 sslCaLocation = "res://cacert.pem"

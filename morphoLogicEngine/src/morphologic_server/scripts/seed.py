@@ -120,7 +120,7 @@ async def _ensure_player_character(
         logger.info("Seed: character '%s' already exists — skipping.", name)
         return existing, None
 
-    character, soul = await memory.create_character_and_soul(
+    character = await memory.create_character_and_soul(
         account_id=account.id,
         name=name,
         description=description,
@@ -131,7 +131,7 @@ async def _ensure_player_character(
     if attributes is not None:
         character.attributes = attributes
     if puppet_self:
-        character.puppeted_by_id = soul.id
+        character.puppeted_by_id = character.soul.id
     await character.save()
     logger.info(
         "Seed: created character '%s' (perm=%d, puppet_self=%s).",
@@ -139,7 +139,7 @@ async def _ensure_player_character(
         permission_level,
         puppet_self,
     )
-    return character, soul
+    return character, character.soul
 
 
 async def _ensure_npc(
@@ -203,7 +203,7 @@ async def seed(fresh: bool = False):
     # ── Areas ────────────────────────────────────────────────────────────── #
     if not await memory.simple_query("Mały, wierzbowy lasek", "name", Area):
         await memory.create_area(
-            polygon=[(-10, -10), (10, -10), (10, 10), (-10, 10), (-10, -10)],
+            vertices=[(-10, -10), (10, -10), (10, 10), (-10, 10), (-10, -10)],
             name="Mały, wierzbowy lasek",
             description="Cichy lasek nad rzeką, gdzie rosną stare wierzby.",
             priority=2,
@@ -212,7 +212,7 @@ async def seed(fresh: bool = False):
 
     if not await memory.simple_query("Polana", "name", Area):
         await memory.create_area(
-            polygon=[(5, 5), (20, 5), (20, 20), (5, 20), (5, 5)],
+            vertices=[(5, 5), (20, 5), (20, 20), (5, 20), (5, 5)],
             name="Polana",
             description="Niewielka polana z miękką trawą i dzikimi kwiatami.",
             priority=1,
@@ -222,7 +222,7 @@ async def seed(fresh: bool = False):
     # Overlapping high-priority area, sits inside the wierzbowy lasek.
     if not await memory.simple_query("Magiczny Zakątek", "name", Area):
         await memory.create_area(
-            polygon=[(-2, -2), (2, -2), (2, 2), (-2, 2), (-2, -2)],
+            vertices=[(-2, -2), (2, -2), (2, 2), (-2, 2), (-2, -2)],
             name="Magiczny Zakątek",
             description="Drewniana ławka pod rozłożystą wierzbą. Światło wydaje się tu docierać w mniejszym stopniu.",
             priority=10,
@@ -232,7 +232,7 @@ async def seed(fresh: bool = False):
     # Karczma — far from spawn so it doesn't tangle with the lasek/polana.
     if not await memory.simple_query("Karczma 'Pod Srebrzystym Liściem'", "name", Area):
         await memory.create_area(
-            polygon=[(45, 45), (55, 45), (55, 55), (45, 55), (45, 45)],
+            vertices=[(45, 45), (55, 45), (55, 55), (45, 55), (45, 45)],
             name="Karczma 'Pod Srebrzystym Liściem'",
             description="Przytulna karczma o ścianach z bali i niskim, dymnym sklepieniu.",
             priority=3,
