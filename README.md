@@ -10,7 +10,7 @@ Setting up a local anvironment for developing and testing.
 
 ```bash
 cd morphoLogicEngine/deployment/docker
-docker compose up -d postgres kafka
+docker compose up -d
 ```
 
 #### 2. Install the Python project (check the minimal Python version in pyproject.toml)

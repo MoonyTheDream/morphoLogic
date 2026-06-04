@@ -5,7 +5,7 @@
 # and localhost:9092 for Kafka..
 #
 # Run from this directory, or pass `-f morphoLogicEngine/deployment/docker/docker-compose.yml`.
-
+name: morphoLogic
 services:
   postgres:
     image: postgis/postgis:16-3.4
