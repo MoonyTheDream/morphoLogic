@@ -1,4 +1,4 @@
-from morphologic_server.services.messages import ClientMessage
+from morphologic_server.network.messages import ClientMessage
 
 def test_valid_client_message():
     good = {

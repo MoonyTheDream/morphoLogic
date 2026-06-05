@@ -1,17 +1,62 @@
 """
-ClientMessage and ServerMessage definitions using Pydantic models.
-The general idea is to be able to easily access Kafka messages like in the following way:
+ClientMessage and ServerMessage definitions.
+The general idea is to be able to easily access messages like in the following way:
     msg = ReceivedMessage(raw_msg)
     msg.user  # Access username
     msg.type  # Access message type
     msg.msg   # Access message content
+    
+At the same time Message Objects have helper methods for adding metadata and dumping to JSON for sending over WS.
 """
+import json
+
 from typing import Literal
 
 from pydantic import BaseModel
 
 from confluent_kafka import Message as KafkaMessage
 
+from morphologic_server import settings
+from morphologic_server.utils.time_helpers import get_gmt_time
+
+
+# MessageToSend template
+template = {
+    "metadata": {
+        "to_user": "",
+        "server_version": settings.SERVER_VERSION,
+        "timestamp": get_gmt_time(),
+    },
+    "payload": {
+        "type": "server_request",
+        "message": "",
+        "content": None,
+        "objects": None,
+    }
+}
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Messages For Clients ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+class MessageToSend():
+    
+    def __init__(self):
+        self.data = self.create_metadata()
+    
+    def create_metadata(self) -> dict:
+        """
+        Wraps metadata data to the dictionary.
+        """
+        data = {
+                "metadata": {
+                    "server_version": settings.SERVER_VERSION,
+                    "timestamp": get_gmt_time(),
+                }
+            }
+        return data
+    
+    def to_json_bytes(self) -> bytes:
+        """Dumps the message data to JSON for sending over WS."""
+        return json.dumps(self.data, ensure_ascii=False).encode("utf-8")
+    
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Client Messages ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 class ClientMetadata(BaseModel):
     """Metadata sent by the client with each message."""
@@ -30,6 +75,7 @@ class ClientMessage(BaseModel):
     metadata: ClientMetadata
     payload: ClientPayload
     topic: str = ""
+    
     
 class ReceivedMessage():
     """

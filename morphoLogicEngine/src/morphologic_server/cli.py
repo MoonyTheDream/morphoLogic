@@ -14,7 +14,7 @@ from morphologic_server import (
     TerminateTaskGroup,
     force_terminate_task_group
 )
-from morphologic_server.awakening import MorphoLogicHeart
+from morphologic_server.heart import MorphoLogicHeart
 from morphologic_server.config import ServerSettings
 from morphologic_server.utils.async_cmd import AsyncCmd
 from morphologic_server.utils.logger import (

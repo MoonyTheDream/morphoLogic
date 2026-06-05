@@ -9,12 +9,12 @@ from typing import TYPE_CHECKING
 from morphologic_server.network.kafka import (
     KafkaConnection,
 )
-from morphologic_server.services.messages import ReceivedMessage
+from morphologic_server.network.messages import ReceivedMessage
 
 from confluent_kafka import Message
 
 if TYPE_CHECKING:
-    from morphologic_server.awakening import MorphoLogicHeart
+    from morphologic_server.heart import MorphoLogicHeart
 
 
 # class ReceivedMessage:

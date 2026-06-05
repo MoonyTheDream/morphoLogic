@@ -11,6 +11,7 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "confluent-kafka",
+    "websockets>=16.0",
     "debugpy",
     "sqlalchemy>=2.0.39",
     "GeoAlchemy2>=0.17.1",

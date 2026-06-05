@@ -1,10 +1,10 @@
 import json
 
 from morphologic_server.network.kafka import KafkaConnection
-from morphologic_server.services.messages import ReceivedMessage
+from morphologic_server.network.messages import ReceivedMessage
 from morphologic_server.config import ServerSettings
 
-from morphologic_server.awakening import MorphoLogicHeart
+from morphologic_server.heart import MorphoLogicHeart
 
 def get_test_message_via_kafka(test_msg: dict | None = None) -> ReceivedMessage:
     """Test function to produce and consume a test message via Kafka."""

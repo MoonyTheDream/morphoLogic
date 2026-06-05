@@ -18,7 +18,7 @@ from confluent_kafka.cimpl import NewTopic
 
 
 if TYPE_CHECKING:
-    from morphologic_server.awakening import MorphoLogicHeart
+    from morphologic_server.heart import MorphoLogicHeart
 
 from morphologic_server.utils.time_helpers import get_gmt_time
 
