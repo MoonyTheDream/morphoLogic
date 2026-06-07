@@ -13,12 +13,16 @@ from morphologic_server.utils.time_helpers import get_gmt_time
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Server Messages For Clients ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 class ServerEnvelope(BaseModel):
     """Metadata for the messages sent by the server to the clients"""
+
     timestamp: datetime = Field(default_factory=get_gmt_time)
     server_version: str = settings.SERVER_VERSION
-    
-# class 
-class ReceivedMessage():
+
+
+# class
+class ReceivedMessage:
     pass
+
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Client Messages ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 class ClientEnvelope(BaseModel):
     """Expected additional information for messages sent by the clients"""

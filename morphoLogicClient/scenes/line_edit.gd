@@ -51,10 +51,6 @@ func _append(message: String) -> void:
 func _send_to_tcp(content: String) -> void:
 	_inputHandler(content)
 
-	# if content == "odeslij":
-	# 	for i in range(100):
-	# 		TCPDialog.send_tcp_message("odeslij")
-
 	Kafka.send_user_input(content)
 
 func _up():
@@ -136,13 +132,6 @@ func is_valid_username(username_text: String) -> bool:
 	var regex = RegEx.new()
 	regex.compile("^[a-zA-Z0-9_-]+$")  # Allows only letters, numbers, _ and -
 	return regex.search(username_text) != null
-
-# func _client_metadata_json(username: String) -> String:
-# 	var data = {
-# 		"username": username,
-# 		"client_version": ClientData.version
-# 	}
-# 	return JSON.stringify(data)
 
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.

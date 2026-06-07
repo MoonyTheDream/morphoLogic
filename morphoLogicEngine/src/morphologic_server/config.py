@@ -31,6 +31,14 @@ class ServerSettings(BaseSettings):
     KAFKA_SECURITY_PROTOCOL: str = ""  # set to "ssl" to enable TSL
     KAFKA_SSL_CA_LOCATIONS: str = ""
 
+    # Wecbsocket server configuration
+    WEBSOCKET_HOST: str = Field(
+        default="localhost", description="Websocket server host (e.g., localhost)"
+    )
+    WEBSOCKET_PORT: int = Field(
+        default=8765, description="Websocket server port (e.g., 8765)"
+    )
+
     # Kafka configuration
     KAFKA_SERVER: str = Field(
         default="localhost:9092", description="Kafka bootstrap servers"

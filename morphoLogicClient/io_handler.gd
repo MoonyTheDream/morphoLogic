@@ -1,7 +1,5 @@
 extends Node
 
-# var TextOutput
-
 signal draw_message(msg)
 signal update_objects(objects)
 signal update_minimap(objects: Dictionary)
@@ -24,14 +22,8 @@ func parse_message(data: Dictionary) -> void:
 		match server_message:
 			# Handshake
 			"SHH_LET'S_TALK_IN_PRIVATE":
-				# var new_topic = message_content
-				# TCPDialog.send_tcp_message("", "MICROSERVER_SUBSCRIBE_TO", message_content)
 				await Kafka.change_consumer_topic(message_content)
-
-				# TCPDialog.send_tcp_message("", "PRODUCE_TO_TOPIC", ClientData.server_general_topic)
-				# Kafka.set_producer_topic(ClientData.server_general_topic)
 				Kafka.send_system_message("WALLS_HAVE_EARS_GOT_IT")
-				# _wait_for_ack()
 			"CAN_YOU_HEAR_ME?":
 				var success_msg = tr("[color=green_yellow]Succsessfuly Established Server Connection.[/color]\n")
 				draw_message.emit(success_msg)
@@ -44,7 +36,6 @@ func parse_message(data: Dictionary) -> void:
 			_:
 				draw_message.emit(tr('[color=tomato]UKNOWN SERVER MESSAGE:[/color]"%s"! [color=tomato]REPORT ISSUE TO DEVS.[/color]\n' % server_message))
 		# _:
-		# 	draw_message.emit(tr("[color=tomato]UKNOWN MESSAGE TYPE! REPORT ISSUE TO DEVS.[/color]\n"))
 		if direct_message:
 			draw_message.emit(direct_message)
 
@@ -52,15 +43,3 @@ func parse_message(data: Dictionary) -> void:
 			update_minimap.emit(objects)
 	message_processed = true
 		
-
-# func _wait_for_ack() -> void:
-# 	Kafka.new_data_arrived.disconnect(parse_message)
-# 	var server_answer = await Kafka.new_data_arrived
-# 	if server_answer['payload'].get('server_message', '') == "ACK":
-# 		var success_msg = tr("[color=green_yellow]Succsessfuly Established Server Connection.[/color]\n")
-# 		draw_message.emit(success_msg)
-# 	else:
-# 		draw_message.emit("KURDE ERROR, BO NIE BYŁO 'ACK', ALE NIE MAM NIC POZA TYM PRINTEM")
-# 	message_processed = true
-# 	Kafka.new_data_arrived.connect(parse_message)
-
