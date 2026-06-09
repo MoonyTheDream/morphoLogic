@@ -1,0 +1,191 @@
+[gd_scene format=3 uid="uid://cwpddf7ess2rw"]
+
+[ext_resource type="Theme" uid="uid://pf3aed1fopu5" path="res://test/morphoLogic_theme.tres" id="1_theme"]
+
+[sub_resource type="ButtonGroup" id="bg_zoom"]
+
+[node name="ThemePreview" type="Control" unique_id=620064384]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("1_theme")
+
+[node name="Backdrop" type="ColorRect" parent="." unique_id=454571769]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.9059, 0.8863, 0.8431, 1)
+
+[node name="Window" type="Panel" parent="." unique_id=85205041]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -470.0
+offset_top = -310.0
+offset_right = 470.0
+offset_bottom = 310.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Layout" type="VBoxContainer" parent="Window" unique_id=1291689849]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 2.0
+offset_top = 2.0
+offset_right = -2.0
+offset_bottom = -2.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 0
+
+[node name="TitleBar" type="PanelContainer" parent="Window/Layout" unique_id=1153334843]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+theme_type_variation = &"TitleBar"
+
+[node name="HBox" type="HBoxContainer" parent="Window/Layout/TitleBar" unique_id=1082665288]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Dot" type="Label" parent="Window/Layout/TitleBar/HBox" unique_id=1923864239]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2275, 0.8196, 0.7804, 1)
+theme_override_font_sizes/font_size = 13
+text = "●"
+vertical_alignment = 1
+
+[node name="Title" type="Label" parent="Window/Layout/TitleBar/HBox" unique_id=471657409]
+layout_mode = 2
+theme_type_variation = &"MonoLabel"
+text = "morphoLogicClient"
+vertical_alignment = 1
+
+[node name="Spacer" type="Control" parent="Window/Layout/TitleBar/HBox" unique_id=1967441080]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BtnMin" type="Button" parent="Window/Layout/TitleBar/HBox" unique_id=1417378125]
+layout_mode = 2
+theme_type_variation = &"TitleButton"
+text = "—"
+
+[node name="BtnMax" type="Button" parent="Window/Layout/TitleBar/HBox" unique_id=1033203846]
+layout_mode = 2
+theme_type_variation = &"TitleButton"
+text = "▢"
+
+[node name="BtnClose" type="Button" parent="Window/Layout/TitleBar/HBox" unique_id=1314875690]
+layout_mode = 2
+theme_type_variation = &"TitleButton"
+text = "×"
+
+[node name="Body" type="HBoxContainer" parent="Window/Layout" unique_id=1089471419]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 0
+
+[node name="Prose" type="RichTextLabel" parent="Window/Layout/Body" unique_id=2047658806]
+layout_mode = 2
+size_flags_horizontal = 3
+bbcode_enabled = true
+text = "[color=#6b6863][font_size=12]GRZEBIESZ PRZY SOBIE · PLECAK OTWARTY[/font_size][/color]
+
+Pod ręką masz [u]flet[/u] i niedoczytany [u]liścik od Lu[/u]. W sakiewce słyszysz brzęk: [color=#1d8e87]pięć monet[/color] i — coś, co skrzy się zielenią — [u]szmaragd[/u].
+
+[i]— Zostań jeszcze chwilę,[/i] mówi Lu. Możesz [color=#1d8e87][u]obejrzeć[/u][/color] szmaragd albo [color=#1d8e87][u]schować[/u][/color] go z powrotem."
+
+[node name="Side" type="PanelContainer" parent="Window/Layout/Body" unique_id=1751210863]
+custom_minimum_size = Vector2(280, 0)
+layout_mode = 2
+theme_type_variation = &"SidePanel"
+
+[node name="SideVBox" type="VBoxContainer" parent="Window/Layout/Body/Side" unique_id=1860561378]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Tabs" type="TabBar" parent="Window/Layout/Body/Side/SideVBox" unique_id=2083619408]
+layout_mode = 2
+current_tab = 0
+tab_count = 2
+tab_0/title = "◯ mapka"
+tab_1/title = "▦ rzeczy"
+
+[node name="Inv" type="RichTextLabel" parent="Window/Layout/Body/Side/SideVBox" unique_id=264381083]
+layout_mode = 2
+size_flags_vertical = 3
+theme_type_variation = &"MapText"
+bbcode_enabled = true
+text = "[font_size=11][color=#8a7a5e]PRZY SOBIE · 4.3 KG · 12/30 L[/color][/font_size]
+
+[code]▾[/code] Fior
+   flet drewniany
+   liścik od Lu
+   [code]▾[/code] [i]plecak skórzany[/i]
+      pędzel
+      [code]▾[/code] [i]sakiewka[/i]
+         5 × moneta
+         [color=#1d8e87]szmaragd[/color]
+   [code]▾[/code] [i]pas[/i]
+      nóż · manierka"
+
+[node name="ZoomMargin" type="MarginContainer" parent="Window/Layout/Body/Side/SideVBox" unique_id=846697598]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 8
+
+[node name="ZoomRow" type="HBoxContainer" parent="Window/Layout/Body/Side/SideVBox/ZoomMargin" unique_id=1554816088]
+layout_mode = 2
+theme_override_constants/separation = 0
+alignment = 2
+
+[node name="ChipHere" type="Button" parent="Window/Layout/Body/Side/SideVBox/ZoomMargin/ZoomRow" unique_id=359584821]
+layout_mode = 2
+theme_type_variation = &"ToggleChip"
+toggle_mode = true
+button_pressed = true
+button_group = SubResource("bg_zoom")
+text = "tutaj"
+
+[node name="ChipFar" type="Button" parent="Window/Layout/Body/Side/SideVBox/ZoomMargin/ZoomRow" unique_id=1458615685]
+layout_mode = 2
+theme_type_variation = &"ToggleChip"
+toggle_mode = true
+button_group = SubResource("bg_zoom")
+text = "okolica"
+
+[node name="InputBar" type="PanelContainer" parent="Window/Layout" unique_id=2029398094]
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+theme_type_variation = &"InputBar"
+
+[node name="HBox" type="HBoxContainer" parent="Window/Layout/InputBar" unique_id=88333557]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Prompt" type="Label" parent="Window/Layout/InputBar/HBox" unique_id=303483453]
+layout_mode = 2
+theme_type_variation = &"MonoLabel"
+theme_override_colors/font_color = Color(0.2275, 0.8196, 0.7804, 1)
+theme_override_font_sizes/font_size = 18
+text = ">"
+vertical_alignment = 1
+
+[node name="Cmd" type="LineEdit" parent="Window/Layout/InputBar/HBox" unique_id=276227121]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+placeholder_text = "wpisz komendę…"
+caret_blink = true

@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>morphoLogic · Godot theme spec</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Patrick+Hand&family=JetBrains+Mono:wght@400;500&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#161513; --ink2:#3d3a36; --ink3:#6b6863;
+    --paper:#f4f1ea; --paper2:#ebe6da; --paperEdge:#d9d3c2;
+    --accent:#3ad1c7; --accentDim:#1d8e87; --warn:#c44f2e;
+    --mapPaper:#efe6d2; --mapDeep:#e3d6b6; --mapInk:#2a2218; --mapInk2:#5b4d36; --mapInk3:#8a7a5e;
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+    --serif:'EB Garamond',Georgia,serif;
+    --hand:'Caveat',cursive;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; background:#e7e2d7; color:var(--ink); font-family:var(--serif); }
+  body{
+    background-image:
+      radial-gradient(60% 50% at 30% 20%, rgba(255,255,255,.4), transparent 70%),
+      repeating-linear-gradient(0deg, rgba(0,0,0,.012) 0 1px, transparent 1px 4px);
+  }
+  .wrap{ max-width:1120px; margin:0 auto; padding:48px 40px 90px; }
+  .eyebrow{ font-family:var(--mono); font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--ink3); }
+  h1{ font-family:var(--hand); font-weight:700; font-size:54px; line-height:.95; margin:6px 0 4px; }
+  .lede{ font-size:18px; color:var(--ink2); max-width:64ch; line-height:1.5; margin:0; }
+  .lede code{ font-family:var(--mono); font-size:14px; background:var(--paper2); padding:1px 5px; border:1px solid var(--paperEdge); }
+
+  .rule{ height:1px; background:var(--ink2); opacity:.35; margin:40px 0 28px; }
+  .sec-h{ display:flex; align-items:baseline; gap:12px; margin:0 0 18px; }
+  .sec-h .n{ font-family:var(--mono); font-size:12px; color:var(--accentDim); }
+  .sec-h h2{ font-family:var(--hand); font-weight:700; font-size:30px; margin:0; line-height:1; }
+  .sec-h .sub{ font-family:var(--mono); font-size:11px; color:var(--ink3); margin-left:auto; }
+
+  /* ---------- palette ---------- */
+  .swatches{ display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; }
+  .sw{ border:1px solid var(--ink2); background:var(--paper); }
+  .sw .chip{ height:64px; border-bottom:1px solid var(--ink2); }
+  .sw .meta{ padding:7px 9px; }
+  .sw .nm{ font-family:var(--mono); font-size:11px; font-weight:500; }
+  .sw .hex{ font-family:var(--mono); font-size:10px; color:var(--ink3); text-transform:uppercase; }
+  .sw .role{ font-size:13px; color:var(--ink2); margin-top:3px; line-height:1.2; }
+
+  /* ---------- generic spec card grid ---------- */
+  .grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:22px; }
+  .card{ border:1px solid var(--ink2); background:var(--paper); box-shadow:3px 3px 0 var(--paperEdge); }
+  .card .cap{ font-family:var(--mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink3);
+    padding:8px 12px; border-bottom:1px dashed var(--ink2); display:flex; justify-content:space-between; gap:10px; }
+  .card .cap b{ color:var(--accentDim); font-weight:500; }
+  .card .stage{ padding:22px; background:
+      repeating-linear-gradient(45deg, rgba(0,0,0,.025) 0 1px, transparent 1px 9px); }
+
+  /* ---------- rendered control mocks (mirror the .tres) ---------- */
+  .btn{ font-family:var(--mono); font-size:13px; color:var(--ink2); padding:4px 8px; border:0; background:transparent; cursor:default; }
+  .btn.hover{ background:var(--paper2); color:var(--ink); }
+  .btn.press{ background:var(--paperEdge); color:var(--ink); }
+  .btn.focus{ color:var(--ink); box-shadow:inset 0 0 0 1px var(--accent); }
+  .row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+
+  .chip{ font-family:var(--mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase;
+    padding:3px 7px; border:1px solid var(--ink2); background:var(--mapPaper); color:var(--ink2); cursor:default; }
+  .chip.on{ background:var(--ink2); color:var(--mapPaper); }
+  .chip.hov{ background:var(--mapDeep); }
+
+  .tabs{ display:flex; font-family:var(--mono); font-size:11px; letter-spacing:.04em; text-transform:uppercase; }
+  .tab{ padding:6px 12px; background:var(--paper2); color:var(--ink3); border-bottom:1px solid var(--ink2); }
+  .tab.sel{ background:var(--mapPaper); color:var(--ink); box-shadow:inset 0 -2px 0 var(--accent); }
+
+  .lineedit{ display:flex; align-items:center; gap:7px; background:var(--paper); border:1px solid var(--ink2);
+    padding:5px 10px; font-family:var(--mono); font-size:14px; color:var(--ink); }
+  .lineedit.foc{ border-color:var(--accent); border-bottom-width:2px; padding-bottom:4px; }
+  .lineedit .pl{ color:var(--ink3); }
+  .lineedit .car{ width:2px; height:16px; background:var(--accentDim); display:inline-block; animation:blink 1.05s steps(1) infinite; }
+  @keyframes blink{ 50%{ opacity:0; } }
+
+  .lab-row{ display:flex; flex-direction:column; gap:10px; }
+  .l-head{ font-family:var(--hand); font-weight:700; font-size:26px; line-height:1; }
+  .l-mono{ font-family:var(--mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink3); }
+  .l-acc{ color:var(--accentDim); }
+  .l-warn{ font-family:var(--hand); color:var(--warn); font-size:17px; }
+
+  .rtl{ background:var(--paper); padding:14px 18px; font-family:var(--serif); font-size:17px; line-height:1.5; color:var(--ink); }
+  .rtl .verb{ color:var(--accentDim); text-decoration:underline; text-decoration-style:dotted; text-underline-offset:3px; }
+  .rtl .noun{ border-bottom:1px dotted var(--ink2); }
+  .rtl .npc{ font-style:italic; color:var(--ink2); }
+  .rtl .sel{ background:rgba(58,209,199,.35); }
+
+  /* font roles */
+  .fonts{ display:grid; grid-template-columns:repeat(2,1fr); gap:14px; }
+  .frow{ border:1px solid var(--ink2); background:var(--paper); padding:14px 16px; }
+  .frow .fname{ font-family:var(--mono); font-size:11px; color:var(--accentDim); text-transform:uppercase; letter-spacing:.06em; }
+  .frow .fslot{ font-family:var(--mono); font-size:11px; color:var(--ink3); margin-top:3px; }
+  .frow .fsample{ margin-top:9px; font-size:24px; line-height:1.2; color:var(--ink); }
+
+  /* assembled window */
+  .winwrap{ display:flex; justify-content:center; padding:6px 0 0; }
+  .win{ width:760px; border:2px solid var(--ink); background:var(--paper); box-shadow:5px 5px 0 var(--paperEdge); }
+  .win .tbar{ display:flex; align-items:center; justify-content:space-between; height:30px; padding:0 11px;
+    background:var(--paper2); border-bottom:1px solid var(--ink); font-family:var(--mono); font-size:11px; color:var(--ink2); }
+  .win .tbar .lft{ display:flex; align-items:center; gap:8px; }
+  .win .tbar .dot{ width:9px; height:9px; border-radius:50%; background:var(--accent); box-shadow:0 0 6px var(--accent); }
+  .win .tbar .btns{ display:flex; gap:14px; color:var(--ink3); font-size:13px; }
+  .win .body{ display:grid; grid-template-columns:1fr 248px; min-height:300px; }
+  .win .prose{ padding:18px 22px; font-family:var(--serif); font-size:16px; line-height:1.5; }
+  .win .prose .loc{ font-family:var(--mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink3); }
+  .win .prose .init{ float:left; font-size:44px; line-height:.9; padding:3px 8px 0 0; }
+  .win .side{ background:var(--mapPaper); border-left:1px solid var(--ink2); display:flex; flex-direction:column; }
+  .win .side .stabs{ display:flex; height:30px; border-bottom:1px solid var(--ink2); background:var(--paper2);
+    font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
+  .win .side .stab{ flex:1; display:flex; align-items:center; justify-content:center; gap:5px; color:var(--ink3); border-right:1px solid var(--ink2); }
+  .win .side .stab:last-child{ border-right:0; }
+  .win .side .stab.sel{ background:var(--mapPaper); color:var(--ink); box-shadow:inset 0 -2px 0 var(--accent); }
+  .win .side .sbody{ flex:1; padding:12px 14px; font-family:var(--serif); font-size:13px; color:var(--mapInk); line-height:1.7; }
+  .win .side .tree .tr{ white-space:nowrap; }
+  .win .side .tree .mk{ font-family:var(--mono); font-size:10px; color:var(--mapInk3); margin-right:6px; }
+  .win .inbar{ display:flex; align-items:center; gap:8px; height:40px; padding:0 20px;
+    border-top:1px solid var(--ink2); background:var(--paper); font-family:var(--mono); font-size:13px; }
+  .win .inbar .gt{ color:var(--accent); font-weight:700; }
+  .win .inbar .pl{ color:var(--ink3); }
+  .win .inbar .car{ width:2px; height:15px; background:var(--accentDim); display:inline-block; animation:blink 1.05s steps(1) infinite; }
+
+  .foot{ margin-top:42px; font-family:var(--mono); font-size:11px; color:var(--ink3); line-height:1.7; }
+  .foot b{ color:var(--ink2); font-weight:500; }
+  .tag{ display:inline-block; font-family:var(--mono); font-size:10px; padding:2px 7px; border:1px solid var(--accent);
+    color:var(--accentDim); background:rgba(58,209,199,.08); letter-spacing:.04em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="eyebrow">morphoLogic · v3 · godot 4.6 theme</div>
+  <h1>Theme spec sheet</h1>
+  <p class="lede">A visual reference for <code>morphoLogic_theme.tres</code> — every stylebox, state and type variation, rendered with the same values the resource uses. Drop the <code>.tres</code> on any root <code>Control</code>; see <code>README.md</code> for fonts &amp; scene wiring. <span class="tag">paper · ink · cyan</span></p>
+
+  <div class="rule"></div>
+
+  <!-- PALETTE -->
+  <div class="sec-h"><span class="n">01</span><h2>Palette</h2><span class="sub">sRGB → Godot Color()</span></div>
+  <div class="swatches" id="sw"></div>
+
+  <div class="rule"></div>
+
+  <!-- FONTS -->
+  <div class="sec-h"><span class="n">02</span><h2>Type roles</h2><span class="sub">assign in Theme editor → §3 of README</span></div>
+  <div class="fonts">
+    <div class="frow"><div class="fname">EB Garamond</div><div class="fslot">RichTextLabel body · Label · MapText</div><div class="fsample" style="font-family:var(--serif)">Pod ręką masz flet i liścik od Lu.</div></div>
+    <div class="frow"><div class="fname">JetBrains Mono</div><div class="fslot">LineEdit · MonoLabel · TabBar · code</div><div class="fsample" style="font-family:var(--mono);font-size:18px">&gt; wyjmij szmaragd_</div></div>
+    <div class="frow"><div class="fname">Caveat</div><div class="fslot">Heading variation</div><div class="fsample" style="font-family:var(--hand);font-size:30px">jesteś gdzieś</div></div>
+    <div class="frow"><div class="fname">Patrick Hand</div><div class="fslot">secondary hand (optional)</div><div class="fsample" style="font-family:'Patrick Hand',cursive">na stół · do dyskusji</div></div>
+  </div>
+
+  <div class="rule"></div>
+
+  <!-- CONTROLS -->
+  <div class="sec-h"><span class="n">03</span><h2>Controls &amp; states</h2><span class="sub">mirrors the StyleBoxFlat sub-resources</span></div>
+  <div class="grid">
+
+    <div class="card">
+      <div class="cap"><span>Button — flat</span><b>Button</b></div>
+      <div class="stage"><div class="row">
+        <button class="btn">normal</button>
+        <button class="btn hover">hover</button>
+        <button class="btn press">pressed</button>
+        <button class="btn focus">focus</button>
+      </div></div>
+    </div>
+
+    <div class="card">
+      <div class="cap"><span>Zoom toggle</span><b>ToggleChip</b></div>
+      <div class="stage"><div class="row">
+        <span class="chip on">tutaj</span><span class="chip">okolica</span>
+        <span style="width:18px"></span>
+        <span class="chip">tutaj</span><span class="chip hov">okolica</span>
+      </div></div>
+    </div>
+
+    <div class="card">
+      <div class="cap"><span>Side tabs</span><b>TabBar / TabContainer</b></div>
+      <div class="stage"><div class="tabs">
+        <div class="tab sel">◯ mapka</div><div class="tab">▦ rzeczy</div>
+      </div></div>
+    </div>
+
+    <div class="card">
+      <div class="cap"><span>Command bar</span><b>LineEdit</b></div>
+      <div class="stage" style="display:flex;flex-direction:column;gap:12px">
+        <div class="lineedit foc"><span>wyjmij szmaragd</span><span class="car"></span></div>
+        <div class="lineedit"><span class="pl">wpisz komendę…</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="cap"><span>Labels</span><b>Heading · MonoLabel · Accent · Warn</b></div>
+      <div class="stage"><div class="lab-row">
+        <span class="l-head">Przebudzenie</span>
+        <span class="l-mono">grzebiesz przy sobie · plecak otwarty</span>
+        <span><span class="l-acc">pięć monet</span> i szmaragd</span>
+        <span class="l-warn">↳ rozmowa = część prozy</span>
+      </div></div>
+    </div>
+
+    <div class="card">
+      <div class="cap"><span>Prose / output</span><b>RichTextLabel</b></div>
+      <div class="stage" style="padding:0">
+        <div class="rtl">
+          Pod ręką masz <span class="noun">flet</span> i niedoczytany <span class="noun">liścik od Lu</span>.
+          <span class="npc">— Zostań jeszcze chwilę,</span> mówi. Możesz <span class="verb">obejrzeć</span> albo <span class="sel">wyjąć szmaragd</span>.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="rule"></div>
+
+  <!-- ASSEMBLED -->
+  <div class="sec-h"><span class="n">04</span><h2>Assembled client</h2><span class="sub">Panel · TitleBar · SidePanel · InputBar</span></div>
+  <div class="winwrap">
+    <div class="win">
+      <div class="tbar"><div class="lft"><span class="dot"></span><span>morphoLogicClient</span></div><div class="btns"><span>—</span><span>▢</span><span>×</span></div></div>
+      <div class="body">
+        <div class="prose">
+          <div class="loc">grzebiesz przy sobie · plecak otwarty</div>
+          <p style="margin:12px 0 0"><span class="init">P</span>od ręką masz <span style="border-bottom:1px dotted var(--ink2)">flet</span> i niedoczytany <span style="border-bottom:1px dotted var(--ink2)">liścik od Lu</span>. W sakiewce słyszysz brzęk: <span style="color:var(--accentDim)">pięć monet</span> i — coś, co skrzy się zielenią — <span style="border-bottom:1px dotted var(--ink2)">szmaragd</span>.</p>
+        </div>
+        <div class="side">
+          <div class="stabs"><div class="stab">◯ mapka</div><div class="stab sel">▦ rzeczy</div></div>
+          <div class="sbody tree">
+            <div class="tr"><span class="mk">▾</span><span>Fior</span></div>
+            <div class="tr" style="padding-left:14px"><span class="mk">├</span><span>flet drewniany</span></div>
+            <div class="tr" style="padding-left:14px"><span class="mk">▾</span><em>plecak skórzany</em></div>
+            <div class="tr" style="padding-left:28px"><span class="mk">▾</span><em>sakiewka</em></div>
+            <div class="tr" style="padding-left:42px"><span class="mk">├</span><span>5 × moneta</span></div>
+            <div class="tr" style="padding-left:42px"><span class="mk">└</span><span>szmaragd</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="inbar"><span class="gt">&gt;</span><span>wyjmij szmaragd</span><span class="car"></span></div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <b>files</b> · v3/morphoLogic_theme.tres &nbsp;·&nbsp; v3/README.md &nbsp;·&nbsp; this sheet<br/>
+    <b>variations</b> · TitleBar · SidePanel · InputBar · Card · TitleButton · ToggleChip · Heading · MonoLabel · AccentLabel · WarnLabel · MapText<br/>
+    <b>note</b> · the <span style="color:var(--accentDim)">&gt;</span> prompt is a separate AccentLabel left of the LineEdit; dotted noun-underlines are decoration (BBCode uses color, not dotted underline).
+  </div>
+
+</div>
+
+<script>
+  const PAL = [
+    ['ink','#161513','primary text · window border'],
+    ['ink2','#3d3a36','secondary text · hairlines'],
+    ['ink3','#6b6863','captions · placeholder · disabled'],
+    ['paper','#f4f1ea','window / field background'],
+    ['paper2','#ebe6da','titlebar · hover · unselected tab'],
+    ['paperEdge','#d9d3c2','drop shadow · pressed'],
+    ['accent','#3ad1c7','caret · focus · tab underline'],
+    ['accentDim','#1d8e87','cyan text · verbs'],
+    ['warn','#c44f2e','annotations · close hover'],
+    ['mapPaper','#efe6d2','pergamin side panel'],
+    ['mapDeep','#e3d6b6','pergamin shading'],
+    ['mapInk','#2a2218','sepia text on pergamin'],
+  ];
+  const toF = h => {
+    const n = parseInt(h.slice(1),16);
+    const r=(n>>16&255)/255, g=(n>>8&255)/255, b=(n&255)/255;
+    return `(${r.toFixed(3)}, ${g.toFixed(3)}, ${b.toFixed(3)}, 1)`;
+  };
+  document.getElementById('sw').innerHTML = PAL.map(([n,h,r])=>`
+    <div class="sw">
+      <div class="chip" style="background:${h}"></div>
+      <div class="meta">
+        <div class="nm">${n}</div>
+        <div class="hex">${h} · Color${toF(h)}</div>
+        <div class="role">${r}</div>
+      </div>
+    </div>`).join('');
+</script>
+</body>
+</html>
