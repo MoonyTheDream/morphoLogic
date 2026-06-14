@@ -29,10 +29,10 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -470.0
-offset_top = -310.0
-offset_right = 470.0
-offset_bottom = 310.0
+offset_left = -960.0
+offset_top = -540.0
+offset_right = 960.0
+offset_bottom = 540.0
 grow_horizontal = 2
 grow_vertical = 2
 
@@ -48,47 +48,6 @@ offset_bottom = -2.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 0
-
-[node name="TitleBar" type="PanelContainer" parent="Window/Layout" unique_id=1153334843]
-custom_minimum_size = Vector2(0, 36)
-layout_mode = 2
-theme_type_variation = &"TitleBar"
-
-[node name="HBox" type="HBoxContainer" parent="Window/Layout/TitleBar" unique_id=1082665288]
-layout_mode = 2
-theme_override_constants/separation = 10
-
-[node name="Dot" type="Label" parent="Window/Layout/TitleBar/HBox" unique_id=1923864239]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.2275, 0.8196, 0.7804, 1)
-theme_override_font_sizes/font_size = 13
-text = "●"
-vertical_alignment = 1
-
-[node name="Title" type="Label" parent="Window/Layout/TitleBar/HBox" unique_id=471657409]
-layout_mode = 2
-theme_type_variation = &"MonoLabel"
-text = "morphoLogicClient"
-vertical_alignment = 1
-
-[node name="Spacer" type="Control" parent="Window/Layout/TitleBar/HBox" unique_id=1967441080]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="BtnMin" type="Button" parent="Window/Layout/TitleBar/HBox" unique_id=1417378125]
-layout_mode = 2
-theme_type_variation = &"TitleButton"
-text = "—"
-
-[node name="BtnMax" type="Button" parent="Window/Layout/TitleBar/HBox" unique_id=1033203846]
-layout_mode = 2
-theme_type_variation = &"TitleButton"
-text = "▢"
-
-[node name="BtnClose" type="Button" parent="Window/Layout/TitleBar/HBox" unique_id=1314875690]
-layout_mode = 2
-theme_type_variation = &"TitleButton"
-text = "×"
 
 [node name="Body" type="HBoxContainer" parent="Window/Layout" unique_id=1089471419]
 layout_mode = 2
