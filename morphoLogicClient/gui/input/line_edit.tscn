@@ -1,0 +1,20 @@
+[gd_scene format=3 uid="uid://cwe1xynk2opfb"]
+
+[ext_resource type="Script" uid="uid://basqkxjcadfu4" path="res://gui/input/line_edit.gd" id="1_ti0pi"]
+
+[node name="Control" type="Control" unique_id=771704845]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="LineEdit" type="LineEdit" parent="." unique_id=313115916]
+layout_mode = 0
+offset_right = 667.0
+offset_bottom = 38.0
+keep_editing_on_text_submit = true
+middle_mouse_paste_enabled = false
+caret_blink = true
+script = ExtResource("1_ti0pi")
