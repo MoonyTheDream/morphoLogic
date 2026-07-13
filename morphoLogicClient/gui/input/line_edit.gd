@@ -58,13 +58,16 @@ func _if_at_zero(is_up=false):
 			cursor -=1
 
 func _esc():
-	if cursor != 0:
-		text = inputList[0]
-		cursor = 0
+	if self.cursor != 0:
+		self.text = self.inputList[0]
+		self.cursor = 0
 	else:
 		self.text = ""
 	grab_focus()
-	select_all()
+	# select_all()
+	# if not has_focus():
+	# 	grab_focus()
+	# 	select_all()
 
 func _enter_key():
 	if not has_focus():
